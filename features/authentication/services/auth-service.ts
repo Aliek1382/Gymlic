@@ -2,23 +2,30 @@ import { createClient } from "@/lib/supabase/client";
 import type { AccountType } from "@/types/database.types";
 
 import { normalizeIranPhone } from "../validators/auth-schemas";
+import type { LoginMethod } from "../validators/auth-schemas";
 import type { Profile } from "../types/auth-types";
 
-export async function requestOtp(phone: string) {
+export async function requestOtp(method: LoginMethod, value: string) {
   const supabase = createClient();
-  const { error } = await supabase.auth.signInWithOtp({
-    phone: normalizeIranPhone(phone),
-  });
+  const { error } = await supabase.auth.signInWithOtp(
+    method === "phone"
+      ? { phone: normalizeIranPhone(value) }
+      : { email: value.trim() }
+  );
   if (error) throw error;
 }
 
-export async function verifyOtp(phone: string, code: string) {
+export async function verifyOtp(
+  method: LoginMethod,
+  value: string,
+  code: string
+) {
   const supabase = createClient();
-  const { data, error } = await supabase.auth.verifyOtp({
-    phone: normalizeIranPhone(phone),
-    token: code,
-    type: "sms",
-  });
+  const { data, error } = await supabase.auth.verifyOtp(
+    method === "phone"
+      ? { phone: normalizeIranPhone(value), token: code, type: "sms" }
+      : { email: value.trim(), token: code, type: "email" }
+  );
   if (error) throw error;
   return data;
 }
@@ -32,7 +39,7 @@ export async function getMyProfile(): Promise<Profile | null> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, phone, first_name, last_name, avatar_url, account_type")
+    .select("id, phone, email, first_name, last_name, avatar_url, account_type")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -42,8 +49,12 @@ export async function getMyProfile(): Promise<Profile | null> {
     // First login: create the profile row before role selection happens.
     const { data: created, error: insertError } = await supabase
       .from("profiles")
-      .insert({ id: user.id, phone: user.phone ?? null })
-      .select("id, phone, first_name, last_name, avatar_url, account_type")
+      .insert({
+        id: user.id,
+        phone: user.phone ?? null,
+        email: user.email ?? null,
+      })
+      .select("id, phone, email, first_name, last_name, avatar_url, account_type")
       .single();
     if (insertError) throw insertError;
     return mapProfile(created);
@@ -183,6 +194,7 @@ export async function signOut() {
 function mapProfile(row: {
   id: string;
   phone: string | null;
+  email: string | null;
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
@@ -191,6 +203,7 @@ function mapProfile(row: {
   return {
     id: row.id,
     phone: row.phone,
+    email: row.email,
     firstName: row.first_name,
     lastName: row.last_name,
     avatarUrl: row.avatar_url,

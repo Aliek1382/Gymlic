@@ -13,9 +13,19 @@ import { Label } from "@/components/ui/label";
 import { useRequestOtp } from "../hooks/use-request-otp";
 import { useVerifyOtp } from "../hooks/use-verify-otp";
 import { OTP_RESEND_SECONDS } from "../constants/auth";
-import { otpSchema, type OtpFormValues } from "../validators/auth-schemas";
+import {
+  otpSchema,
+  type LoginMethod,
+  type OtpFormValues,
+} from "../validators/auth-schemas";
 
-export function OtpVerificationForm({ phone }: { phone: string }) {
+export function OtpVerificationForm({
+  method,
+  value,
+}: {
+  method: LoginMethod;
+  value: string;
+}) {
   const router = useRouter();
   const verifyOtp = useVerifyOtp();
   const requestOtp = useRequestOtp();
@@ -34,7 +44,7 @@ export function OtpVerificationForm({ phone }: { phone: string }) {
 
   async function onSubmit(values: OtpFormValues) {
     try {
-      await verifyOtp.mutateAsync({ phone, code: values.code });
+      await verifyOtp.mutateAsync({ method, value, code: values.code });
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
@@ -46,7 +56,7 @@ export function OtpVerificationForm({ phone }: { phone: string }) {
 
   async function handleResend() {
     try {
-      await requestOtp.mutateAsync(phone);
+      await requestOtp.mutateAsync({ method, value });
       setSecondsLeft(OTP_RESEND_SECONDS);
       toast.success("کد تایید مجدد ارسال شد.");
     } catch (error) {
@@ -59,9 +69,9 @@ export function OtpVerificationForm({ phone }: { phone: string }) {
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
       <p className="text-center text-sm text-muted-foreground">
-        کد ارسال شده به شماره{" "}
+        کد ارسال شده به {method === "phone" ? "شماره" : "ایمیل"}{" "}
         <bdi className="font-medium text-foreground" dir="ltr">
-          {phone}
+          {value}
         </bdi>{" "}
         را وارد کنید.
       </p>

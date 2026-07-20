@@ -1,24 +1,27 @@
 import { redirect } from "next/navigation";
 
 import { AuthShell, OtpVerificationForm } from "@/features/authentication";
+import type { LoginMethod } from "@/features/authentication/validators/auth-schemas";
 
 export const metadata = { title: "تایید کد | جیم‌لیک" };
 
 export default async function VerifyOtpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ phone?: string }>;
+  searchParams: Promise<{ method?: string; value?: string }>;
 }) {
-  const { phone } = await searchParams;
+  const { method, value } = await searchParams;
 
-  if (!phone) redirect("/login");
+  if (!value || (method !== "phone" && method !== "email")) {
+    redirect("/login");
+  }
 
   return (
     <AuthShell
-      title="تایید شماره موبایل"
+      title={method === "phone" ? "تایید شماره موبایل" : "تایید ایمیل"}
       description="کد ۶ رقمی ارسال شده را وارد کنید."
     >
-      <OtpVerificationForm phone={phone} />
+      <OtpVerificationForm method={method as LoginMethod} value={value} />
     </AuthShell>
   );
 }

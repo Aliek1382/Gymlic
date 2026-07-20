@@ -7,6 +7,7 @@ import type { AccountType, MembershipRole } from "@/types/database.types";
 export interface ServerAuthContext {
   userId: string;
   phone: string | null;
+  email: string | null;
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
@@ -37,7 +38,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("phone, first_name, last_name, avatar_url, account_type")
+    .select("phone, email, first_name, last_name, avatar_url, account_type")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -63,6 +64,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
   return {
     userId: user.id,
     phone: profile?.phone ?? user.phone ?? null,
+    email: profile?.email ?? user.email ?? null,
     firstName: profile?.first_name ?? null,
     lastName: profile?.last_name ?? null,
     avatarUrl: profile?.avatar_url ?? null,

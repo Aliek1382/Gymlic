@@ -30,6 +30,7 @@ export interface Database {
         {
           id: string;
           phone: string | null;
+          email: string | null;
           first_name: string | null;
           last_name: string | null;
           avatar_url: string | null;
@@ -40,6 +41,7 @@ export interface Database {
         {
           id: string;
           phone?: string | null;
+          email?: string | null;
           first_name?: string | null;
           last_name?: string | null;
           avatar_url?: string | null;

@@ -12,6 +12,18 @@ export const phoneSchema = z.object({
 
 export type PhoneFormValues = z.infer<typeof phoneSchema>;
 
+export const emailSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "ایمیل را وارد کنید.")
+    .email("ایمیل معتبر نیست."),
+});
+
+export type EmailFormValues = z.infer<typeof emailSchema>;
+
+export type LoginMethod = "phone" | "email";
+
 export const otpSchema = z.object({
   code: z
     .string()

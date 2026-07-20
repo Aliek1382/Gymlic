@@ -1,5 +1,5 @@
 export * from "./components/auth-shell";
-export * from "./components/phone-login-form";
+export * from "./components/login-form";
 export * from "./components/otp-verification-form";
 export * from "./components/role-selector";
 export * from "./components/create-club-form";

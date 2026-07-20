@@ -3,6 +3,7 @@ import type { AccountType } from "@/types/database.types";
 export interface Profile {
   id: string;
   phone: string | null;
+  email: string | null;
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
