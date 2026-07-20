@@ -1,0 +1,34 @@
+import { Sidebar } from "./sidebar";
+import { DashboardHeader } from "./dashboard-header";
+import type { AccountType } from "@/types/database.types";
+
+interface DashboardShellProps {
+  accountType: AccountType;
+  fullName: string;
+  roleLabel: string;
+  avatarUrl: string | null;
+  children: React.ReactNode;
+}
+
+export function DashboardShell({
+  accountType,
+  fullName,
+  roleLabel,
+  avatarUrl,
+  children,
+}: DashboardShellProps) {
+  return (
+    <div className="flex min-h-screen bg-background">
+      <Sidebar accountType={accountType} />
+      <div className="flex min-h-screen flex-1 flex-col">
+        <DashboardHeader
+          accountType={accountType}
+          fullName={fullName}
+          roleLabel={roleLabel}
+          avatarUrl={avatarUrl}
+        />
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+      </div>
+    </div>
+  );
+}

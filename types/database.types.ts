@@ -1,0 +1,260 @@
+/**
+ * Hand-written mirror of the Supabase schema defined in
+ * supabase/migrations/0001_init.sql and 0002_dashboard_metrics.sql.
+ * Regenerate with the Supabase CLI (`supabase gen types typescript`) once a
+ * live project is connected, and replace this file with the generated
+ * output.
+ */
+
+export type AccountType = "club" | "trainer" | "athlete";
+export type MembershipRole = "owner" | "trainer" | "reception" | "athlete";
+export type MembershipStatus = "active" | "pending" | "suspended";
+export type ClubStatus = "active" | "suspended";
+export type SubscriptionStatus = "active" | "expiring" | "expired";
+export type InvitationRole = "trainer" | "reception" | "athlete";
+export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
+export type WorkoutStatus = "active" | "completed" | "cancelled";
+export type MembershipPlanTier = "elite" | "basic" | "daily";
+
+type TableOf<Row, Insert, Update = Partial<Insert>> = {
+  Row: Row;
+  Insert: Insert;
+  Update: Update;
+  Relationships: [];
+};
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: TableOf<
+        {
+          id: string;
+          phone: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          avatar_url: string | null;
+          account_type: AccountType | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id: string;
+          phone?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          avatar_url?: string | null;
+          account_type?: AccountType | null;
+        }
+      >;
+      clubs: TableOf<
+        {
+          id: string;
+          name: string;
+          logo_url: string | null;
+          owner_id: string;
+          status: ClubStatus;
+          member_capacity: number | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          name: string;
+          owner_id: string;
+          logo_url?: string | null;
+          status?: ClubStatus;
+          member_capacity?: number | null;
+        }
+      >;
+      memberships: TableOf<
+        {
+          id: string;
+          club_id: string;
+          user_id: string;
+          role: MembershipRole;
+          status: MembershipStatus;
+          plan_tier: MembershipPlanTier;
+          joined_at: string;
+        },
+        {
+          club_id: string;
+          user_id: string;
+          role: MembershipRole;
+          status?: MembershipStatus;
+          plan_tier?: MembershipPlanTier;
+        }
+      >;
+      trainer_athletes: TableOf<
+        {
+          id: string;
+          trainer_id: string;
+          athlete_id: string;
+          club_id: string | null;
+          status: MembershipStatus;
+          created_at: string;
+        },
+        {
+          trainer_id: string;
+          athlete_id: string;
+          club_id?: string | null;
+          status?: MembershipStatus;
+        }
+      >;
+      invitations: TableOf<
+        {
+          id: string;
+          code: string;
+          club_id: string | null;
+          trainer_id: string | null;
+          invited_role: InvitationRole;
+          phone: string | null;
+          status: InvitationStatus;
+          created_by: string;
+          created_at: string;
+          expires_at: string;
+          accepted_by: string | null;
+          accepted_at: string | null;
+        },
+        {
+          code: string;
+          invited_role: InvitationRole;
+          created_by: string;
+          club_id?: string | null;
+          trainer_id?: string | null;
+          phone?: string | null;
+          status?: InvitationStatus;
+          expires_at?: string;
+        },
+        {
+          status?: InvitationStatus;
+          accepted_by?: string | null;
+          accepted_at?: string | null;
+        }
+      >;
+      subscriptions: TableOf<
+        {
+          id: string;
+          club_id: string;
+          plan_name: string;
+          status: SubscriptionStatus;
+          started_at: string;
+          expires_at: string;
+          created_at: string;
+        },
+        {
+          club_id: string;
+          plan_name: string;
+          expires_at: string;
+          status?: SubscriptionStatus;
+        }
+      >;
+      workout_assignments: TableOf<
+        {
+          id: string;
+          club_id: string | null;
+          trainer_id: string;
+          athlete_id: string;
+          title: string;
+          status: WorkoutStatus;
+          assigned_at: string;
+          updated_at: string;
+        },
+        {
+          trainer_id: string;
+          athlete_id: string;
+          title: string;
+          club_id?: string | null;
+          status?: WorkoutStatus;
+        }
+      >;
+      nutrition_assignments: TableOf<
+        {
+          id: string;
+          club_id: string | null;
+          trainer_id: string;
+          athlete_id: string;
+          title: string;
+          status: WorkoutStatus;
+          assigned_at: string;
+          updated_at: string;
+        },
+        {
+          trainer_id: string;
+          athlete_id: string;
+          title: string;
+          club_id?: string | null;
+          status?: WorkoutStatus;
+        }
+      >;
+      measurements: TableOf<
+        {
+          id: string;
+          athlete_id: string;
+          recorded_by: string | null;
+          height_cm: number | null;
+          weight_kg: number | null;
+          body_fat_percent: number | null;
+          note: string | null;
+          recorded_at: string;
+        },
+        {
+          athlete_id: string;
+          recorded_by?: string | null;
+          height_cm?: number | null;
+          weight_kg?: number | null;
+          body_fat_percent?: number | null;
+          note?: string | null;
+        }
+      >;
+      activity_logs: TableOf<
+        {
+          id: string;
+          club_id: string | null;
+          actor_id: string | null;
+          subject_id: string | null;
+          action: string;
+          metadata: Record<string, unknown>;
+          created_at: string;
+        },
+        {
+          action: string;
+          club_id?: string | null;
+          actor_id?: string | null;
+          subject_id?: string | null;
+          metadata?: Record<string, unknown>;
+        }
+      >;
+      revenue_entries: TableOf<
+        {
+          id: string;
+          club_id: string;
+          amount: number;
+          occurred_at: string;
+          created_at: string;
+        },
+        {
+          club_id: string;
+          amount: number;
+          occurred_at?: string;
+        }
+      >;
+      class_attendance_logs: TableOf<
+        {
+          id: string;
+          club_id: string;
+          member_id: string;
+          attended: boolean;
+          class_date: string;
+          created_at: string;
+        },
+        {
+          club_id: string;
+          member_id: string;
+          attended?: boolean;
+          class_date?: string;
+        }
+      >;
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+  };
+}
