@@ -22,7 +22,18 @@ export const emailSchema = z.object({
 
 export type EmailFormValues = z.infer<typeof emailSchema>;
 
-export type LoginMethod = "phone" | "email";
+export const passwordLoginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "ایمیل را وارد کنید.")
+    .email("ایمیل معتبر نیست."),
+  password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد."),
+});
+
+export type PasswordLoginFormValues = z.infer<typeof passwordLoginSchema>;
+
+export type LoginMethod = "phone" | "email" | "password";
 
 export const otpSchema = z.object({
   code: z

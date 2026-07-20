@@ -6,7 +6,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="ورود به جیم‌لیک"
-      description="با موبایل یا ایمیل وارد شوید تا کد تایید برایتان ارسال شود."
+      description="با موبایل، ایمیل یا رمز عبور وارد جیم‌لیک شوید."
     >
       <LoginForm />
     </AuthShell>

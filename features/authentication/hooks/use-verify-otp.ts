@@ -2,8 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 
-import { verifyOtp } from "../services/auth-service";
-import type { LoginMethod } from "../validators/auth-schemas";
+import { verifyOtp, type OtpMethod } from "../services/auth-service";
 
 export function useVerifyOtp() {
   return useMutation({
@@ -12,7 +11,7 @@ export function useVerifyOtp() {
       value,
       code,
     }: {
-      method: LoginMethod;
+      method: OtpMethod;
       value: string;
       code: string;
     }) => verifyOtp(method, value, code),

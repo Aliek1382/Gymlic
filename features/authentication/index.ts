@@ -12,6 +12,7 @@ export * from "./hooks/use-choose-role";
 export * from "./hooks/use-create-club";
 export * from "./hooks/use-accept-invitation";
 export * from "./hooks/use-sign-out";
+export * from "./hooks/use-sign-in-with-password";
 
 export * from "./services/auth-service";
 export * from "./types/auth-types";

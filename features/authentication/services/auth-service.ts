@@ -5,7 +5,9 @@ import { normalizeIranPhone } from "../validators/auth-schemas";
 import type { LoginMethod } from "../validators/auth-schemas";
 import type { Profile } from "../types/auth-types";
 
-export async function requestOtp(method: LoginMethod, value: string) {
+export type OtpMethod = Exclude<LoginMethod, "password">;
+
+export async function requestOtp(method: OtpMethod, value: string) {
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithOtp(
     method === "phone"
@@ -16,7 +18,7 @@ export async function requestOtp(method: LoginMethod, value: string) {
 }
 
 export async function verifyOtp(
-  method: LoginMethod,
+  method: OtpMethod,
   value: string,
   code: string
 ) {
@@ -26,6 +28,16 @@ export async function verifyOtp(
       ? { phone: normalizeIranPhone(value), token: code, type: "sms" }
       : { email: value.trim(), token: code, type: "email" }
   );
+  if (error) throw error;
+  return data;
+}
+
+export async function signInWithPassword(email: string, password: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
   if (error) throw error;
   return data;
 }
@@ -70,10 +82,15 @@ export async function chooseRole(role: AccountType) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("نشست کاربر معتبر نیست.");
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({ account_type: role })
-    .eq("id", user.id);
+  // Upsert (not a plain update) so this still works even in the unlikely
+  // case the profiles row wasn't created yet by the on_auth_user_created
+  // trigger — an update would otherwise silently match 0 rows.
+  const { error } = await supabase.from("profiles").upsert({
+    id: user.id,
+    account_type: role,
+    phone: user.phone ?? null,
+    email: user.email ?? null,
+  });
   if (error) throw error;
 }
 

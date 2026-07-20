@@ -12,18 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRequestOtp } from "../hooks/use-request-otp";
 import { useVerifyOtp } from "../hooks/use-verify-otp";
+import type { OtpMethod } from "../services/auth-service";
 import { OTP_RESEND_SECONDS } from "../constants/auth";
-import {
-  otpSchema,
-  type LoginMethod,
-  type OtpFormValues,
-} from "../validators/auth-schemas";
+import { otpSchema, type OtpFormValues } from "../validators/auth-schemas";
 
 export function OtpVerificationForm({
   method,
   value,
 }: {
-  method: LoginMethod;
+  method: OtpMethod;
   value: string;
 }) {
   const router = useRouter();

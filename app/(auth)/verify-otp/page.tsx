@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AuthShell, OtpVerificationForm } from "@/features/authentication";
-import type { LoginMethod } from "@/features/authentication/validators/auth-schemas";
+import type { OtpMethod } from "@/features/authentication/services/auth-service";
 
 export const metadata = { title: "تایید کد | جیم‌لیک" };
 
@@ -21,7 +21,7 @@ export default async function VerifyOtpPage({
       title={method === "phone" ? "تایید شماره موبایل" : "تایید ایمیل"}
       description="کد ۶ رقمی ارسال شده را وارد کنید."
     >
-      <OtpVerificationForm method={method as LoginMethod} value={value} />
+      <OtpVerificationForm method={method as OtpMethod} value={value} />
     </AuthShell>
   );
 }
