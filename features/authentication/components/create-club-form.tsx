@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getErrorMessage } from "@/lib/get-error-message";
 import { useCreateClub } from "../hooks/use-create-club";
 import {
   createClubSchema,
@@ -31,9 +32,7 @@ export function CreateClubForm({ skippable }: { skippable?: boolean }) {
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "ساخت باشگاه با خطا مواجه شد."
-      );
+      toast.error(getErrorMessage(error, "ساخت باشگاه با خطا مواجه شد."));
     }
   }
 

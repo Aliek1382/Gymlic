@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getErrorMessage } from "@/lib/get-error-message";
 import { useSignInWithPassword } from "../hooks/use-sign-in-with-password";
 import { useSignUpWithPassword } from "../hooks/use-sign-up-with-password";
 import {
@@ -80,9 +81,7 @@ function LoginPanel({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "ورود با خطا مواجه شد."
-      );
+      toast.error(getErrorMessage(error, "ورود با خطا مواجه شد."));
     }
   }
 
@@ -183,9 +182,7 @@ function SignUpPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
         onSwitchToLogin();
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "ثبت‌نام با خطا مواجه شد."
-      );
+      toast.error(getErrorMessage(error, "ثبت‌نام با خطا مواجه شد."));
     }
   }
 

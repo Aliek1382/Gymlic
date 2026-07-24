@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getErrorMessage } from "@/lib/get-error-message";
 import { useAcceptInvitation } from "../hooks/use-accept-invitation";
 import {
   invitationSchema,
@@ -31,9 +32,7 @@ export function InvitationForm({ defaultCode }: { defaultCode?: string }) {
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "کد دعوت معتبر نیست."
-      );
+      toast.error(getErrorMessage(error, "کد دعوت معتبر نیست."));
     }
   }
 

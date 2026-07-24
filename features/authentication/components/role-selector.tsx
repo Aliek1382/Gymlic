@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/get-error-message";
 import { useChooseRole } from "../hooks/use-choose-role";
 import { ROLE_OPTIONS } from "../constants/auth";
 import type { AccountType } from "@/types/database.types";
@@ -31,9 +32,7 @@ export function RoleSelector() {
       else router.push("/dashboard");
       router.refresh();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "ثبت نقش با خطا مواجه شد."
-      );
+      toast.error(getErrorMessage(error, "ثبت نقش با خطا مواجه شد."));
     }
   }
 
