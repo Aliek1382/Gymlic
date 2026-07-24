@@ -1,36 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import type { AccountType } from "@/types/database.types";
 
-import { normalizeIranPhone } from "../validators/auth-schemas";
-import type { LoginMethod } from "../validators/auth-schemas";
 import type { Profile } from "../types/auth-types";
-
-export type OtpMethod = Exclude<LoginMethod, "password">;
-
-export async function requestOtp(method: OtpMethod, value: string) {
-  const supabase = createClient();
-  const { error } = await supabase.auth.signInWithOtp(
-    method === "phone"
-      ? { phone: normalizeIranPhone(value) }
-      : { email: value.trim() }
-  );
-  if (error) throw error;
-}
-
-export async function verifyOtp(
-  method: OtpMethod,
-  value: string,
-  code: string
-) {
-  const supabase = createClient();
-  const { data, error } = await supabase.auth.verifyOtp(
-    method === "phone"
-      ? { phone: normalizeIranPhone(value), token: code, type: "sms" }
-      : { email: value.trim(), token: code, type: "email" }
-  );
-  if (error) throw error;
-  return data;
-}
 
 export async function signInWithPassword(email: string, password: string) {
   const supabase = createClient();
@@ -85,7 +56,8 @@ export async function getMyProfile(): Promise<Profile | null> {
   if (error) throw error;
 
   if (!data) {
-    // First login: create the profile row before role selection happens.
+    // Belt-and-braces fallback — the on_auth_user_created trigger normally
+    // creates this row already.
     const { data: created, error: insertError } = await supabase
       .from("profiles")
       .insert({

@@ -1,37 +1,15 @@
 import { z } from "zod";
 
-import { IRAN_MOBILE_REGEX, OTP_LENGTH } from "../constants/auth";
-
-export const phoneSchema = z.object({
-  phone: z
-    .string()
-    .trim()
-    .min(1, "شماره موبایل را وارد کنید.")
-    .regex(IRAN_MOBILE_REGEX, "شماره موبایل معتبر نیست. مثال: 09123456789"),
-});
-
-export type PhoneFormValues = z.infer<typeof phoneSchema>;
-
-export const emailSchema = z.object({
+export const loginSchema = z.object({
   email: z
     .string()
     .trim()
     .min(1, "ایمیل را وارد کنید.")
     .email("ایمیل معتبر نیست."),
+  password: z.string().min(1, "رمز عبور را وارد کنید."),
 });
 
-export type EmailFormValues = z.infer<typeof emailSchema>;
-
-export const passwordLoginSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "ایمیل را وارد کنید.")
-    .email("ایمیل معتبر نیست."),
-  password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد."),
-});
-
-export type PasswordLoginFormValues = z.infer<typeof passwordLoginSchema>;
+export type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const signUpSchema = z.object({
   name: z.string().trim().min(2, "نام باید حداقل ۲ حرف باشد."),
@@ -44,17 +22,6 @@ export const signUpSchema = z.object({
 });
 
 export type SignUpFormValues = z.infer<typeof signUpSchema>;
-
-export type LoginMethod = "phone" | "email" | "password";
-
-export const otpSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .length(OTP_LENGTH, `کد تایید باید ${OTP_LENGTH} رقم باشد.`),
-});
-
-export type OtpFormValues = z.infer<typeof otpSchema>;
 
 export const roleSchema = z.object({
   role: z.enum(["club", "trainer", "athlete"], {
@@ -75,11 +42,3 @@ export const invitationSchema = z.object({
 });
 
 export type InvitationFormValues = z.infer<typeof invitationSchema>;
-
-export function normalizeIranPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  const local = digits.startsWith("98")
-    ? digits.slice(2)
-    : digits.replace(/^0/, "");
-  return `+98${local}`;
-}

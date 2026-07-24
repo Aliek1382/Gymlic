@@ -1,7 +1,3 @@
-export const OTP_LENGTH = 6;
-export const OTP_RESEND_SECONDS = 60;
-export const IRAN_MOBILE_REGEX = /^0?9\d{9}$/;
-
 export const ROLE_OPTIONS = [
   {
     value: "club",
