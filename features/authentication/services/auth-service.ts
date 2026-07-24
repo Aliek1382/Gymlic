@@ -42,6 +42,33 @@ export async function signInWithPassword(email: string, password: string) {
   return data;
 }
 
+export async function signUpWithPassword(
+  name: string,
+  email: string,
+  password: string
+): Promise<{ hasSession: boolean }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+  });
+  if (error) throw error;
+
+  // If "Confirm email" is disabled in the Supabase project, signUp already
+  // returns a live session — the on_auth_user_created trigger has also
+  // already created the profiles row by the time this resolves, so it's
+  // safe to update it with the display name right away.
+  if (data.session && data.user) {
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ first_name: name })
+      .eq("id", data.user.id);
+    if (profileError) throw profileError;
+  }
+
+  return { hasSession: !!data.session };
+}
+
 export async function getMyProfile(): Promise<Profile | null> {
   const supabase = createClient();
   const {

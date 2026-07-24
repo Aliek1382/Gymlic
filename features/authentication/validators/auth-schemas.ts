@@ -33,6 +33,18 @@ export const passwordLoginSchema = z.object({
 
 export type PasswordLoginFormValues = z.infer<typeof passwordLoginSchema>;
 
+export const signUpSchema = z.object({
+  name: z.string().trim().min(2, "نام باید حداقل ۲ حرف باشد."),
+  email: z
+    .string()
+    .trim()
+    .min(1, "ایمیل را وارد کنید.")
+    .email("ایمیل معتبر نیست."),
+  password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد."),
+});
+
+export type SignUpFormValues = z.infer<typeof signUpSchema>;
+
 export type LoginMethod = "phone" | "email" | "password";
 
 export const otpSchema = z.object({
