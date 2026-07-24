@@ -63,8 +63,8 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
 
   return {
     userId: user.id,
-    phone: profile?.phone ?? user.phone ?? null,
-    email: profile?.email ?? user.email ?? null,
+    phone: profile?.phone || user.phone || null,
+    email: profile?.email || user.email || null,
     firstName: profile?.first_name ?? null,
     lastName: profile?.last_name ?? null,
     avatarUrl: profile?.avatar_url ?? null,

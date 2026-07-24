@@ -62,8 +62,8 @@ export async function getMyProfile(): Promise<Profile | null> {
       .from("profiles")
       .insert({
         id: user.id,
-        phone: user.phone ?? null,
-        email: user.email ?? null,
+        phone: user.phone || null,
+        email: user.email || null,
       })
       .select("id, phone, email, first_name, last_name, avatar_url, account_type")
       .single();
@@ -87,8 +87,8 @@ export async function chooseRole(role: AccountType) {
   const { error } = await supabase.from("profiles").upsert({
     id: user.id,
     account_type: role,
-    phone: user.phone ?? null,
-    email: user.email ?? null,
+    phone: user.phone || null,
+    email: user.email || null,
   });
   if (error) throw error;
 }
