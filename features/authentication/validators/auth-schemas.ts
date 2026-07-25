@@ -23,6 +23,17 @@ export const signUpSchema = z.object({
 
 export type SignUpFormValues = z.infer<typeof signUpSchema>;
 
+export const joinSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "ایمیل را وارد کنید.")
+    .email("ایمیل معتبر نیست."),
+  password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد."),
+});
+
+export type JoinFormValues = z.infer<typeof joinSchema>;
+
 export const roleSchema = z.object({
   role: z.enum(["club", "trainer", "athlete"], {
     message: "یک نقش را انتخاب کنید.",

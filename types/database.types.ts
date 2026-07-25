@@ -109,6 +109,10 @@ export interface Database {
           trainer_id: string | null;
           invited_role: InvitationRole;
           phone: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          height_cm: number | null;
+          weight_kg: number | null;
           status: InvitationStatus;
           created_by: string;
           created_at: string;
@@ -123,6 +127,10 @@ export interface Database {
           club_id?: string | null;
           trainer_id?: string | null;
           phone?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          height_cm?: number | null;
+          weight_kg?: number | null;
           status?: InvitationStatus;
           expires_at?: string;
         },
@@ -156,6 +164,7 @@ export interface Database {
           trainer_id: string;
           athlete_id: string;
           title: string;
+          description: string | null;
           status: WorkoutStatus;
           assigned_at: string;
           updated_at: string;
@@ -164,6 +173,7 @@ export interface Database {
           trainer_id: string;
           athlete_id: string;
           title: string;
+          description?: string | null;
           club_id?: string | null;
           status?: WorkoutStatus;
         }
@@ -175,6 +185,7 @@ export interface Database {
           trainer_id: string;
           athlete_id: string;
           title: string;
+          description: string | null;
           status: WorkoutStatus;
           assigned_at: string;
           updated_at: string;
@@ -183,6 +194,7 @@ export interface Database {
           trainer_id: string;
           athlete_id: string;
           title: string;
+          description?: string | null;
           club_id?: string | null;
           status?: WorkoutStatus;
         }

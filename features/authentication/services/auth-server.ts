@@ -79,3 +79,30 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
     hasTrainer: (trainerCount ?? 0) > 0,
   };
 });
+
+export interface InvitationPreview {
+  firstName: string | null;
+  lastName: string | null;
+}
+
+/**
+ * Server-side lookup for the public /join/[code] page. Works with no
+ * session at all thanks to the "invitations_select_public_pending" RLS
+ * policy — possession of the (unguessable) code is the authorization model.
+ */
+export async function getInvitationPreview(
+  code: string
+): Promise<InvitationPreview | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("invitations")
+    .select("first_name, last_name, status, expires_at")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (!data) return null;
+  if (data.status !== "pending" || new Date(data.expires_at) < new Date())
+    return null;
+
+  return { firstName: data.first_name, lastName: data.last_name };
+}

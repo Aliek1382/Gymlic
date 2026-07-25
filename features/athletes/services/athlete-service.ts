@@ -1,0 +1,154 @@
+import { createClient } from "@/lib/supabase/client";
+import { INVITE_EXPIRES_DAYS } from "../constants/athletes";
+import type {
+  AthleteSummary,
+  PendingAthleteInvite,
+  PlanKind,
+} from "../types/athlete-types";
+
+async function getCurrentUserId(): Promise<string> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("نشست کاربر معتبر نیست.");
+  return user.id;
+}
+
+export async function listAthletes(): Promise<AthleteSummary[]> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from("trainer_athletes")
+    .select("athlete_id, created_at, profiles(first_name, last_name)")
+    .eq("trainer_id", trainerId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .returns<
+      {
+        athlete_id: string;
+        created_at: string;
+        profiles: { first_name: string | null; last_name: string | null } | null;
+      }[]
+    >();
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.athlete_id,
+    name:
+      [row.profiles?.first_name, row.profiles?.last_name]
+        .filter(Boolean)
+        .join(" ") || "بدون نام",
+    joinedAt: row.created_at,
+  }));
+}
+
+export async function listPendingAthleteInvites(): Promise<
+  PendingAthleteInvite[]
+> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from("invitations")
+    .select("id, code, first_name, last_name, height_cm, weight_kg, created_at, expires_at")
+    .eq("created_by", trainerId)
+    .eq("invited_role", "athlete")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    code: row.code,
+    name:
+      [row.first_name, row.last_name].filter(Boolean).join(" ") || "بدون نام",
+    heightCm: row.height_cm,
+    weightKg: row.weight_kg,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+  }));
+}
+
+export async function createAthleteInvite(input: {
+  firstName: string;
+  lastName: string;
+  heightCm: number | null;
+  weightKg: number | null;
+}): Promise<{ code: string }> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const code = crypto.randomUUID();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRES_DAYS);
+
+  const { error } = await supabase.from("invitations").insert({
+    code,
+    trainer_id: trainerId,
+    invited_role: "athlete",
+    created_by: trainerId,
+    first_name: input.firstName,
+    last_name: input.lastName,
+    height_cm: input.heightCm,
+    weight_kg: input.weightKg,
+    expires_at: expiresAt.toISOString(),
+  });
+  if (error) throw error;
+
+  return { code };
+}
+
+const TABLE_BY_KIND = {
+  workout: "workout_assignments",
+  nutrition: "nutrition_assignments",
+} as const;
+
+export interface PlanEntry {
+  id: string;
+  title: string;
+  description: string | null;
+  assignedAt: string;
+}
+
+export async function listPlans(
+  kind: PlanKind,
+  athleteId: string
+): Promise<PlanEntry[]> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from(TABLE_BY_KIND[kind])
+    .select("id, title, description, assigned_at")
+    .eq("trainer_id", trainerId)
+    .eq("athlete_id", athleteId)
+    .order("assigned_at", { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    assignedAt: row.assigned_at,
+  }));
+}
+
+export async function createPlan(
+  kind: PlanKind,
+  athleteId: string,
+  title: string,
+  description: string | null
+): Promise<void> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { error } = await supabase.from(TABLE_BY_KIND[kind]).insert({
+    trainer_id: trainerId,
+    athlete_id: athleteId,
+    title,
+    description,
+  });
+  if (error) throw error;
+}
