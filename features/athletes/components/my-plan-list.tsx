@@ -1,6 +1,6 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
+import { Apple, Dumbbell } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,14 +9,17 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useMyPlans } from "../hooks/use-my-plans";
 import type { PlanKind } from "../types/athlete-types";
 
+// Icon components can't cross the Server -> Client Component boundary as a
+// prop (only serializable values can), so it's picked here from `kind`
+// rather than being passed in from the (server) page.
+const ICON_BY_KIND = { workout: Dumbbell, nutrition: Apple } as const;
+
 export function MyPlanList({
   kind,
-  icon,
   emptyTitle,
   emptyDescription,
 }: {
   kind: PlanKind;
-  icon: LucideIcon;
   emptyTitle: string;
   emptyDescription: string;
 }) {
@@ -35,7 +38,7 @@ export function MyPlanList({
     return (
       <Card className="py-5">
         <EmptyState
-          icon={icon}
+          icon={ICON_BY_KIND[kind]}
           title={emptyTitle}
           description={emptyDescription}
         />

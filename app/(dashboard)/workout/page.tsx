@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { Dumbbell } from "lucide-react";
 
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
 import { MyPlanList } from "@/features/athletes";
@@ -22,7 +21,6 @@ export default async function WorkoutPage() {
 
       <MyPlanList
         kind="workout"
-        icon={Dumbbell}
         emptyTitle="هنوز برنامه تمرینی ثبت نشده است."
         emptyDescription="به محض ثبت برنامه توسط مربی، اینجا نمایش داده می‌شود."
       />

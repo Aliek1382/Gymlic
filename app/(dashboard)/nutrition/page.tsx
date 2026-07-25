@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { Apple } from "lucide-react";
 
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
 import { MyPlanList } from "@/features/athletes";
@@ -22,7 +21,6 @@ export default async function NutritionPage() {
 
       <MyPlanList
         kind="nutrition"
-        icon={Apple}
         emptyTitle="هنوز برنامه غذایی ثبت نشده است."
         emptyDescription="به محض ثبت برنامه توسط مربی، اینجا نمایش داده می‌شود."
       />
