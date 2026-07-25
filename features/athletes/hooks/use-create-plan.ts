@@ -3,9 +3,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { createPlan } from "../services/athlete-service";
-import type { PlanKind } from "../types/athlete-types";
+import type { PlanKind, PlanTarget } from "../types/athlete-types";
 
-export function useCreatePlan(kind: PlanKind, athleteId: string) {
+function targetKey(target: PlanTarget) {
+  return "athleteId" in target ? target.athleteId : target.invitationId;
+}
+
+export function useCreatePlan(kind: PlanKind, target: PlanTarget) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -15,10 +19,10 @@ export function useCreatePlan(kind: PlanKind, athleteId: string) {
     }: {
       title: string;
       description: string | null;
-    }) => createPlan(kind, athleteId, title, description),
+    }) => createPlan(kind, target, title, description),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["athletes", "plans", kind, athleteId],
+        queryKey: ["athletes", "plans", kind, targetKey(target)],
       });
     },
   });

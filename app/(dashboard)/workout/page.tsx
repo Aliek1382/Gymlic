@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { Dumbbell } from "lucide-react";
 
-import { ComingSoon } from "@/components/coming-soon";
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
+import { MyPlanList } from "@/features/athletes";
 
 export const metadata = { title: "برنامه تمرینی | جیم‌لیک" };
 
@@ -12,10 +12,20 @@ export default async function WorkoutPage() {
   if (context.accountType !== "athlete") redirect("/dashboard");
 
   return (
-    <ComingSoon
-      icon={Dumbbell}
-      title="برنامه تمرینی"
-      description="مشاهده کامل برنامه تمرینی و ثبت پیشرفت هر جلسه به‌زودی در دسترس خواهد بود."
-    />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-foreground">برنامه تمرینی</h1>
+        <p className="text-sm text-muted-foreground">
+          برنامه‌های تمرینی که مربی برای شما ثبت کرده است.
+        </p>
+      </div>
+
+      <MyPlanList
+        kind="workout"
+        icon={Dumbbell}
+        emptyTitle="هنوز برنامه تمرینی ثبت نشده است."
+        emptyDescription="به محض ثبت برنامه توسط مربی، اینجا نمایش داده می‌شود."
+      />
+    </div>
   );
 }

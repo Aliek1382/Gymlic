@@ -212,79 +212,31 @@ export async function joinViaInvitation(
   password: string
 ): Promise<{ hasSession: boolean }> {
   const supabase = createClient();
+  const trimmedCode = code.trim();
 
-  const { data: invitation, error: invitationError } = await supabase
-    .from("invitations")
-    .select(
-      "id, trainer_id, club_id, invited_role, status, expires_at, first_name, last_name, height_cm, weight_kg"
-    )
-    .eq("code", code.trim())
-    .maybeSingle();
-  if (invitationError) throw invitationError;
-  if (!invitation) throw new Error("این لینک دعوت معتبر نیست.");
-  if (invitation.status !== "pending")
-    throw new Error("این دعوت قبلا استفاده شده یا باطل شده است.");
-  if (new Date(invitation.expires_at) < new Date())
-    throw new Error("این دعوت منقضی شده است.");
-  if (!invitation.trainer_id)
-    throw new Error("این لینک دعوت معتبر نیست.");
+  const { data: preview, error: previewError } = await supabase.rpc(
+    "get_invitation_preview",
+    { p_code: trimmedCode }
+  );
+  if (previewError) throw previewError;
+  if (!preview || preview.length === 0)
+    throw new Error("این لینک دعوت معتبر نیست یا منقضی شده است.");
 
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
   });
   if (error) throw error;
-  if (!data.session || !data.user) return { hasSession: false };
+  if (!data.session) return { hasSession: false };
 
-  const userId = data.user.id;
-
-  const { error: profileError } = await supabase.from("profiles").upsert({
-    id: userId,
-    account_type: "athlete",
-    first_name: invitation.first_name,
-    last_name: invitation.last_name,
-    phone: data.user.phone || null,
-    email: data.user.email || null,
-  });
-  if (profileError) throw profileError;
-
-  const { error: relationError } = await supabase
-    .from("trainer_athletes")
-    .insert({
-      trainer_id: invitation.trainer_id,
-      athlete_id: userId,
-      club_id: invitation.club_id,
-    });
-  if (relationError) throw relationError;
-
-  if (invitation.club_id) {
-    const { error: membershipError } = await supabase
-      .from("memberships")
-      .insert({ club_id: invitation.club_id, user_id: userId, role: "athlete" });
-    if (membershipError) throw membershipError;
-  }
-
-  if (invitation.height_cm || invitation.weight_kg) {
-    const { error: measurementError } = await supabase
-      .from("measurements")
-      .insert({
-        athlete_id: userId,
-        recorded_by: invitation.trainer_id,
-        height_cm: invitation.height_cm,
-        weight_kg: invitation.weight_kg,
-      });
-    if (measurementError) throw measurementError;
-  }
-
-  const { error: updateError } = await supabase
-    .from("invitations")
-    .update({
-      status: "accepted",
-      accepted_by: userId,
-      accepted_at: new Date().toISOString(),
-    })
-    .eq("id", invitation.id);
-  if (updateError) throw updateError;
+  // Runs as a SECURITY DEFINER function so the whole hand-off (role, trainer
+  // link, measurements, any plans pre-assigned to this invitation) commits
+  // atomically instead of depending on several separate RLS-gated calls.
+  const { error: acceptError } = await supabase.rpc(
+    "accept_athlete_invitation",
+    { p_code: trimmedCode }
+  );
+  if (acceptError) throw acceptError;
 
   return { hasSession: true };
 }

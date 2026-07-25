@@ -94,15 +94,13 @@ export async function getInvitationPreview(
   code: string
 ): Promise<InvitationPreview | null> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("invitations")
-    .select("first_name, last_name, status, expires_at")
-    .eq("code", code)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_invitation_preview", {
+    p_code: code,
+  });
+  if (error) return null;
 
-  if (!data) return null;
-  if (data.status !== "pending" || new Date(data.expires_at) < new Date())
-    return null;
+  const row = data?.[0];
+  if (!row) return null;
 
-  return { firstName: data.first_name, lastName: data.last_name };
+  return { firstName: row.first_name, lastName: row.last_name };
 }

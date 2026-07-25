@@ -4,6 +4,7 @@ import type {
   AthleteSummary,
   PendingAthleteInvite,
   PlanKind,
+  PlanTarget,
 } from "../types/athlete-types";
 
 async function getCurrentUserId(): Promise<string> {
@@ -114,15 +115,40 @@ export interface PlanEntry {
 
 export async function listPlans(
   kind: PlanKind,
-  athleteId: string
+  target: PlanTarget
 ): Promise<PlanEntry[]> {
   const supabase = createClient();
   const trainerId = await getCurrentUserId();
 
+  let query = supabase
+    .from(TABLE_BY_KIND[kind])
+    .select("id, title, description, assigned_at")
+    .eq("trainer_id", trainerId);
+  query =
+    "athleteId" in target
+      ? query.eq("athlete_id", target.athleteId)
+      : query.eq("invitation_id", target.invitationId);
+
+  const { data, error } = await query.order("assigned_at", {
+    ascending: false,
+  });
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    assignedAt: row.assigned_at,
+  }));
+}
+
+export async function listMyPlans(kind: PlanKind): Promise<PlanEntry[]> {
+  const supabase = createClient();
+  const athleteId = await getCurrentUserId();
+
   const { data, error } = await supabase
     .from(TABLE_BY_KIND[kind])
     .select("id, title, description, assigned_at")
-    .eq("trainer_id", trainerId)
     .eq("athlete_id", athleteId)
     .order("assigned_at", { ascending: false });
   if (error) throw error;
@@ -137,7 +163,7 @@ export async function listPlans(
 
 export async function createPlan(
   kind: PlanKind,
-  athleteId: string,
+  target: PlanTarget,
   title: string,
   description: string | null
 ): Promise<void> {
@@ -146,7 +172,8 @@ export async function createPlan(
 
   const { error } = await supabase.from(TABLE_BY_KIND[kind]).insert({
     trainer_id: trainerId,
-    athlete_id: athleteId,
+    athlete_id: "athleteId" in target ? target.athleteId : null,
+    invitation_id: "invitationId" in target ? target.invitationId : null,
     title,
     description,
   });

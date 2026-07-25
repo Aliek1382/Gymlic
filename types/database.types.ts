@@ -162,7 +162,8 @@ export interface Database {
           id: string;
           club_id: string | null;
           trainer_id: string;
-          athlete_id: string;
+          athlete_id: string | null;
+          invitation_id: string | null;
           title: string;
           description: string | null;
           status: WorkoutStatus;
@@ -171,8 +172,9 @@ export interface Database {
         },
         {
           trainer_id: string;
-          athlete_id: string;
           title: string;
+          athlete_id?: string | null;
+          invitation_id?: string | null;
           description?: string | null;
           club_id?: string | null;
           status?: WorkoutStatus;
@@ -183,7 +185,8 @@ export interface Database {
           id: string;
           club_id: string | null;
           trainer_id: string;
-          athlete_id: string;
+          athlete_id: string | null;
+          invitation_id: string | null;
           title: string;
           description: string | null;
           status: WorkoutStatus;
@@ -192,8 +195,9 @@ export interface Database {
         },
         {
           trainer_id: string;
-          athlete_id: string;
           title: string;
+          athlete_id?: string | null;
+          invitation_id?: string | null;
           description?: string | null;
           club_id?: string | null;
           status?: WorkoutStatus;
@@ -269,6 +273,15 @@ export interface Database {
       >;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_invitation_preview: {
+        Args: { p_code: string };
+        Returns: { first_name: string | null; last_name: string | null }[];
+      };
+      accept_athlete_invitation: {
+        Args: { p_code: string };
+        Returns: undefined;
+      };
+    };
   };
 }

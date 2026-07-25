@@ -71,11 +71,21 @@ export function AthleteList() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="warning">
                     <Clock className="size-3" />
                     در انتظار پذیرش
                   </Badge>
+                  <PlanDialog
+                    kind="workout"
+                    target={{ invitationId: invite.id }}
+                    athleteName={invite.name}
+                  />
+                  <PlanDialog
+                    kind="nutrition"
+                    target={{ invitationId: invite.id }}
+                    athleteName={invite.name}
+                  />
                   <Button
                     size="sm"
                     variant="outline"
@@ -125,12 +135,12 @@ export function AthleteList() {
                 <div className="flex items-center gap-2">
                   <PlanDialog
                     kind="workout"
-                    athleteId={athlete.id}
+                    target={{ athleteId: athlete.id }}
                     athleteName={athlete.name}
                   />
                   <PlanDialog
                     kind="nutrition"
-                    athleteId={athlete.id}
+                    target={{ athleteId: athlete.id }}
                     athleteName={athlete.name}
                   />
                 </div>

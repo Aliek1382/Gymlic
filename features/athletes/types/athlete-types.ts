@@ -15,3 +15,5 @@ export interface PendingAthleteInvite {
 }
 
 export type PlanKind = "workout" | "nutrition";
+
+export type PlanTarget = { athleteId: string } | { invitationId: string };

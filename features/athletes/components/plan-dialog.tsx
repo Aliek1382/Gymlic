@@ -22,7 +22,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { usePlans } from "../hooks/use-plans";
 import { useCreatePlan } from "../hooks/use-create-plan";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
-import type { PlanKind } from "../types/athlete-types";
+import type { PlanKind, PlanTarget } from "../types/athlete-types";
 
 const KIND_LABEL: Record<PlanKind, { title: string; icon: typeof Dumbbell }> = {
   workout: { title: "برنامه تمرینی", icon: Dumbbell },
@@ -31,16 +31,16 @@ const KIND_LABEL: Record<PlanKind, { title: string; icon: typeof Dumbbell }> = {
 
 export function PlanDialog({
   kind,
-  athleteId,
+  target,
   athleteName,
 }: {
   kind: PlanKind;
-  athleteId: string;
+  target: PlanTarget;
   athleteName: string;
 }) {
   const [open, setOpen] = useState(false);
-  const plans = usePlans(kind, athleteId, open);
-  const createPlan = useCreatePlan(kind, athleteId);
+  const plans = usePlans(kind, target, open);
+  const createPlan = useCreatePlan(kind, target);
   const { title: kindTitle, icon: Icon } = KIND_LABEL[kind];
 
   const form = useForm<PlanFormValues>({
