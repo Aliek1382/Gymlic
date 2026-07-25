@@ -20,9 +20,12 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
   const supabase = createClient();
   const trainerId = await getCurrentUserId();
 
+  // trainer_athletes has two foreign keys into profiles (trainer_id and
+  // athlete_id) — the embed must be disambiguated via the column-based
+  // hint, or PostgREST rejects the query as ambiguous.
   const { data, error } = await supabase
     .from("trainer_athletes")
-    .select("athlete_id, created_at, profiles(first_name, last_name)")
+    .select("athlete_id, created_at, profiles!athlete_id(first_name, last_name)")
     .eq("trainer_id", trainerId)
     .eq("status", "active")
     .order("created_at", { ascending: false })
@@ -70,6 +73,30 @@ export async function listPendingAthleteInvites(): Promise<
     createdAt: row.created_at,
     expiresAt: row.expires_at,
   }));
+}
+
+export async function removeAthlete(athleteId: string): Promise<void> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { error } = await supabase
+    .from("trainer_athletes")
+    .delete()
+    .eq("trainer_id", trainerId)
+    .eq("athlete_id", athleteId);
+  if (error) throw error;
+}
+
+export async function revokeAthleteInvite(invitationId: string): Promise<void> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { error } = await supabase
+    .from("invitations")
+    .update({ status: "revoked" })
+    .eq("id", invitationId)
+    .eq("created_by", trainerId);
+  if (error) throw error;
 }
 
 export async function createAthleteInvite(input: {

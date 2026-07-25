@@ -12,11 +12,16 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useAthletes } from "../hooks/use-athletes";
 import { usePendingAthleteInvites } from "../hooks/use-pending-athlete-invites";
+import { useRemoveAthlete } from "../hooks/use-remove-athlete";
+import { useRevokeAthleteInvite } from "../hooks/use-revoke-athlete-invite";
 import { PlanDialog } from "./plan-dialog";
+import { RemoveAthleteButton } from "./remove-athlete-button";
 
 export function AthleteList() {
   const athletes = useAthletes();
   const pendingInvites = usePendingAthleteInvites();
+  const removeAthlete = useRemoveAthlete();
+  const revokeInvite = useRevokeAthleteInvite();
 
   if (athletes.isLoading || pendingInvites.isLoading) {
     return <TableCardSkeleton />;
@@ -39,6 +44,14 @@ export function AthleteList() {
 
   return (
     <div className="space-y-4">
+      {athletes.isError && (
+        <Card className="border-destructive/30 py-5">
+          <p className="px-6 text-sm text-destructive">
+            دریافت لیست ورزشکاران با خطا مواجه شد. صفحه را دوباره بارگذاری کنید.
+          </p>
+        </Card>
+      )}
+
       {hasPendingInvites && (
         <Card className="gap-4 py-5">
           <div className="px-6">
@@ -99,6 +112,11 @@ export function AthleteList() {
                     <Copy />
                     کپی لینک
                   </Button>
+                  <RemoveAthleteButton
+                    athleteName={invite.name}
+                    description="این دعوت لغو می‌شود و لینک آن دیگر کار نخواهد کرد."
+                    onConfirm={() => revokeInvite.mutateAsync(invite.id)}
+                  />
                 </div>
               </div>
             ))}
@@ -142,6 +160,11 @@ export function AthleteList() {
                     kind="nutrition"
                     target={{ athleteId: athlete.id }}
                     athleteName={athlete.name}
+                  />
+                  <RemoveAthleteButton
+                    athleteName={athlete.name}
+                    description="این ورزشکار از لیست شما حذف می‌شود. برنامه‌های قبلی او حذف نخواهند شد."
+                    onConfirm={() => removeAthlete.mutateAsync(athlete.id)}
                   />
                 </div>
               </div>
