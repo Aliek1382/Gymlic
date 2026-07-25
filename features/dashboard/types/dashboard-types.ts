@@ -99,6 +99,7 @@ export interface TrainerActivityItem {
 
 export interface AthletePlanSummary {
   title: string;
+  description: string | null;
   assignedAt: string;
 }
 

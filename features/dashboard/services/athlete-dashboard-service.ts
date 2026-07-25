@@ -14,7 +14,7 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
   const [workout, nutrition, measurements] = await Promise.all([
     supabase
       .from("workout_assignments")
-      .select("title, assigned_at")
+      .select("title, description, assigned_at")
       .eq("athlete_id", user.id)
       .eq("status", "active")
       .order("assigned_at", { ascending: false })
@@ -22,7 +22,7 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
       .maybeSingle(),
     supabase
       .from("nutrition_assignments")
-      .select("title, assigned_at")
+      .select("title, description, assigned_at")
       .eq("athlete_id", user.id)
       .eq("status", "active")
       .order("assigned_at", { ascending: false })
@@ -54,10 +54,18 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
 
   return {
     todaysWorkout: workout.data
-      ? { title: workout.data.title, assignedAt: workout.data.assigned_at }
+      ? {
+          title: workout.data.title,
+          description: workout.data.description,
+          assignedAt: workout.data.assigned_at,
+        }
       : null,
     nutritionPlan: nutrition.data
-      ? { title: nutrition.data.title, assignedAt: nutrition.data.assigned_at }
+      ? {
+          title: nutrition.data.title,
+          description: nutrition.data.description,
+          assignedAt: nutrition.data.assigned_at,
+        }
       : null,
     latestMeasurement: history[0] ?? null,
     measurementHistory: history,

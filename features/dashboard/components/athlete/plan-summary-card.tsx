@@ -27,16 +27,23 @@ export function PlanSummaryCard({
         {!plan ? (
           <EmptyState icon={Icon} title={emptyTitle} description={emptyDescription} />
         ) : (
-          <div className="flex items-center gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-              <Icon className="size-6" />
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                <Icon className="size-6" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">{plan.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  تخصیص داده شده در {formatPersianDate(new Date(plan.assignedAt))}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-foreground">{plan.title}</p>
-              <p className="text-xs text-muted-foreground">
-                تخصیص داده شده در {formatPersianDate(new Date(plan.assignedAt))}
+            {plan.description && (
+              <p className="whitespace-pre-line rounded-xl bg-muted/50 p-3 text-sm text-muted-foreground">
+                {plan.description}
               </p>
-            </div>
+            )}
           </div>
         )}
       </div>
