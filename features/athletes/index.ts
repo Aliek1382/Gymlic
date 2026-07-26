@@ -3,6 +3,7 @@ export * from "./components/athlete-list";
 export * from "./components/plan-dialog";
 export * from "./components/my-plan-list";
 export * from "./components/remove-athlete-button";
+export * from "./components/plan-browser";
 
 export * from "./hooks/use-athletes";
 export * from "./hooks/use-pending-athlete-invites";
