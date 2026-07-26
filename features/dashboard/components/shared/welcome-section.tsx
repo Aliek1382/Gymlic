@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Calendar, ChevronDown } from "lucide-react";
+import { Calendar, ChevronDown, UserRound } from "lucide-react";
 
 import { formatPersianDate } from "@/lib/persian";
 
@@ -15,9 +15,11 @@ function getGreeting(): string {
 export function WelcomeSection({
   name,
   subtitle,
+  trainerName,
 }: {
   name: string;
   subtitle: string;
+  trainerName?: string | null;
 }) {
   const greeting = useMemo(getGreeting, []);
   const today = useMemo(() => formatPersianDate(new Date()), []);
@@ -29,6 +31,12 @@ export function WelcomeSection({
           {greeting}، {name}
         </h1>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
+        {trainerName && (
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
+            <UserRound className="size-3.5" />
+            مربی شما: {trainerName}
+          </div>
+        )}
       </div>
 
       <button

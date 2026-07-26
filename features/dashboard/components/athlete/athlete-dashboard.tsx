@@ -10,7 +10,13 @@ import { PlanSummaryCard } from "./plan-summary-card";
 import { MeasurementsCard } from "./measurements-card";
 import { CoachMessageCard } from "./coach-message-card";
 
-export function AthleteDashboard({ athleteName }: { athleteName: string }) {
+export function AthleteDashboard({
+  athleteName,
+  trainerName,
+}: {
+  athleteName: string;
+  trainerName: string | null;
+}) {
   const dashboard = useAthleteDashboard();
 
   if (dashboard.isLoading) {
@@ -26,6 +32,7 @@ export function AthleteDashboard({ athleteName }: { athleteName: string }) {
       <WelcomeSection
         name={athleteName}
         subtitle="برنامه امروز و پیشرفت خودت را اینجا ببین."
+        trainerName={trainerName}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

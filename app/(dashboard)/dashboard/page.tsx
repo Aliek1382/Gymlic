@@ -18,7 +18,9 @@ export default async function DashboardPage() {
     case "trainer":
       return <TrainerDashboard trainerName={name} />;
     case "athlete":
-      return <AthleteDashboard athleteName={name} />;
+      return (
+        <AthleteDashboard athleteName={name} trainerName={context!.trainerName} />
+      );
     default:
       return null;
   }

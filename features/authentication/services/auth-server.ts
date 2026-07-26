@@ -18,6 +18,7 @@ export interface ServerAuthContext {
     clubName: string;
   } | null;
   hasTrainer: boolean;
+  trainerName: string | null;
 }
 
 /**
@@ -61,6 +62,27 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
     .eq("athlete_id", user.id)
     .eq("status", "active");
 
+  let trainerName: string | null = null;
+  if (profile?.account_type === "athlete") {
+    // trainer_athletes has two foreign keys into profiles (trainer_id and
+    // athlete_id) — the embed must be disambiguated via the column hint.
+    const { data: trainerRelation } = await supabase
+      .from("trainer_athletes")
+      .select("profiles!trainer_id(first_name, last_name)")
+      .eq("athlete_id", user.id)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle()
+      .returns<{
+        profiles: { first_name: string | null; last_name: string | null } | null;
+      }>();
+
+    trainerName =
+      [trainerRelation?.profiles?.first_name, trainerRelation?.profiles?.last_name]
+        .filter(Boolean)
+        .join(" ") || null;
+  }
+
   return {
     userId: user.id,
     phone: profile?.phone || user.phone || null,
@@ -77,6 +99,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
         }
       : null,
     hasTrainer: (trainerCount ?? 0) > 0,
+    trainerName,
   };
 });
 
@@ -86,9 +109,10 @@ export interface InvitationPreview {
 }
 
 /**
- * Server-side lookup for the public /join/[code] page. Works with no
- * session at all thanks to the "invitations_select_public_pending" RLS
- * policy — possession of the (unguessable) code is the authorization model.
+ * Server-side lookup for the public /join/[code] page. Calls the
+ * get_invitation_preview SECURITY DEFINER function, so it works with no
+ * session at all — possession of the (unguessable) code is the
+ * authorization model.
  */
 export async function getInvitationPreview(
   code: string
