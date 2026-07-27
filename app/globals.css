@@ -177,10 +177,12 @@
   }
   html {
     direction: rtl;
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "ss01", "cv01";
+    overflow-x: hidden;
   }
 }
 

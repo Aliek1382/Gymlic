@@ -223,7 +223,7 @@ export function AthleteList() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <PlanDialog
                     kind="workout"
                     target={{ athleteId: athlete.id }}
