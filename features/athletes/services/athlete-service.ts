@@ -137,6 +137,7 @@ export interface PlanEntry {
   id: string;
   title: string;
   description: string | null;
+  status: "active" | "completed" | "cancelled" | "draft";
   assignedAt: string;
 }
 
@@ -149,7 +150,7 @@ export async function listPlans(
 
   let query = supabase
     .from(TABLE_BY_KIND[kind])
-    .select("id, title, description, assigned_at")
+    .select("id, title, description, status, assigned_at")
     .eq("trainer_id", trainerId);
   query =
     "athleteId" in target
@@ -165,6 +166,7 @@ export async function listPlans(
     id: row.id,
     title: row.title,
     description: row.description,
+    status: row.status,
     assignedAt: row.assigned_at,
   }));
 }
@@ -173,10 +175,13 @@ export async function listMyPlans(kind: PlanKind): Promise<PlanEntry[]> {
   const supabase = createClient();
   const athleteId = await getCurrentUserId();
 
+  // Drafts are unfinished — an athlete should never see a plan their
+  // trainer hasn't submitted yet.
   const { data, error } = await supabase
     .from(TABLE_BY_KIND[kind])
-    .select("id, title, description, assigned_at")
+    .select("id, title, description, status, assigned_at")
     .eq("athlete_id", athleteId)
+    .neq("status", "draft")
     .order("assigned_at", { ascending: false });
   if (error) throw error;
 
@@ -184,25 +189,51 @@ export async function listMyPlans(kind: PlanKind): Promise<PlanEntry[]> {
     id: row.id,
     title: row.title,
     description: row.description,
+    status: row.status,
     assignedAt: row.assigned_at,
   }));
 }
 
-export async function createPlan(
+export async function savePlan(
   kind: PlanKind,
   target: PlanTarget,
-  title: string,
-  description: string | null
-): Promise<void> {
+  input: {
+    id?: string;
+    title: string;
+    description: string | null;
+    status: "active" | "draft";
+  }
+): Promise<{ id: string }> {
   const supabase = createClient();
   const trainerId = await getCurrentUserId();
 
-  const { error } = await supabase.from(TABLE_BY_KIND[kind]).insert({
-    trainer_id: trainerId,
-    athlete_id: "athleteId" in target ? target.athleteId : null,
-    invitation_id: "invitationId" in target ? target.invitationId : null,
-    title,
-    description,
-  });
+  if (input.id) {
+    const { error } = await supabase
+      .from(TABLE_BY_KIND[kind])
+      .update({
+        title: input.title,
+        description: input.description,
+        status: input.status,
+      })
+      .eq("id", input.id)
+      .eq("trainer_id", trainerId);
+    if (error) throw error;
+    return { id: input.id };
+  }
+
+  const { data, error } = await supabase
+    .from(TABLE_BY_KIND[kind])
+    .insert({
+      trainer_id: trainerId,
+      athlete_id: "athleteId" in target ? target.athleteId : null,
+      invitation_id: "invitationId" in target ? target.invitationId : null,
+      title: input.title,
+      description: input.description,
+      status: input.status,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+
+  return { id: data.id };
 }

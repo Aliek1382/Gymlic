@@ -94,6 +94,15 @@ export interface TrainerActivityItem {
   date: string;
 }
 
+export interface TrainerDraftPlan {
+  id: string;
+  athleteName: string;
+  title: string;
+  description: string | null;
+  type: TrainerActivityType;
+  updatedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Athlete Dashboard
 // ---------------------------------------------------------------------------
