@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Apple, Dumbbell, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { usePlans } from "../hooks/use-plans";
-import { useCreatePlan } from "../hooks/use-create-plan";
+import { useSavePlan } from "../hooks/use-save-plan";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind, PlanTarget } from "../types/athlete-types";
 
@@ -39,8 +40,10 @@ export function PlanDialog({
   athleteName: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const plans = usePlans(kind, target, open);
-  const createPlan = useCreatePlan(kind, target);
+  const savePlan = useSavePlan(kind, target);
   const { title: kindTitle, icon: Icon } = KIND_LABEL[kind];
 
   const form = useForm<PlanFormValues>({
@@ -48,21 +51,52 @@ export function PlanDialog({
     defaultValues: { title: "", description: "" },
   });
 
-  async function onSubmit(values: PlanFormValues) {
+  // Auto-resume the trainer's most recent unfinished draft (if any) for this
+  // athlete once the plan history has loaded, so continuing means editing
+  // the same row instead of retyping from scratch.
+  useEffect(() => {
+    if (!open || hydrated || plans.isLoading) return;
+    const draft = plans.data?.find((plan) => plan.status === "draft");
+    if (draft) {
+      form.reset({ title: draft.title, description: draft.description ?? "" });
+      setDraftId(draft.id);
+    }
+    setHydrated(true);
+  }, [open, hydrated, plans.isLoading, plans.data, form]);
+
+  async function onSubmit(values: PlanFormValues, status: "active" | "draft") {
     try {
-      await createPlan.mutateAsync({
+      const result = await savePlan.mutateAsync({
+        id: draftId ?? undefined,
         title: values.title,
         description: values.description || null,
+        status,
       });
-      form.reset();
-      toast.success("برنامه با موفقیت ثبت شد.");
+
+      if (status === "draft") {
+        setDraftId(result.id);
+        toast.success("برنامه به‌عنوان پیش‌نویس ذخیره شد.");
+      } else {
+        form.reset({ title: "", description: "" });
+        setDraftId(null);
+        toast.success("برنامه با موفقیت ثبت شد.");
+      }
     } catch (error) {
       toast.error(getErrorMessage(error, "ثبت برنامه با خطا مواجه شد."));
     }
   }
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setHydrated(false);
+      setDraftId(null);
+      form.reset({ title: "", description: "" });
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
         <Icon />
         {kindTitle}
@@ -74,11 +108,16 @@ export function PlanDialog({
             {kindTitle} — {athleteName}
           </DialogTitle>
           <DialogDescription>
-            یک برنامه جدید برای این ورزشکار ثبت کنید.
+            {draftId
+              ? "شما یک پیش‌نویس ناتمام دارید — از همین‌جا ادامه دهید."
+              : "یک برنامه جدید برای این ورزشکار ثبت کنید."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form
+          onSubmit={form.handleSubmit((values) => onSubmit(values, "active"))}
+          className="space-y-4"
+        >
           <div className="space-y-2">
             <Label htmlFor={`${kind}-title`}>عنوان برنامه</Label>
             <Input
@@ -104,14 +143,25 @@ export function PlanDialog({
             />
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={createPlan.isPending}
-          >
-            {createPlan.isPending && <Loader2 className="animate-spin" />}
-            ثبت برنامه
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={savePlan.isPending}
+            >
+              {savePlan.isPending && <Loader2 className="animate-spin" />}
+              ثبت نهایی برنامه
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={savePlan.isPending}
+              onClick={form.handleSubmit((values) => onSubmit(values, "draft"))}
+            >
+              بعداً بقیه‌اش را می‌نویسم
+            </Button>
+          </div>
         </form>
 
         <div className="space-y-2 border-t border-border pt-4">
@@ -130,13 +180,18 @@ export function PlanDialog({
                   key={plan.id}
                   className="rounded-xl border border-border p-3 text-sm"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-foreground">
                       {plan.title}
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatPersianDate(new Date(plan.assignedAt))}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {plan.status === "draft" && (
+                        <Badge variant="warning">پیش‌نویس</Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {formatPersianDate(new Date(plan.assignedAt))}
+                      </span>
+                    </div>
                   </div>
                   {plan.description && (
                     <p className="mt-1 text-xs text-muted-foreground">
