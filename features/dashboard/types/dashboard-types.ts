@@ -88,6 +88,7 @@ export interface TrainerActivityItem {
   id: string;
   athleteName: string;
   title: string;
+  description: string | null;
   type: TrainerActivityType;
   status: ActivityStatus;
   date: string;

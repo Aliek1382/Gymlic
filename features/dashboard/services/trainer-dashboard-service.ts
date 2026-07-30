@@ -56,25 +56,35 @@ export async function getTrainerRecentActivities(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("نشست کاربر معتبر نیست.");
 
+  // workout_assignments/nutrition_assignments have two foreign keys into
+  // profiles (trainer_id and athlete_id) — the embed must be disambiguated
+  // via the column hint, or PostgREST rejects the query as ambiguous.
   const [workouts, nutrition] = await Promise.all([
     supabase
       .from("workout_assignments")
-      .select("id, title, status, assigned_at, profiles(first_name, last_name)")
+      .select(
+        "id, title, description, status, assigned_at, profiles!athlete_id(first_name, last_name)"
+      )
       .eq("trainer_id", user.id)
       .order("assigned_at", { ascending: false })
       .limit(limit),
     supabase
       .from("nutrition_assignments")
-      .select("id, title, status, assigned_at, profiles(first_name, last_name)")
+      .select(
+        "id, title, description, status, assigned_at, profiles!athlete_id(first_name, last_name)"
+      )
       .eq("trainer_id", user.id)
       .order("assigned_at", { ascending: false })
       .limit(limit),
   ]);
+  if (workouts.error) throw workouts.error;
+  if (nutrition.error) throw nutrition.error;
 
   const mapRow = (
     row: {
       id: string;
       title: string;
+      description: string | null;
       status: string;
       assigned_at: string;
       profiles: unknown;
@@ -91,6 +101,7 @@ export async function getTrainerRecentActivities(
         [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
         "ورزشکار",
       title: row.title,
+      description: row.description,
       type,
       status: row.status === "cancelled" ? "cancelled" : "active",
       date: row.assigned_at,

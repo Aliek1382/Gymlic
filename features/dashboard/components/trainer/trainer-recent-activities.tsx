@@ -44,6 +44,7 @@ export function TrainerRecentActivities({
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {activity.athleteName}
+                    {activity.description ? ` · ${activity.description}` : ""}
                   </p>
                 </div>
                 <Badge variant={activity.status === "cancelled" ? "secondary" : "success"}>
