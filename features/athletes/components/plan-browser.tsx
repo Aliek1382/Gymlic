@@ -1,7 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Apple, ChevronLeft, Dumbbell, Search, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Apple,
+  ChevronLeft,
+  Dumbbell,
+  Loader2,
+  Pencil,
+  Search,
+  Users,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,16 +36,30 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
+import { getErrorMessage } from "@/lib/get-error-message";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useAthletes } from "../hooks/use-athletes";
 import { usePlans } from "../hooks/use-plans";
+import { useSavePlan } from "../hooks/use-save-plan";
+import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
 
 type SortOrder = "newest" | "oldest";
 
 const ICON_BY_KIND = { workout: Dumbbell, nutrition: Apple } as const;
+
+// A finalized plan can only be edited for a few days after it was
+// assigned; drafts are always editable since they were never "published".
+const EDIT_WINDOW_DAYS = 4;
+
+function canEditPlan(plan: PlanEntry): boolean {
+  if (plan.status === "draft") return true;
+  const assignedAt = new Date(plan.assignedAt).getTime();
+  const daysSinceAssigned = (Date.now() - assignedAt) / (1000 * 60 * 60 * 24);
+  return daysSinceAssigned <= EDIT_WINDOW_DAYS;
+}
 
 export function PlanBrowser({ kind }: { kind: PlanKind }) {
   const Icon = ICON_BY_KIND[kind];
@@ -45,6 +71,7 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
     name: string;
   } | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanEntry | null>(null);
+  const [editingPlan, setEditingPlan] = useState<PlanEntry | null>(null);
 
   const filteredAthletes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -63,6 +90,37 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
     { athleteId: selectedAthlete?.id ?? "" },
     !!selectedAthlete
   );
+  const savePlan = useSavePlan(kind, { athleteId: selectedAthlete?.id ?? "" });
+
+  const editForm = useForm<PlanFormValues>({
+    resolver: zodResolver(planSchema),
+    defaultValues: { title: "", description: "" },
+  });
+
+  useEffect(() => {
+    if (editingPlan) {
+      editForm.reset({
+        title: editingPlan.title,
+        description: editingPlan.description ?? "",
+      });
+    }
+  }, [editingPlan, editForm]);
+
+  async function onEditSubmit(values: PlanFormValues) {
+    if (!editingPlan) return;
+    try {
+      await savePlan.mutateAsync({
+        id: editingPlan.id,
+        title: values.title,
+        description: values.description || null,
+        status: editingPlan.status === "draft" ? "draft" : "active",
+      });
+      toast.success("تغییرات ذخیره شد.");
+      setEditingPlan(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "ذخیره تغییرات با خطا مواجه شد."));
+    }
+  }
 
   if (athletes.isLoading) {
     return <TableCardSkeleton />;
@@ -96,15 +154,19 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
               />
             ) : (
               plans.data.map((plan) => (
-                <button
+                <div
                   key={plan.id}
-                  type="button"
-                  onClick={() => setSelectedPlan(plan)}
-                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-border p-4 text-right transition-colors hover:bg-muted/50"
+                  className="flex items-center gap-2 rounded-xl border border-border p-4 transition-colors hover:bg-muted/50"
                 >
-                  <span className="font-medium text-foreground">
-                    {plan.title}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPlan(plan)}
+                    className="min-w-0 flex-1 text-right"
+                  >
+                    <span className="truncate font-medium text-foreground">
+                      {plan.title}
+                    </span>
+                  </button>
                   <span className="flex shrink-0 items-center gap-2">
                     {plan.status === "draft" && (
                       <Badge variant="warning">پیش‌نویس</Badge>
@@ -112,8 +174,18 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
                     <span className="text-xs text-muted-foreground">
                       {formatPersianDate(new Date(plan.assignedAt))}
                     </span>
+                    {canEditPlan(plan) && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingPlan(plan)}
+                        aria-label="ویرایش برنامه"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    )}
                   </span>
-                </button>
+                </div>
               ))
             )}
           </div>
@@ -135,6 +207,63 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
               <p className="whitespace-pre-line text-sm text-foreground">
                 {selectedPlan.description || "توضیحاتی برای این برنامه ثبت نشده است."}
               </p>
+            </DialogContent>
+          )}
+        </Dialog>
+
+        <Dialog
+          open={!!editingPlan}
+          onOpenChange={(open) => !open && setEditingPlan(null)}
+        >
+          {editingPlan && (
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>ویرایش برنامه</DialogTitle>
+                <DialogDescription>
+                  {editingPlan.status === "draft"
+                    ? "این پیش‌نویس را ویرایش کنید."
+                    : `تا ${EDIT_WINDOW_DAYS} روز پس از ثبت نهایی قابل ویرایش است.`}
+                </DialogDescription>
+              </DialogHeader>
+
+              <form
+                onSubmit={editForm.handleSubmit(onEditSubmit)}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="edit-plan-title">عنوان برنامه</Label>
+                  <Input
+                    id="edit-plan-title"
+                    {...editForm.register("title")}
+                  />
+                  {editForm.formState.errors.title && (
+                    <p className="text-xs text-destructive">
+                      {editForm.formState.errors.title.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-plan-description">
+                    توضیحات (اختیاری)
+                  </Label>
+                  <textarea
+                    id="edit-plan-description"
+                    rows={4}
+                    className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                    {...editForm.register("description")}
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={savePlan.isPending}
+                >
+                  {savePlan.isPending && <Loader2 className="animate-spin" />}
+                  ذخیره تغییرات
+                </Button>
+              </form>
             </DialogContent>
           )}
         </Dialog>
