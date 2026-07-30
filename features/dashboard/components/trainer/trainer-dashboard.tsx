@@ -5,7 +5,6 @@ import { Apple, CalendarCheck2, Dumbbell, LineChart, UserPlus, Users } from "luc
 import { toPersianDigits } from "@/lib/persian";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
 import { useTrainerRecentActivities } from "../../hooks/use-trainer-recent-activities";
-import { useTrainerDraftPlans } from "../../hooks/use-trainer-draft-plans";
 import { WelcomeSection } from "../shared/welcome-section";
 import { StatisticsGrid } from "../shared/statistics-grid";
 import { StatisticCard } from "../shared/statistic-card";
@@ -16,7 +15,6 @@ import {
 import { ErrorState } from "../shared/error-state";
 import { QuickActions } from "../shared/quick-actions";
 import { TrainerRecentActivities } from "./trainer-recent-activities";
-import { TrainerDraftPlans } from "./trainer-draft-plans";
 import type { QuickAction } from "../../types/dashboard-types";
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -29,7 +27,6 @@ const QUICK_ACTIONS: QuickAction[] = [
 export function TrainerDashboard({ trainerName }: { trainerName: string }) {
   const statistics = useTrainerStatistics();
   const activities = useTrainerRecentActivities();
-  const draftPlans = useTrainerDraftPlans();
 
   return (
     <div className="space-y-6">
@@ -98,14 +95,6 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
         <ErrorState message="خطا در دریافت آخرین فعالیت‌ها" />
       ) : (
         <TrainerRecentActivities activities={activities.data ?? []} />
-      )}
-
-      {draftPlans.isLoading ? (
-        <TableCardSkeleton />
-      ) : draftPlans.isError ? (
-        <ErrorState message="خطا در دریافت پیش‌نویس‌ها" />
-      ) : (
-        <TrainerDraftPlans drafts={draftPlans.data ?? []} />
       )}
 
       <QuickActions actions={QUICK_ACTIONS} />

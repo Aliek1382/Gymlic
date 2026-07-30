@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { Apple, ChevronLeft, Dumbbell, Search, Users } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import {
@@ -100,18 +99,13 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
                   key={plan.id}
                   type="button"
                   onClick={() => setSelectedPlan(plan)}
-                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-border p-4 text-right transition-colors hover:bg-muted/50"
+                  className="flex w-full items-center justify-between rounded-xl border border-border p-4 text-right transition-colors hover:bg-muted/50"
                 >
                   <span className="font-medium text-foreground">
                     {plan.title}
                   </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {plan.status === "draft" && (
-                      <Badge variant="warning">پیش‌نویس</Badge>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {formatPersianDate(new Date(plan.assignedAt))}
-                    </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatPersianDate(new Date(plan.assignedAt))}
                   </span>
                 </button>
               ))

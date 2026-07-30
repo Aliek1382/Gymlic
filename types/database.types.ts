@@ -13,7 +13,7 @@ export type ClubStatus = "active" | "suspended";
 export type SubscriptionStatus = "active" | "expiring" | "expired";
 export type InvitationRole = "trainer" | "reception" | "athlete";
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
-export type WorkoutStatus = "active" | "completed" | "cancelled" | "draft";
+export type WorkoutStatus = "active" | "completed" | "cancelled";
 export type MembershipPlanTier = "elite" | "basic" | "daily";
 
 type TableOf<Row, Insert, Update = Partial<Insert>> = {
