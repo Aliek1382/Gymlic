@@ -4,12 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Dumbbell, KeyRound, Loader2, Mail, User } from "lucide-react";
+import { KeyRound, Loader2, Mail, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useSignInWithPassword } from "../hooks/use-sign-in-with-password";
 import { useSignUpWithPassword } from "../hooks/use-sign-up-with-password";
@@ -46,7 +47,7 @@ export function AuthSplitCard() {
           <div className="mb-8 flex items-center justify-end gap-2.5 lg:hidden">
             <span className="text-lg font-bold text-foreground">جیم‌لیک</span>
             <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Dumbbell className="size-4" />
+              <GymlicMark className="size-4" />
             </div>
           </div>
 

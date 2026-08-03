@@ -1,5 +1,7 @@
 import { Dumbbell, TrendingUp, Users } from "lucide-react";
 
+import { GymlicMark } from "@/components/brand/gymlic-mark";
+
 export function AuthIllustration({
   title,
   description,
@@ -48,7 +50,7 @@ export function AuthIllustration({
 
       <div className="relative flex items-center gap-2.5">
         <div className="flex size-9 items-center justify-center rounded-xl bg-white/15">
-          <Dumbbell className="size-4 text-white" />
+          <GymlicMark className="size-4 text-white" />
         </div>
         <span className="text-lg font-bold">جیم‌لیک</span>
       </div>

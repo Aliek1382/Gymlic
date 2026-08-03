@@ -1,3 +1,5 @@
+import { GymlicMark } from "@/components/brand/gymlic-mark";
+
 export function AuthShell({
   title,
   description,
@@ -12,7 +14,7 @@ export function AuthShell({
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <span className="text-xl font-bold">G</span>
+            <GymlicMark className="size-6" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">جیم‌لیک</h1>
         </div>

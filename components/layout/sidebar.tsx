@@ -6,6 +6,7 @@ import { LogOut, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { SIDEBAR_NAV } from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
@@ -25,7 +26,7 @@ export function SidebarContent({
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-6 py-6">
         <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <span className="text-base font-bold">G</span>
+          <GymlicMark className="size-5" />
         </div>
         <span className="text-lg font-bold text-foreground">جیم‌لیک</span>
       </div>
