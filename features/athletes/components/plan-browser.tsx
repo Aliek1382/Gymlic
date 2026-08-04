@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Apple,
+  CheckCircle2,
   ChevronLeft,
   Dumbbell,
   Loader2,
@@ -40,6 +41,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useAthletes } from "../hooks/use-athletes";
+import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
@@ -91,6 +93,9 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
     !!selectedAthlete
   );
   const savePlan = useSavePlan(kind, { athleteId: selectedAthlete?.id ?? "" });
+  const completePlan = useCompletePlan(kind, {
+    athleteId: selectedAthlete?.id ?? "",
+  });
 
   const editForm = useForm<PlanFormValues>({
     resolver: zodResolver(planSchema),
@@ -105,6 +110,15 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
       });
     }
   }, [editingPlan, editForm]);
+
+  async function handleComplete(planId: string) {
+    try {
+      await completePlan.mutateAsync(planId);
+      toast.success("برنامه به‌عنوان تکمیل‌شده علامت خورد.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "ثبت تکمیل برنامه با خطا مواجه شد."));
+    }
+  }
 
   async function onEditSubmit(values: PlanFormValues) {
     if (!editingPlan) return;
@@ -156,7 +170,7 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
               plans.data.map((plan) => (
                 <div
                   key={plan.id}
-                  className="flex items-center gap-2 rounded-xl border border-border p-4 transition-colors hover:bg-muted/50"
+                  className="flex flex-col gap-3 rounded-xl border border-border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center"
                 >
                   <button
                     type="button"
@@ -167,13 +181,27 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
                       {plan.title}
                     </span>
                   </button>
-                  <span className="flex shrink-0 items-center gap-2">
+                  <span className="flex flex-wrap items-center gap-2">
                     {plan.status === "draft" && (
                       <Badge variant="warning">پیش‌نویس</Badge>
+                    )}
+                    {plan.status === "completed" && (
+                      <Badge variant="success">تکمیل‌شده</Badge>
                     )}
                     <span className="text-xs text-muted-foreground">
                       {formatPersianDate(new Date(plan.assignedAt))}
                     </span>
+                    {plan.status === "active" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={completePlan.isPending}
+                        onClick={() => handleComplete(plan.id)}
+                      >
+                        <CheckCircle2 />
+                        تکمیل شد
+                      </Button>
+                    )}
                     {canEditPlan(plan) && (
                       <Button
                         size="icon"

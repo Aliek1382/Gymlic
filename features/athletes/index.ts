@@ -13,6 +13,7 @@ export * from "./hooks/use-save-plan";
 export * from "./hooks/use-my-plans";
 export * from "./hooks/use-remove-athlete";
 export * from "./hooks/use-revoke-athlete-invite";
+export * from "./hooks/use-complete-plan";
 
 export * from "./services/athlete-service";
 export * from "./types/athlete-types";

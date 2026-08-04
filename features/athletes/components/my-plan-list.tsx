@@ -1,11 +1,16 @@
 "use client";
 
-import { Apple, Dumbbell } from "lucide-react";
+import { Apple, CheckCircle2, Dumbbell } from "lucide-react";
+import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
+import { getErrorMessage } from "@/lib/get-error-message";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
+import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
 import type { PlanKind } from "../types/athlete-types";
 
@@ -24,6 +29,16 @@ export function MyPlanList({
   emptyDescription: string;
 }) {
   const plans = useMyPlans(kind);
+  const completePlan = useCompletePlan(kind);
+
+  async function handleComplete(planId: string) {
+    try {
+      await completePlan.mutateAsync(planId);
+      toast.success("این برنامه به‌عنوان تکمیل‌شده علامت خورد.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "ثبت تکمیل برنامه با خطا مواجه شد."));
+    }
+  }
 
   if (plans.isLoading) {
     return (
@@ -50,8 +65,8 @@ export function MyPlanList({
     <div className="space-y-3">
       {plans.data.map((plan) => (
         <Card key={plan.id} className="gap-2 py-5">
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
+          <CardContent className="space-y-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-medium text-foreground">{plan.title}</p>
               <p className="text-xs text-muted-foreground">
                 {formatPersianDate(new Date(plan.assignedAt))}
@@ -62,6 +77,22 @@ export function MyPlanList({
                 {plan.description}
               </p>
             )}
+            <div className="flex flex-wrap items-center gap-2">
+              {plan.status === "completed" && (
+                <Badge variant="success">تکمیل‌شده</Badge>
+              )}
+              {plan.status === "active" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={completePlan.isPending}
+                  onClick={() => handleComplete(plan.id)}
+                >
+                  <CheckCircle2 />
+                  این برنامه را انجام دادم
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ))}

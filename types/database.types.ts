@@ -315,6 +315,14 @@ export interface Database {
         Args: { p_code: string };
         Returns: undefined;
       };
+      complete_workout_assignment: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
+      complete_nutrition_assignment: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
     };
   };
 }

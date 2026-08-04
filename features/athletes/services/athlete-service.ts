@@ -133,6 +133,11 @@ const TABLE_BY_KIND = {
   nutrition: "nutrition_assignments",
 } as const;
 
+const COMPLETE_RPC_BY_KIND = {
+  workout: "complete_workout_assignment",
+  nutrition: "complete_nutrition_assignment",
+} as const;
+
 export interface PlanEntry {
   id: string;
   title: string;
@@ -236,4 +241,12 @@ export async function savePlan(
   if (error) throw error;
 
   return { id: data.id };
+}
+
+export async function completePlan(kind: PlanKind, planId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc(COMPLETE_RPC_BY_KIND[kind], {
+    p_id: planId,
+  });
+  if (error) throw error;
 }
