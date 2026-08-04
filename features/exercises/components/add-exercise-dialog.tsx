@@ -29,12 +29,17 @@ export function AddExerciseDialog() {
 
   const form = useForm<AddExerciseFormValues>({
     resolver: zodResolver(addExerciseSchema),
-    defaultValues: { name: "", muscleGroup: "" },
+    defaultValues: { name: "", nameEn: "", description: "", muscleGroup: "" },
   });
 
   async function onSubmit(values: AddExerciseFormValues) {
     try {
-      await createExercise.mutateAsync(values);
+      await createExercise.mutateAsync({
+        name: values.name,
+        nameEn: values.nameEn?.trim() || null,
+        description: values.description?.trim() || null,
+        muscleGroup: values.muscleGroup,
+      });
       toast.success("حرکت جدید به کتابخانه اضافه شد.");
       handleOpenChange(false);
     } catch (error) {
@@ -65,7 +70,7 @@ export function AddExerciseDialog() {
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="exercise-name">نام حرکت</Label>
+            <Label htmlFor="exercise-name">نام حرکت (فارسی)</Label>
             <Input
               id="exercise-name"
               placeholder="مثلاً پرس سینه با هالتر"
@@ -76,6 +81,33 @@ export function AddExerciseDialog() {
                 {form.formState.errors.name.message}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="exercise-name-en">
+              نام انگلیسی حرکت{" "}
+              <span className="text-muted-foreground">(اختیاری)</span>
+            </Label>
+            <Input
+              id="exercise-name-en"
+              dir="ltr"
+              placeholder="e.g. Barbell Bench Press"
+              {...form.register("nameEn")}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="exercise-description">
+              توضیح حرکت{" "}
+              <span className="text-muted-foreground">(اختیاری)</span>
+            </Label>
+            <textarea
+              id="exercise-description"
+              rows={3}
+              placeholder="نکات اجرای صحیح حرکت..."
+              className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+              {...form.register("description")}
+            />
           </div>
 
           <div className="space-y-2">

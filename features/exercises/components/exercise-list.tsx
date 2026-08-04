@@ -76,6 +76,11 @@ export function ExerciseList() {
                       {exercise.nameEn}
                     </p>
                   )}
+                  {exercise.description && (
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                      {exercise.description}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge variant="secondary">{exercise.muscleGroup}</Badge>
