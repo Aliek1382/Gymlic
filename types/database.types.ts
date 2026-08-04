@@ -289,6 +289,21 @@ export interface Database {
           created_by?: string | null;
         }
       >;
+      exercise_usage: TableOf<
+        {
+          id: string;
+          trainer_id: string;
+          exercise_id: string;
+          use_count: number;
+          last_used_at: string;
+        },
+        {
+          trainer_id: string;
+          exercise_id: string;
+          use_count?: number;
+          last_used_at?: string;
+        }
+      >;
     };
     Views: Record<string, never>;
     Functions: {

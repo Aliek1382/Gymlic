@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { ExercisePicker } from "@/features/exercises";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
@@ -86,6 +87,13 @@ export function PlanDialog({
     }
   }
 
+  function handleInsertExerciseLine(line: string) {
+    const current = form.getValues("description") ?? "";
+    form.setValue("description", current.trim() ? `${current}\n${line}` : line, {
+      shouldDirty: true,
+    });
+  }
+
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (!next) {
@@ -132,15 +140,25 @@ export function PlanDialog({
             )}
           </div>
 
+          {kind === "workout" && (
+            <ExercisePicker onInsert={handleInsertExerciseLine} />
+          )}
+
           <div className="space-y-2">
             <Label htmlFor={`${kind}-description`}>توضیحات (اختیاری)</Label>
             <textarea
               id={`${kind}-description`}
-              rows={3}
+              rows={kind === "workout" ? 5 : 3}
               placeholder="توضیحات آزاد برای شرح حرکات، ست و تکرار یا وعده‌های غذایی..."
               className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
               {...form.register("description")}
             />
+            {kind === "workout" && (
+              <p className="text-xs text-muted-foreground">
+                اگر درمورد سیستم انجام دادن حرکات توضیحی دارید اضافه کنید،
+                مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
