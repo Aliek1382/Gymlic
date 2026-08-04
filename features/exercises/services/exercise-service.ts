@@ -16,13 +16,14 @@ export async function listExercises(): Promise<ExerciseSummary[]> {
 
   const { data, error } = await supabase
     .from("exercises")
-    .select("id, name, muscle_group, created_by, created_at")
+    .select("id, name, name_en, muscle_group, created_by, created_at")
     .order("name", { ascending: true });
   if (error) throw error;
 
   return (data ?? []).map((row) => ({
     id: row.id,
     name: row.name,
+    nameEn: row.name_en,
     muscleGroup: row.muscle_group,
     isCustom: row.created_by !== null,
     createdAt: row.created_at,

@@ -275,6 +275,7 @@ export interface Database {
         {
           id: string;
           name: string;
+          name_en: string | null;
           muscle_group: string;
           created_by: string | null;
           created_at: string;
@@ -282,6 +283,7 @@ export interface Database {
         {
           name: string;
           muscle_group: string;
+          name_en?: string | null;
           created_by?: string | null;
         }
       >;

@@ -61,20 +61,28 @@ export function ExerciseList() {
           <div className="px-6">
             <CardTitle className="text-base">{muscleGroup}</CardTitle>
           </div>
-          <div className="grid grid-cols-1 gap-2 px-6 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
             {items.map((exercise) => (
               <div
                 key={exercise.id}
-                className="flex items-center justify-between gap-2 rounded-xl border border-border p-3"
+                className="flex flex-col gap-2 rounded-xl border border-border p-3"
               >
-                <span className="text-sm font-medium text-foreground">
-                  {exercise.name}
-                </span>
-                {exercise.isCustom && (
-                  <Badge variant="info" className="shrink-0">
-                    حرکت شما
-                  </Badge>
-                )}
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium text-foreground">
+                    {exercise.name}
+                  </p>
+                  {exercise.nameEn && (
+                    <p dir="ltr" className="text-xs text-muted-foreground">
+                      {exercise.nameEn}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge variant="secondary">{exercise.muscleGroup}</Badge>
+                  {exercise.isCustom && (
+                    <Badge variant="info">حرکت شما</Badge>
+                  )}
+                </div>
               </div>
             ))}
           </div>
