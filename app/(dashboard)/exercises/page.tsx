@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { LineChart } from "lucide-react";
 
-import { ComingSoon } from "@/components/coming-soon";
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
+import { AddExerciseDialog, ExerciseList } from "@/features/exercises";
 
 export const metadata = { title: "کتابخانه حرکات | جیم‌لیک" };
 
@@ -12,10 +11,19 @@ export default async function ExercisesPage() {
   if (context.accountType !== "trainer") redirect("/dashboard");
 
   return (
-    <ComingSoon
-      icon={LineChart}
-      title="کتابخانه حرکات"
-      description="مجموعه حرکات تمرینی برای استفاده در برنامه‌های تمرینی به‌زودی در دسترس خواهد بود."
-    />
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">کتابخانه حرکات</h1>
+          <p className="text-sm text-muted-foreground">
+            حرکات پرتکرار به‌صورت پیش‌فرض در دسترس است؛ حرکت‌های اختصاصی خودتان
+            را هم می‌توانید اضافه کنید.
+          </p>
+        </div>
+        <AddExerciseDialog />
+      </div>
+
+      <ExerciseList />
+    </div>
   );
 }

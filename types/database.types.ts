@@ -271,6 +271,20 @@ export interface Database {
           class_date?: string;
         }
       >;
+      exercises: TableOf<
+        {
+          id: string;
+          name: string;
+          muscle_group: string;
+          created_by: string | null;
+          created_at: string;
+        },
+        {
+          name: string;
+          muscle_group: string;
+          created_by?: string | null;
+        }
+      >;
     };
     Views: Record<string, never>;
     Functions: {
