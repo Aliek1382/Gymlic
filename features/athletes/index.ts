@@ -4,6 +4,7 @@ export * from "./components/plan-dialog";
 export * from "./components/my-plan-list";
 export * from "./components/remove-athlete-button";
 export * from "./components/plan-browser";
+export * from "./components/workout-day-builder";
 
 export * from "./hooks/use-athletes";
 export * from "./hooks/use-pending-athlete-invites";
@@ -17,3 +18,4 @@ export * from "./hooks/use-complete-plan";
 
 export * from "./services/athlete-service";
 export * from "./types/athlete-types";
+export * from "./utils/workout-plan-text";

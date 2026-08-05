@@ -44,9 +44,11 @@ import { useAthletes } from "../hooks/use-athletes";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
+import { insertExerciseLineForDay } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
+import { WorkoutDayBuilder } from "./workout-day-builder";
 
 type SortOrder = "newest" | "oldest";
 
@@ -110,6 +112,15 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
       });
     }
   }, [editingPlan, editForm]);
+
+  function handleInsertExerciseLine(day: string, line: string) {
+    const current = editForm.getValues("description") ?? "";
+    editForm.setValue(
+      "description",
+      insertExerciseLineForDay(current, day, line),
+      { shouldDirty: true }
+    );
+  }
 
   async function handleComplete(planId: string) {
     try {
@@ -271,16 +282,26 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
                   )}
                 </div>
 
+                {kind === "workout" && (
+                  <WorkoutDayBuilder onInsertLine={handleInsertExerciseLine} />
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="edit-plan-description">
                     توضیحات (اختیاری)
                   </Label>
                   <textarea
                     id="edit-plan-description"
-                    rows={4}
+                    rows={kind === "workout" ? 6 : 4}
                     className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
                     {...editForm.register("description")}
                   />
+                  {kind === "workout" && (
+                    <p className="text-xs text-muted-foreground">
+                      اگر درمورد سیستم انجام دادن حرکات توضیحی دارید اضافه
+                      کنید، مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
+                    </p>
+                  )}
                 </div>
 
                 <Button

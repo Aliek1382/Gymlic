@@ -20,11 +20,12 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { ExercisePicker } from "@/features/exercises";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
+import { insertExerciseLineForDay } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind, PlanTarget } from "../types/athlete-types";
+import { WorkoutDayBuilder } from "./workout-day-builder";
 
 const KIND_LABEL: Record<PlanKind, { title: string; icon: typeof Dumbbell }> = {
   workout: { title: "برنامه تمرینی", icon: Dumbbell },
@@ -87,9 +88,9 @@ export function PlanDialog({
     }
   }
 
-  function handleInsertExerciseLine(line: string) {
+  function handleInsertExerciseLine(day: string, line: string) {
     const current = form.getValues("description") ?? "";
-    form.setValue("description", current.trim() ? `${current}\n${line}` : line, {
+    form.setValue("description", insertExerciseLineForDay(current, day, line), {
       shouldDirty: true,
     });
   }
@@ -141,7 +142,7 @@ export function PlanDialog({
           </div>
 
           {kind === "workout" && (
-            <ExercisePicker onInsert={handleInsertExerciseLine} />
+            <WorkoutDayBuilder onInsertLine={handleInsertExerciseLine} />
           )}
 
           <div className="space-y-2">
@@ -212,7 +213,7 @@ export function PlanDialog({
                     </div>
                   </div>
                   {plan.description && (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 whitespace-pre-line text-xs text-muted-foreground">
                       {plan.description}
                     </p>
                   )}
