@@ -20,7 +20,11 @@ export function DashboardShell({
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar accountType={accountType} />
-      <div className="flex min-h-screen flex-1 flex-col">
+      {/* min-w-0 is required: without it this flex-1 column can't shrink
+          below the natural width of its widest un-wrapped content (e.g. a
+          long activity title), which silently overflows the viewport since
+          overflow-x is hidden globally instead of scrolling. */}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <DashboardHeader
           accountType={accountType}
           fullName={fullName}
