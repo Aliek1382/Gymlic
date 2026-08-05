@@ -3,7 +3,21 @@
 // reason to store (or make users upload) full-resolution photos.
 export async function compressImageToBlob(
   file: File,
-  { maxDimension = 512, quality = 0.82 }: { maxDimension?: number; quality?: number } = {}
+  {
+    maxDimension = 512,
+    initialQuality = 0.9,
+    maxBytes = 200 * 1024,
+    minQuality = 0.5,
+  }: {
+    maxDimension?: number;
+    initialQuality?: number;
+    // Ceiling the output must fit under. A single fixed quality value can't
+    // guarantee this on its own — a busy/detailed source photo can still
+    // encode large even at the same quality setting — so quality is stepped
+    // down automatically until the blob fits, instead of trusting one number.
+    maxBytes?: number;
+    minQuality?: number;
+  } = {}
 ): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
@@ -18,9 +32,23 @@ export async function compressImageToBlob(
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", quality)
-  );
-  if (!blob) throw new Error("فشرده‌سازی تصویر با خطا مواجه شد.");
+  function encode(quality: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) =>
+          blob ? resolve(blob) : reject(new Error("فشرده‌سازی تصویر با خطا مواجه شد.")),
+        "image/jpeg",
+        quality
+      );
+    });
+  }
+
+  let quality = initialQuality;
+  let blob = await encode(quality);
+  while (blob.size > maxBytes && quality > minQuality) {
+    quality = Math.max(minQuality, quality - 0.1);
+    blob = await encode(quality);
+  }
+
   return blob;
 }

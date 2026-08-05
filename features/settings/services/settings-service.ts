@@ -65,7 +65,7 @@ export async function uploadAvatar(file: File): Promise<{ url: string }> {
     throw new Error("حجم تصویر انتخابی خیلی زیاد است (حداکثر ۸ مگابایت).");
   }
 
-  const blob = await compressImageToBlob(file, { maxDimension: 512, quality: 0.82 });
+  const blob = await compressImageToBlob(file, { maxDimension: 512, initialQuality: 0.9 });
   const path = `${userId}/avatar.jpg`;
 
   const { error: uploadError } = await supabase.storage
