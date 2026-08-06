@@ -5,6 +5,9 @@ export * from "./components/my-plan-list";
 export * from "./components/remove-athlete-button";
 export * from "./components/plan-browser";
 export * from "./components/workout-day-builder";
+export * from "./components/template-manager";
+export * from "./components/template-form-dialog";
+export * from "./components/template-list";
 
 export * from "./hooks/use-athletes";
 export * from "./hooks/use-pending-athlete-invites";

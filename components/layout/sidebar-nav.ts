@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Apple,
   BarChart3,
+  Bookmark,
   Calendar,
   Dumbbell,
   LayoutGrid,
@@ -19,6 +20,7 @@ export interface SidebarNavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  description?: string;
 }
 
 // Dashboard Pack — اصلاح شماره ۴: Sidebar is Dynamic per role.
@@ -36,6 +38,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "ورزشکاران", href: "/athletes", icon: Users },
     { label: "برنامه‌های تمرینی", href: "/workout-programs", icon: Dumbbell },
     { label: "برنامه‌های غذایی", href: "/nutrition-programs", icon: Apple },
+    {
+      label: "قالب‌ها",
+      href: "/templates",
+      icon: Bookmark,
+      description:
+        "قالب‌های آماده برای برنامه تمرینی و غذایی بسازید تا هنگام نوشتن برنامه برای ورزشکاران سریع‌تر شروع کنید.",
+    },
     { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "تنظیمات", href: "/settings", icon: Settings },

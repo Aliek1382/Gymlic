@@ -6,6 +6,12 @@ import { LogOut, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { SIDEBAR_NAV } from "./sidebar-nav";
@@ -32,27 +38,47 @@ export function SidebarContent({
       </div>
 
       <nav className="flex-1 space-y-1 px-4">
-        {items.map((item) => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-muted"
-              )}
-            >
-              <Icon className="size-[18px]" />
-              {item.label}
-            </Link>
-          );
-        })}
+        <TooltipProvider delayDuration={300}>
+          {items.map((item) => {
+            const isActive =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const Icon = item.icon;
+            const linkClassName = cn(
+              "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-muted"
+            );
+
+            if (!item.description) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={linkClassName}
+                >
+                  <Icon className="size-[18px]" />
+                  {item.label}
+                </Link>
+              );
+            }
+
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                  <Link href={item.href} onClick={onNavigate} className={linkClassName}>
+                    <Icon className="size-[18px]" />
+                    {item.label}
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-56 text-center">
+                  {item.description}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </TooltipProvider>
       </nav>
 
       <div className="space-y-2 px-4 pb-6 pt-4">
