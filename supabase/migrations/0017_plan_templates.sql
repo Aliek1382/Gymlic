@@ -12,18 +12,18 @@
 -- never changes plans already sent out.
 -- ============================================================================
 
-alter table workout_assignments add column is_template boolean not null default false;
-alter table nutrition_assignments add column is_template boolean not null default false;
+alter table workout_assignments add column if not exists is_template boolean not null default false;
+alter table nutrition_assignments add column if not exists is_template boolean not null default false;
 
-alter table workout_assignments drop constraint workout_assignments_target_chk;
+alter table workout_assignments drop constraint if exists workout_assignments_target_chk;
 alter table workout_assignments
   add constraint workout_assignments_target_chk
   check (is_template or athlete_id is not null or invitation_id is not null);
 
-alter table nutrition_assignments drop constraint nutrition_assignments_target_chk;
+alter table nutrition_assignments drop constraint if exists nutrition_assignments_target_chk;
 alter table nutrition_assignments
   add constraint nutrition_assignments_target_chk
   check (is_template or athlete_id is not null or invitation_id is not null);
 
-create index workout_assignments_template_idx on workout_assignments (trainer_id) where is_template;
-create index nutrition_assignments_template_idx on nutrition_assignments (trainer_id) where is_template;
+create index if not exists workout_assignments_template_idx on workout_assignments (trainer_id) where is_template;
+create index if not exists nutrition_assignments_template_idx on nutrition_assignments (trainer_id) where is_template;
