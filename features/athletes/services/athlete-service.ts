@@ -5,6 +5,7 @@ import type {
   PendingAthleteInvite,
   PlanKind,
   PlanTarget,
+  PlanTemplate,
 } from "../types/athlete-types";
 
 async function getCurrentUserId(): Promise<string> {
@@ -248,5 +249,60 @@ export async function completePlan(kind: PlanKind, planId: string): Promise<void
   const { error } = await supabase.rpc(COMPLETE_RPC_BY_KIND[kind], {
     p_id: planId,
   });
+  if (error) throw error;
+}
+
+export async function listTemplates(kind: PlanKind): Promise<PlanTemplate[]> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from(TABLE_BY_KIND[kind])
+    .select("id, title, description, assigned_at")
+    .eq("trainer_id", trainerId)
+    .eq("is_template", true)
+    .order("assigned_at", { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    createdAt: row.assigned_at,
+  }));
+}
+
+export async function saveTemplate(
+  kind: PlanKind,
+  input: { title: string; description: string | null }
+): Promise<{ id: string }> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from(TABLE_BY_KIND[kind])
+    .insert({
+      trainer_id: trainerId,
+      title: input.title,
+      description: input.description,
+      is_template: true,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  return { id: data.id };
+}
+
+export async function deleteTemplate(kind: PlanKind, templateId: string): Promise<void> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { error } = await supabase
+    .from(TABLE_BY_KIND[kind])
+    .delete()
+    .eq("id", templateId)
+    .eq("trainer_id", trainerId)
+    .eq("is_template", true);
   if (error) throw error;
 }

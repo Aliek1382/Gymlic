@@ -26,18 +26,21 @@ export async function getTrainerStatistics(): Promise<TrainerStatistics> {
         .from("workout_assignments")
         .select("id", { count: "exact", head: true })
         .eq("trainer_id", user.id)
-        .eq("status", "active"),
+        .eq("status", "active")
+        .eq("is_template", false),
       supabase
         .from("workout_assignments")
         .select("id", { count: "exact", head: true })
         .eq("trainer_id", user.id)
         .eq("status", "active")
+        .eq("is_template", false)
         .gte("assigned_at", todayStart.toISOString()),
       supabase
         .from("nutrition_assignments")
         .select("id", { count: "exact", head: true })
         .eq("trainer_id", user.id)
-        .eq("status", "active"),
+        .eq("status", "active")
+        .eq("is_template", false),
     ]);
 
   return {
@@ -68,6 +71,7 @@ export async function getTrainerRecentActivities(
       )
       .eq("trainer_id", user.id)
       .neq("status", "draft")
+      .eq("is_template", false)
       .order("assigned_at", { ascending: false })
       .limit(limit),
     supabase
@@ -77,6 +81,7 @@ export async function getTrainerRecentActivities(
       )
       .eq("trainer_id", user.id)
       .neq("status", "draft")
+      .eq("is_template", false)
       .order("assigned_at", { ascending: false })
       .limit(limit),
   ]);

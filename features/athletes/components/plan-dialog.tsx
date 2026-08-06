@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Apple, Dumbbell, Loader2 } from "lucide-react";
+import { Apple, Bookmark, Dumbbell, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +20,11 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { useDeleteTemplate } from "../hooks/use-delete-template";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
+import { useSaveTemplate } from "../hooks/use-save-template";
+import { useTemplates } from "../hooks/use-templates";
 import { insertExerciseLineForDay } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind, PlanTarget } from "../types/athlete-types";
@@ -46,6 +49,9 @@ export function PlanDialog({
   const [hydrated, setHydrated] = useState(false);
   const plans = usePlans(kind, target, open);
   const savePlan = useSavePlan(kind, target);
+  const templates = useTemplates(kind, open);
+  const saveTemplate = useSaveTemplate(kind);
+  const deleteTemplate = useDeleteTemplate(kind);
   const { title: kindTitle, icon: Icon } = KIND_LABEL[kind];
 
   const form = useForm<PlanFormValues>({
@@ -95,6 +101,36 @@ export function PlanDialog({
     });
   }
 
+  function handleApplyTemplate(template: { title: string; description: string | null }) {
+    form.reset({ title: template.title, description: template.description ?? "" });
+    toast.success("قالب اعمال شد — قبل از ثبت می‌توانید ویرایش کنید.");
+  }
+
+  async function handleSaveAsTemplate() {
+    const values = form.getValues();
+    if (!values.title.trim()) {
+      toast.error("برای ذخیره قالب، عنوان را وارد کنید.");
+      return;
+    }
+    try {
+      await saveTemplate.mutateAsync({
+        title: values.title,
+        description: values.description || null,
+      });
+      toast.success("به‌عنوان قالب ذخیره شد.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "ذخیره قالب با خطا مواجه شد."));
+    }
+  }
+
+  async function handleDeleteTemplate(templateId: string) {
+    try {
+      await deleteTemplate.mutateAsync(templateId);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "حذف قالب با خطا مواجه شد."));
+    }
+  }
+
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (!next) {
@@ -122,6 +158,38 @@ export function PlanDialog({
               : "یک برنامه جدید برای این ورزشکار ثبت کنید."}
           </DialogDescription>
         </DialogHeader>
+
+        {templates.data && templates.data.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-dashed border-border p-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              شروع از یک قالب
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {templates.data.map((template) => (
+                <div
+                  key={template.id}
+                  className="flex items-center gap-1 rounded-full bg-muted pr-1 pl-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleApplyTemplate(template)}
+                    className="rounded-full px-2 py-1 text-xs font-medium text-foreground hover:text-primary"
+                  >
+                    {template.title}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTemplate(template.id)}
+                    aria-label="حذف قالب"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <form
           onSubmit={form.handleSubmit((values) => onSubmit(values, "active"))}
@@ -181,6 +249,22 @@ export function PlanDialog({
               بعداً بقیه‌اش را می‌نویسم
             </Button>
           </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground"
+            disabled={saveTemplate.isPending}
+            onClick={handleSaveAsTemplate}
+          >
+            {saveTemplate.isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Bookmark />
+            )}
+            ذخیره به‌عنوان قالب
+          </Button>
         </form>
 
         <div className="space-y-2 border-t border-border pt-4">

@@ -17,3 +17,10 @@ export interface PendingAthleteInvite {
 export type PlanKind = "workout" | "nutrition";
 
 export type PlanTarget = { athleteId: string } | { invitationId: string };
+
+export interface PlanTemplate {
+  id: string;
+  title: string;
+  description: string | null;
+  createdAt: string;
+}

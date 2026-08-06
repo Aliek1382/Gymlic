@@ -33,12 +33,14 @@ export async function getTrainerMonthlyStats(): Promise<TrainerMonthlyStatsSumma
       .from("workout_assignments")
       .select("id", { count: "exact", head: true })
       .eq("trainer_id", trainerId)
+      .eq("is_template", false)
       .neq("status", "draft")
       .gte("assigned_at", monthStart.toISOString()),
     supabase
       .from("nutrition_assignments")
       .select("id", { count: "exact", head: true })
       .eq("trainer_id", trainerId)
+      .eq("is_template", false)
       .neq("status", "draft")
       .gte("assigned_at", monthStart.toISOString()),
   ]);

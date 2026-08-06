@@ -167,6 +167,7 @@ export interface Database {
           title: string;
           description: string | null;
           status: WorkoutStatus;
+          is_template: boolean;
           assigned_at: string;
           updated_at: string;
         },
@@ -178,6 +179,7 @@ export interface Database {
           description?: string | null;
           club_id?: string | null;
           status?: WorkoutStatus;
+          is_template?: boolean;
         }
       >;
       nutrition_assignments: TableOf<
@@ -190,6 +192,7 @@ export interface Database {
           title: string;
           description: string | null;
           status: WorkoutStatus;
+          is_template: boolean;
           assigned_at: string;
           updated_at: string;
         },
@@ -201,6 +204,7 @@ export interface Database {
           description?: string | null;
           club_id?: string | null;
           status?: WorkoutStatus;
+          is_template?: boolean;
         }
       >;
       measurements: TableOf<
