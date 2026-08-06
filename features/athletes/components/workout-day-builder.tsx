@@ -1,23 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { ExercisePicker } from "@/features/exercises";
+import { ExercisePicker, useExercisesForPicker } from "@/features/exercises";
 import { WEEKDAYS } from "../utils/workout-plan-text";
 
 export function WorkoutDayBuilder({
   onInsertLine,
 }: {
-  onInsertLine: (day: string, line: string) => void;
+  onInsertLine: (heading: string | null, line: string) => void;
 }) {
-  const [selectedDay, setSelectedDay] = useState<string>(WEEKDAYS[0]);
+  const exercises = useExercisesForPicker();
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<string | null>(null);
+
+  const muscleGroups = useMemo(() => {
+    const unique = new Set(
+      (exercises.data ?? []).map((exercise) => exercise.muscleGroup)
+    );
+    return [...unique].sort((a, b) => a.localeCompare(b, "fa"));
+  }, [exercises.data]);
+
+  function handleSelectDay(day: string) {
+    setSelectedDay((current) => (current === day ? null : day));
+    setSelectedMuscleGroup(null);
+  }
+
+  function handleSelectMuscleGroup(group: string) {
+    setSelectedMuscleGroup((current) => (current === group ? null : group));
+    setSelectedDay(null);
+  }
+
+  const heading = selectedDay ?? selectedMuscleGroup;
 
   return (
     <div className="space-y-3">
       <div>
         <p className="mb-2 text-xs font-medium text-muted-foreground">
-          روز هفته
+          روز هفته <span className="text-muted-foreground">(اختیاری)</span>
         </p>
         <div className="flex flex-wrap gap-1.5">
           {WEEKDAYS.map((day) => (
@@ -26,7 +47,7 @@ export function WorkoutDayBuilder({
               type="button"
               size="sm"
               variant={day === selectedDay ? "default" : "outline"}
-              onClick={() => setSelectedDay(day)}
+              onClick={() => handleSelectDay(day)}
             >
               {day}
             </Button>
@@ -34,7 +55,28 @@ export function WorkoutDayBuilder({
         </div>
       </div>
 
-      <ExercisePicker onInsert={(line) => onInsertLine(selectedDay, line)} />
+      {muscleGroups.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            گروه عضلانی <span className="text-muted-foreground">(اختیاری)</span>
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {muscleGroups.map((group) => (
+              <Button
+                key={group}
+                type="button"
+                size="sm"
+                variant={group === selectedMuscleGroup ? "default" : "outline"}
+                onClick={() => handleSelectMuscleGroup(group)}
+              >
+                {group}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <ExercisePicker onInsert={(line) => onInsertLine(heading, line)} />
     </div>
   );
 }

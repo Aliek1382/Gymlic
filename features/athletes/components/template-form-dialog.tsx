@@ -18,7 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useSaveTemplate } from "../hooks/use-save-template";
-import { insertExerciseLineForDay } from "../utils/workout-plan-text";
+import {
+  appendExerciseLine,
+  insertExerciseLineUnderHeading,
+} from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind } from "../types/athlete-types";
 import { WorkoutDayBuilder } from "./workout-day-builder";
@@ -51,11 +54,12 @@ export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
     defaultValues: { title: "", description: "" },
   });
 
-  function handleInsertExerciseLine(day: string, line: string) {
+  function handleInsertExerciseLine(heading: string | null, line: string) {
     const current = form.getValues("description") ?? "";
-    form.setValue("description", insertExerciseLineForDay(current, day, line), {
-      shouldDirty: true,
-    });
+    const next = heading
+      ? insertExerciseLineUnderHeading(current, heading, line)
+      : appendExerciseLine(current, line);
+    form.setValue("description", next, { shouldDirty: true });
   }
 
   async function onSubmit(values: PlanFormValues) {

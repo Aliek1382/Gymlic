@@ -44,7 +44,10 @@ import { useAthletes } from "../hooks/use-athletes";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
-import { insertExerciseLineForDay } from "../utils/workout-plan-text";
+import {
+  appendExerciseLine,
+  insertExerciseLineUnderHeading,
+} from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
@@ -113,13 +116,12 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
     }
   }, [editingPlan, editForm]);
 
-  function handleInsertExerciseLine(day: string, line: string) {
+  function handleInsertExerciseLine(heading: string | null, line: string) {
     const current = editForm.getValues("description") ?? "";
-    editForm.setValue(
-      "description",
-      insertExerciseLineForDay(current, day, line),
-      { shouldDirty: true }
-    );
+    const next = heading
+      ? insertExerciseLineUnderHeading(current, heading, line)
+      : appendExerciseLine(current, line);
+    editForm.setValue("description", next, { shouldDirty: true });
   }
 
   async function handleComplete(planId: string) {

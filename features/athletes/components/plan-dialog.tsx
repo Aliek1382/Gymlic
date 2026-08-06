@@ -25,7 +25,10 @@ import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
 import { useSaveTemplate } from "../hooks/use-save-template";
 import { useTemplates } from "../hooks/use-templates";
-import { insertExerciseLineForDay } from "../utils/workout-plan-text";
+import {
+  appendExerciseLine,
+  insertExerciseLineUnderHeading,
+} from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind, PlanTarget } from "../types/athlete-types";
 import { WorkoutDayBuilder } from "./workout-day-builder";
@@ -94,11 +97,12 @@ export function PlanDialog({
     }
   }
 
-  function handleInsertExerciseLine(day: string, line: string) {
+  function handleInsertExerciseLine(heading: string | null, line: string) {
     const current = form.getValues("description") ?? "";
-    form.setValue("description", insertExerciseLineForDay(current, day, line), {
-      shouldDirty: true,
-    });
+    const next = heading
+      ? insertExerciseLineUnderHeading(current, heading, line)
+      : appendExerciseLine(current, line);
+    form.setValue("description", next, { shouldDirty: true });
   }
 
   function handleApplyTemplate(template: { title: string; description: string | null }) {
