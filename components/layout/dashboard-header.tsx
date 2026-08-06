@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronLeft, CircleHelp, LogOut, Search, User as UserIcon } from "lucide-react";
+import { Bell, ChevronLeft, CircleHelp, LogOut, User as UserIcon } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
+import { GlobalSearch } from "./global-search";
 import { MobileSidebar } from "./mobile-sidebar";
 import { SIDEBAR_NAV } from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
@@ -93,15 +94,7 @@ export function DashboardHeader({
         <span className="absolute right-2 top-2 size-1.5 rounded-full bg-destructive" />
       </button>
 
-      <div className="hidden flex-1 md:block">
-        <div className="mx-auto flex max-w-md items-center gap-2 rounded-full border border-input bg-muted/60 px-4 py-2 text-sm text-muted-foreground">
-          <Search className="size-4" />
-          <span className="flex-1 truncate">جستجوی سریع</span>
-          <kbd className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px]">
-            ⌘K
-          </kbd>
-        </div>
-      </div>
+      <GlobalSearch accountType={accountType} />
 
       <div className="hidden items-center gap-1.5 text-sm text-muted-foreground lg:flex">
         <span className="text-foreground">جیم‌لیک</span>
