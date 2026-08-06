@@ -49,8 +49,8 @@ export function ExercisePicker({
       </p>
 
       <Select value={exerciseId} onValueChange={setExerciseId}>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="انتخاب حرکت..." />
+        <SelectTrigger className="w-full justify-start">
+          <SelectValue placeholder="انتخاب حرکت..." className="min-w-0 truncate" />
         </SelectTrigger>
         <SelectContent>
           {exercises.data?.map((exercise) => (
@@ -62,20 +62,20 @@ export function ExercisePicker({
         </SelectContent>
       </Select>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <Input
           value={sets}
           onChange={(e) => setSets(e.target.value)}
           inputMode="numeric"
           placeholder="تعداد ست"
-          className="w-24 text-center"
+          className="text-center sm:w-32"
         />
         <Input
           value={reps}
           onChange={(e) => setReps(e.target.value)}
           inputMode="numeric"
           placeholder="تکرار در هر ست"
-          className="w-28 text-center"
+          className="text-center sm:w-32"
         />
         <Button
           type="button"
@@ -83,7 +83,7 @@ export function ExercisePicker({
           variant="outline"
           disabled={!canAdd}
           onClick={handleAdd}
-          className="flex-1 sm:flex-none"
+          className="col-span-2 sm:flex-1"
         >
           <Plus />
           افزودن به برنامه
