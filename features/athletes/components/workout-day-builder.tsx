@@ -24,15 +24,16 @@ export function WorkoutDayBuilder({
 
   function handleSelectDay(day: string) {
     setSelectedDay((current) => (current === day ? null : day));
-    setSelectedMuscleGroup(null);
   }
 
   function handleSelectMuscleGroup(group: string) {
     setSelectedMuscleGroup((current) => (current === group ? null : group));
-    setSelectedDay(null);
   }
 
-  const heading = selectedDay ?? selectedMuscleGroup;
+  // Day and muscle group are independent — a trainer can pick either, both
+  // (combined into one heading, e.g. "شنبه — پا"), or neither.
+  const heading =
+    [selectedDay, selectedMuscleGroup].filter(Boolean).join(" — ") || null;
 
   return (
     <div className="space-y-3">
