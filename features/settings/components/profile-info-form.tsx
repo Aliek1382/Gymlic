@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import {
   type ProfileInfoFormValues,
 } from "../validators/settings-schemas";
 import { AvatarUpload } from "./avatar-upload";
+import { BirthDatePicker } from "./birth-date-picker";
 
 export function ProfileInfoForm({ profile }: { profile: Profile }) {
   const updateProfileInfo = useUpdateProfileInfo();
@@ -27,8 +28,11 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
       firstName: profile.firstName ?? "",
       lastName: profile.lastName ?? "",
       phone: profile.phone ?? "",
+      birthDate: profile.birthDate,
     },
   });
+
+  const isTrainer = profile.accountType === "trainer";
 
   async function onSubmit(values: ProfileInfoFormValues) {
     try {
@@ -36,6 +40,7 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
         firstName: values.firstName,
         lastName: values.lastName,
         phone: values.phone || null,
+        birthDate: isTrainer ? values.birthDate : undefined,
       });
       toast.success("اطلاعات پروفایل به‌روزرسانی شد.");
     } catch (error) {
@@ -95,6 +100,28 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
               </p>
             )}
           </div>
+
+          {isTrainer && (
+            <div className="space-y-2">
+              <Label>
+                تاریخ تولد{" "}
+                <span className="text-muted-foreground">(اختیاری)</span>
+              </Label>
+              <Controller
+                control={form.control}
+                name="birthDate"
+                render={({ field }) => (
+                  <BirthDatePicker
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                برای ارسال آفر یا تخفیف تولد به شما استفاده می‌شود.
+              </p>
+            </div>
+          )}
 
           <Button type="submit" disabled={updateProfileInfo.isPending}>
             {updateProfileInfo.isPending && <Loader2 className="animate-spin" />}

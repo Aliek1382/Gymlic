@@ -49,7 +49,7 @@ export async function getMyProfile(): Promise<Profile | null> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, phone, email, first_name, last_name, avatar_url, account_type")
+    .select("id, phone, email, first_name, last_name, avatar_url, birth_date, account_type")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -65,7 +65,7 @@ export async function getMyProfile(): Promise<Profile | null> {
         phone: user.phone || null,
         email: user.email || null,
       })
-      .select("id, phone, email, first_name, last_name, avatar_url, account_type")
+      .select("id, phone, email, first_name, last_name, avatar_url, birth_date, account_type")
       .single();
     if (insertError) throw insertError;
     return mapProfile(created);
@@ -254,6 +254,7 @@ function mapProfile(row: {
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
+  birth_date: string | null;
   account_type: AccountType | null;
 }): Profile {
   return {
@@ -263,6 +264,7 @@ function mapProfile(row: {
     firstName: row.first_name,
     lastName: row.last_name,
     avatarUrl: row.avatar_url,
+    birthDate: row.birth_date,
     accountType: row.account_type,
   };
 }

@@ -10,6 +10,7 @@ export const profileInfoSchema = z.object({
     .refine((value) => !value || /^0?9\d{9}$/.test(value), {
       message: "شماره موبایل معتبر نیست.",
     }),
+  birthDate: z.string().nullable().optional(),
 });
 
 export type ProfileInfoFormValues = z.infer<typeof profileInfoSchema>;

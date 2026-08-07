@@ -34,6 +34,7 @@ export interface Database {
           first_name: string | null;
           last_name: string | null;
           avatar_url: string | null;
+          birth_date: string | null;
           account_type: AccountType | null;
           created_at: string;
           updated_at: string;
@@ -45,6 +46,7 @@ export interface Database {
           first_name?: string | null;
           last_name?: string | null;
           avatar_url?: string | null;
+          birth_date?: string | null;
           account_type?: AccountType | null;
         }
       >;

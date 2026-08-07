@@ -16,18 +16,26 @@ export async function updateProfileInfo(input: {
   firstName: string;
   lastName: string;
   phone: string | null;
+  birthDate?: string | null;
 }): Promise<void> {
   const supabase = createClient();
   const userId = await getCurrentUserId();
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      first_name: input.firstName,
-      last_name: input.lastName,
-      phone: input.phone,
-    })
-    .eq("id", userId);
+  const update: {
+    first_name: string;
+    last_name: string;
+    phone: string | null;
+    birth_date?: string | null;
+  } = {
+    first_name: input.firstName,
+    last_name: input.lastName,
+    phone: input.phone,
+  };
+  if (input.birthDate !== undefined) {
+    update.birth_date = input.birthDate;
+  }
+
+  const { error } = await supabase.from("profiles").update(update).eq("id", userId);
   if (error) throw error;
 }
 

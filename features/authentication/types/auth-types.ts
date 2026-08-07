@@ -7,6 +7,7 @@ export interface Profile {
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
+  birthDate: string | null;
   accountType: AccountType | null;
 }
 
