@@ -23,6 +23,7 @@ export default async function WorkoutPage() {
         kind="workout"
         emptyTitle="هنوز برنامه تمرینی ثبت نشده است."
         emptyDescription="به محض ثبت برنامه توسط مربی، اینجا نمایش داده می‌شود."
+        trainerName={context.trainerName}
       />
     </div>
   );

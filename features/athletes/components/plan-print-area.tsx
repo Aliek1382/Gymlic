@@ -10,9 +10,26 @@ const KIND_LABEL: Record<PlanKind, string> = {
 export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
   if (!plan) return null;
 
+  const watermarkLabel = plan.trainerName
+    ? `جیم‌لیک — ${plan.trainerName}`
+    : "جیم‌لیک";
+
   return (
     <div className="print-area hidden bg-white print:block" dir="rtl">
-      <div className="mx-auto max-w-2xl p-8 text-black">
+      {/* position: fixed (not absolute) so this repeats on every printed
+          page, and rendered as real text at low opacity — not a CSS
+          background — since browsers omit backgrounds when printing
+          unless the user opts into "background graphics". */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden"
+      >
+        <p className="rotate-[-30deg] whitespace-nowrap text-6xl font-bold text-black/[0.07]">
+          {watermarkLabel}
+        </p>
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-2xl p-8 text-black">
         <div className="mb-6 flex items-center justify-between border-b border-black/20 pb-4">
           <div>
             <p className="text-lg font-bold">جیم‌لیک</p>

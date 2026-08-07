@@ -25,10 +25,12 @@ export function MyPlanList({
   kind,
   emptyTitle,
   emptyDescription,
+  trainerName,
 }: {
   kind: PlanKind;
   emptyTitle: string;
   emptyDescription: string;
+  trainerName?: string | null;
 }) {
   const plans = useMyPlans(kind);
   const completePlan = useCompletePlan(kind);
@@ -104,6 +106,7 @@ export function MyPlanList({
                     title: plan.title,
                     description: plan.description,
                     assignedAt: plan.assignedAt,
+                    trainerName: trainerName ?? undefined,
                   })
                 }
               >

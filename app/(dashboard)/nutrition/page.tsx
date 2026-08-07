@@ -23,6 +23,7 @@ export default async function NutritionPage() {
         kind="nutrition"
         emptyTitle="هنوز برنامه غذایی ثبت نشده است."
         emptyDescription="به محض ثبت برنامه توسط مربی، اینجا نمایش داده می‌شود."
+        trainerName={context.trainerName}
       />
     </div>
   );

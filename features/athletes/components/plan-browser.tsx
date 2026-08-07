@@ -71,7 +71,13 @@ function canEditPlan(plan: PlanEntry): boolean {
   return daysSinceAssigned <= EDIT_WINDOW_DAYS;
 }
 
-export function PlanBrowser({ kind }: { kind: PlanKind }) {
+export function PlanBrowser({
+  kind,
+  trainerName,
+}: {
+  kind: PlanKind;
+  trainerName?: string | null;
+}) {
   const Icon = ICON_BY_KIND[kind];
   const athletes = useAthletes();
   const [search, setSearch] = useState("");
@@ -264,6 +270,7 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
                     description: selectedPlan.description,
                     assignedAt: selectedPlan.assignedAt,
                     athleteName: selectedAthlete?.name,
+                    trainerName: trainerName ?? undefined,
                   })
                 }
               >

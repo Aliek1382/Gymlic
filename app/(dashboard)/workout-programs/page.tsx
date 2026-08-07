@@ -10,6 +10,9 @@ export default async function WorkoutProgramsPage() {
   if (!context) redirect("/login");
   if (context.accountType !== "trainer") redirect("/dashboard");
 
+  const trainerName =
+    [context.firstName, context.lastName].filter(Boolean).join(" ") || null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +23,7 @@ export default async function WorkoutProgramsPage() {
         </p>
       </div>
 
-      <PlanBrowser kind="workout" />
+      <PlanBrowser kind="workout" trainerName={trainerName} />
     </div>
   );
 }
