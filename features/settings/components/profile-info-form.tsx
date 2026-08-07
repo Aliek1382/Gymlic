@@ -32,7 +32,9 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
     },
   });
 
-  const isTrainer = profile.accountType === "trainer";
+  // Club accounts have no birthday-offer use case (yet) — everyone else does.
+  const showBirthDate =
+    profile.accountType === "trainer" || profile.accountType === "athlete";
 
   async function onSubmit(values: ProfileInfoFormValues) {
     try {
@@ -40,7 +42,7 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
         firstName: values.firstName,
         lastName: values.lastName,
         phone: values.phone || null,
-        birthDate: isTrainer ? values.birthDate : undefined,
+        birthDate: showBirthDate ? values.birthDate : undefined,
       });
       toast.success("اطلاعات پروفایل به‌روزرسانی شد.");
     } catch (error) {
@@ -101,7 +103,7 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
             )}
           </div>
 
-          {isTrainer && (
+          {showBirthDate && (
             <div className="space-y-2">
               <Label>
                 تاریخ تولد{" "}
