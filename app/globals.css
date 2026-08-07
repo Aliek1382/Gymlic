@@ -195,3 +195,20 @@
     scrollbar-width: none;
   }
 }
+
+/* Isolates a single .print-area (used for "دانلود PDF" buttons) as the
+   only thing printed, regardless of where it sits in the page. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+  }
+}

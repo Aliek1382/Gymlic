@@ -7,6 +7,7 @@ import {
   Apple,
   CheckCircle2,
   ChevronLeft,
+  Download,
   Dumbbell,
   Loader2,
   Pencil,
@@ -42,6 +43,7 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useAthletes } from "../hooks/use-athletes";
 import { useCompletePlan } from "../hooks/use-complete-plan";
+import { usePlanPrint } from "../hooks/use-plan-print";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
 import {
@@ -51,6 +53,7 @@ import {
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
+import { PlanPrintArea } from "./plan-print-area";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
 type SortOrder = "newest" | "oldest";
@@ -101,6 +104,7 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
   const completePlan = useCompletePlan(kind, {
     athleteId: selectedAthlete?.id ?? "",
   });
+  const { plan: printingPlan, printPlan } = usePlanPrint();
 
   const editForm = useForm<PlanFormValues>({
     resolver: zodResolver(planSchema),
@@ -248,6 +252,24 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
               <p className="whitespace-pre-line text-sm text-foreground">
                 {selectedPlan.description || "توضیحاتی برای این برنامه ثبت نشده است."}
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() =>
+                  printPlan({
+                    kind,
+                    title: selectedPlan.title,
+                    description: selectedPlan.description,
+                    assignedAt: selectedPlan.assignedAt,
+                    athleteName: selectedAthlete?.name,
+                  })
+                }
+              >
+                <Download />
+                دانلود PDF
+              </Button>
             </DialogContent>
           )}
         </Dialog>
@@ -318,6 +340,8 @@ export function PlanBrowser({ kind }: { kind: PlanKind }) {
             </DialogContent>
           )}
         </Dialog>
+
+        <PlanPrintArea plan={printingPlan} />
       </div>
     );
   }

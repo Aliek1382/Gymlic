@@ -1,6 +1,6 @@
 "use client";
 
-import { Apple, CheckCircle2, Dumbbell } from "lucide-react";
+import { Apple, CheckCircle2, Download, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,8 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
+import { usePlanPrint } from "../hooks/use-plan-print";
+import { PlanPrintArea } from "./plan-print-area";
 import type { PlanKind } from "../types/athlete-types";
 
 // Icon components can't cross the Server -> Client Component boundary as a
@@ -30,6 +32,7 @@ export function MyPlanList({
 }) {
   const plans = useMyPlans(kind);
   const completePlan = useCompletePlan(kind);
+  const { plan: printingPlan, printPlan } = usePlanPrint();
 
   async function handleComplete(planId: string) {
     try {
@@ -92,10 +95,27 @@ export function MyPlanList({
                   این برنامه را انجام دادم
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  printPlan({
+                    kind,
+                    title: plan.title,
+                    description: plan.description,
+                    assignedAt: plan.assignedAt,
+                  })
+                }
+              >
+                <Download />
+                دانلود PDF
+              </Button>
             </div>
           </CardContent>
         </Card>
       ))}
+
+      <PlanPrintArea plan={printingPlan} />
     </div>
   );
 }

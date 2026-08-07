@@ -8,6 +8,7 @@ export * from "./components/workout-day-builder";
 export * from "./components/template-manager";
 export * from "./components/template-form-dialog";
 export * from "./components/template-list";
+export * from "./components/plan-print-area";
 
 export * from "./hooks/use-athletes";
 export * from "./hooks/use-pending-athlete-invites";
@@ -21,6 +22,7 @@ export * from "./hooks/use-complete-plan";
 export * from "./hooks/use-templates";
 export * from "./hooks/use-save-template";
 export * from "./hooks/use-delete-template";
+export * from "./hooks/use-plan-print";
 
 export * from "./services/athlete-service";
 export * from "./types/athlete-types";
