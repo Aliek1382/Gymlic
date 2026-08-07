@@ -22,7 +22,7 @@ import {
 type Step = "year" | "month" | "day";
 
 const OLDEST_AGE = 90;
-const YOUNGEST_AGE = 15;
+const YOUNGEST_AGE = 0;
 
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
