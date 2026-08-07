@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
@@ -66,10 +67,23 @@ export function MyPlanList({
     );
   }
 
+  // The most recently assigned plan that's actually in effect (not a draft,
+  // not already completed/cancelled) — this is "what the athlete should be
+  // doing right now," and shifts automatically the moment a newer active
+  // plan is saved, since it's derived from assignedAt rather than tracked
+  // as separate state.
+  const latestPlanId = plans.data.find((plan) => plan.status === "active")?.id;
+
   return (
     <div className="space-y-3">
       {plans.data.map((plan) => (
-        <Card key={plan.id} className="gap-2 py-5">
+        <Card
+          key={plan.id}
+          className={cn(
+            "gap-2 py-5",
+            plan.id === latestPlanId && "border-primary ring-1 ring-primary/30"
+          )}
+        >
           <CardContent className="space-y-3">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-medium text-foreground">{plan.title}</p>
@@ -83,6 +97,9 @@ export function MyPlanList({
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2">
+              {plan.id === latestPlanId && (
+                <Badge variant="info">آخرین برنامه</Badge>
+              )}
               {plan.status === "completed" && (
                 <Badge variant="success">تکمیل‌شده</Badge>
               )}

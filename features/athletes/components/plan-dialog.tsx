@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { cn } from "@/lib/utils";
 import { useDeleteTemplate } from "../hooks/use-delete-template";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
@@ -56,6 +57,11 @@ export function PlanDialog({
   const saveTemplate = useSaveTemplate(kind);
   const deleteTemplate = useDeleteTemplate(kind);
   const { title: kindTitle, icon: Icon } = KIND_LABEL[kind];
+
+  // The most recently assigned active plan — highlighted as what the
+  // athlete should currently be following. Shifts automatically once a
+  // newer active plan is saved, since it's derived from assignedAt.
+  const latestPlanId = plans.data?.find((plan) => plan.status === "active")?.id;
 
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(planSchema),
@@ -285,13 +291,20 @@ export function PlanDialog({
               {plans.data.map((plan) => (
                 <div
                   key={plan.id}
-                  className="rounded-xl border border-border p-3 text-sm"
+                  className={cn(
+                    "rounded-xl border border-border p-3 text-sm",
+                    plan.id === latestPlanId &&
+                      "border-primary ring-1 ring-primary/30"
+                  )}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-foreground">
                       {plan.title}
                     </span>
                     <div className="flex shrink-0 items-center gap-2">
+                      {plan.id === latestPlanId && (
+                        <Badge variant="info">آخرین برنامه</Badge>
+                      )}
                       {plan.status === "draft" && (
                         <Badge variant="warning">پیش‌نویس</Badge>
                       )}

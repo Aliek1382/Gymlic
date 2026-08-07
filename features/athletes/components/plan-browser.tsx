@@ -39,6 +39,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useAthletes } from "../hooks/use-athletes";
@@ -111,6 +112,13 @@ export function PlanBrowser({
     athleteId: selectedAthlete?.id ?? "",
   });
   const { plan: printingPlan, printPlan } = usePlanPrint();
+
+  // The most recently assigned plan that's actually in effect (not a draft,
+  // not already completed/cancelled) — highlighted as what the athlete
+  // should currently be following. Shifts automatically to a newer plan
+  // once one is saved, since it's derived from assignedAt rather than
+  // tracked as separate state.
+  const latestPlanId = plans.data?.find((plan) => plan.status === "active")?.id;
 
   const editForm = useForm<PlanFormValues>({
     resolver: zodResolver(planSchema),
@@ -193,7 +201,11 @@ export function PlanBrowser({
               plans.data.map((plan) => (
                 <div
                   key={plan.id}
-                  className="flex flex-col gap-3 rounded-xl border border-border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center"
+                  className={cn(
+                    "flex flex-col gap-3 rounded-xl border border-border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center",
+                    plan.id === latestPlanId &&
+                      "border-primary ring-1 ring-primary/30"
+                  )}
                 >
                   <button
                     type="button"
@@ -205,6 +217,9 @@ export function PlanBrowser({
                     </span>
                   </button>
                   <span className="flex flex-wrap items-center gap-2">
+                    {plan.id === latestPlanId && (
+                      <Badge variant="info">آخرین برنامه</Badge>
+                    )}
                     {plan.status === "draft" && (
                       <Badge variant="warning">پیش‌نویس</Badge>
                     )}
