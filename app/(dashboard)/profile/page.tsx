@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { UserCircle } from "lucide-react";
 
-import { ComingSoon } from "@/components/coming-soon";
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
+import { SettingsView } from "@/features/settings";
 
 export const metadata = { title: "پروفایل | جیم‌لیک" };
 
@@ -12,10 +11,15 @@ export default async function ProfilePage() {
   if (context.accountType !== "athlete") redirect("/dashboard");
 
   return (
-    <ComingSoon
-      icon={UserCircle}
-      title="پروفایل"
-      description="ویرایش اطلاعات فردی و مدیریت حساب کاربری به‌زودی در دسترس خواهد بود."
-    />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-foreground">پروفایل</h1>
+        <p className="text-sm text-muted-foreground">
+          اطلاعات شخصی، تصویر پروفایل، ایمیل و رمز عبور خود را مدیریت کنید.
+        </p>
+      </div>
+
+      <SettingsView />
+    </div>
   );
 }
