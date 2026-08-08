@@ -14,6 +14,8 @@ export interface PendingAthleteInvite {
   weightKg: number | null;
   createdAt: string;
   expiresAt: string;
+  workoutPlanCount: number;
+  nutritionPlanCount: number;
 }
 
 export type PlanKind = "workout" | "nutrition";

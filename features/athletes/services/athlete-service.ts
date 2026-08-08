@@ -17,11 +17,13 @@ async function getCurrentUserId(): Promise<string> {
   return user.id;
 }
 
-function countByAthlete(rows: { athlete_id: string | null }[]): Map<string, number> {
+// Tallies rows by whichever id column is present — athlete_id for joined
+// athletes, invitation_id for plans pre-assigned to a pending invite.
+function countRowsById(rows: { id: string | null }[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const row of rows) {
-    if (!row.athlete_id) continue;
-    counts.set(row.athlete_id, (counts.get(row.athlete_id) ?? 0) + 1);
+    if (!row.id) continue;
+    counts.set(row.id, (counts.get(row.id) ?? 0) + 1);
   }
   return counts;
 }
@@ -52,13 +54,13 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
     // athlete_id to begin with.
     supabase
       .from("workout_assignments")
-      .select("athlete_id")
+      .select("id:athlete_id")
       .eq("trainer_id", trainerId)
       .eq("is_template", false)
       .neq("status", "draft"),
     supabase
       .from("nutrition_assignments")
-      .select("athlete_id")
+      .select("id:athlete_id")
       .eq("trainer_id", trainerId)
       .eq("is_template", false)
       .neq("status", "draft"),
@@ -67,8 +69,8 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
   if (workouts.error) throw workouts.error;
   if (nutrition.error) throw nutrition.error;
 
-  const workoutCounts = countByAthlete(workouts.data ?? []);
-  const nutritionCounts = countByAthlete(nutrition.data ?? []);
+  const workoutCounts = countRowsById(workouts.data ?? []);
+  const nutritionCounts = countRowsById(nutrition.data ?? []);
 
   return (athletesResult.data ?? []).map((row) => ({
     id: row.athlete_id,
@@ -88,16 +90,37 @@ export async function listPendingAthleteInvites(): Promise<
   const supabase = createClient();
   const trainerId = await getCurrentUserId();
 
-  const { data, error } = await supabase
-    .from("invitations")
-    .select("id, code, first_name, last_name, height_cm, weight_kg, created_at, expires_at")
-    .eq("created_by", trainerId)
-    .eq("invited_role", "athlete")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+  const [invitesResult, workouts, nutrition] = await Promise.all([
+    supabase
+      .from("invitations")
+      .select("id, code, first_name, last_name, height_cm, weight_kg, created_at, expires_at")
+      .eq("created_by", trainerId)
+      .eq("invited_role", "athlete")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+    // A trainer can pre-assign plans to a pending invite before the athlete
+    // even joins, so these can be counted the same way as listAthletes().
+    supabase
+      .from("workout_assignments")
+      .select("id:invitation_id")
+      .eq("trainer_id", trainerId)
+      .eq("is_template", false)
+      .neq("status", "draft"),
+    supabase
+      .from("nutrition_assignments")
+      .select("id:invitation_id")
+      .eq("trainer_id", trainerId)
+      .eq("is_template", false)
+      .neq("status", "draft"),
+  ]);
+  if (invitesResult.error) throw invitesResult.error;
+  if (workouts.error) throw workouts.error;
+  if (nutrition.error) throw nutrition.error;
 
-  return (data ?? []).map((row) => ({
+  const workoutCounts = countRowsById(workouts.data ?? []);
+  const nutritionCounts = countRowsById(nutrition.data ?? []);
+
+  return (invitesResult.data ?? []).map((row) => ({
     id: row.id,
     code: row.code,
     name:
@@ -106,6 +129,8 @@ export async function listPendingAthleteInvites(): Promise<
     weightKg: row.weight_kg,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
+    workoutPlanCount: workoutCounts.get(row.id) ?? 0,
+    nutritionPlanCount: nutritionCounts.get(row.id) ?? 0,
   }));
 }
 

@@ -19,6 +19,7 @@ import {
 import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
+import { ATHLETE_SORT_LABEL, type AthleteSortOrder } from "../constants/athletes";
 import { useAthletes } from "../hooks/use-athletes";
 import { usePendingAthleteInvites } from "../hooks/use-pending-athlete-invites";
 import { useRemoveAthlete } from "../hooks/use-remove-athlete";
@@ -26,7 +27,24 @@ import { useRevokeAthleteInvite } from "../hooks/use-revoke-athlete-invite";
 import { PlanDialog } from "./plan-dialog";
 import { RemoveAthleteButton } from "./remove-athlete-button";
 
-type SortOrder = "newest" | "oldest";
+function compareByCount(
+  order: AthleteSortOrder,
+  a: { workoutPlanCount: number; nutritionPlanCount: number },
+  b: { workoutPlanCount: number; nutritionPlanCount: number }
+): number | null {
+  switch (order) {
+    case "most-workout":
+      return b.workoutPlanCount - a.workoutPlanCount;
+    case "fewest-workout":
+      return a.workoutPlanCount - b.workoutPlanCount;
+    case "most-nutrition":
+      return b.nutritionPlanCount - a.nutritionPlanCount;
+    case "fewest-nutrition":
+      return a.nutritionPlanCount - b.nutritionPlanCount;
+    default:
+      return null;
+  }
+}
 
 export function AthleteList() {
   const athletes = useAthletes();
@@ -34,7 +52,7 @@ export function AthleteList() {
   const removeAthlete = useRemoveAthlete();
   const revokeInvite = useRevokeAthleteInvite();
   const [search, setSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  const [sortOrder, setSortOrder] = useState<AthleteSortOrder>("newest");
 
   const hasAthletes = (athletes.data?.length ?? 0) > 0;
   const hasPendingInvites = (pendingInvites.data?.length ?? 0) > 0;
@@ -44,11 +62,13 @@ export function AthleteList() {
     const list = (pendingInvites.data ?? []).filter((invite) =>
       invite.name.toLowerCase().includes(query)
     );
-    return list.sort((a, b) =>
-      sortOrder === "newest"
+    return list.sort((a, b) => {
+      const byCount = compareByCount(sortOrder, a, b);
+      if (byCount !== null) return byCount;
+      return sortOrder === "newest"
         ? b.createdAt.localeCompare(a.createdAt)
-        : a.createdAt.localeCompare(b.createdAt)
-    );
+        : a.createdAt.localeCompare(b.createdAt);
+    });
   }, [pendingInvites.data, search, sortOrder]);
 
   const filteredAthletes = useMemo(() => {
@@ -56,11 +76,13 @@ export function AthleteList() {
     const list = (athletes.data ?? []).filter((athlete) =>
       athlete.name.toLowerCase().includes(query)
     );
-    return list.sort((a, b) =>
-      sortOrder === "newest"
+    return list.sort((a, b) => {
+      const byCount = compareByCount(sortOrder, a, b);
+      if (byCount !== null) return byCount;
+      return sortOrder === "newest"
         ? b.joinedAt.localeCompare(a.joinedAt)
-        : a.joinedAt.localeCompare(b.joinedAt)
-    );
+        : a.joinedAt.localeCompare(b.joinedAt);
+    });
   }, [athletes.data, search, sortOrder]);
 
   if (athletes.isLoading || pendingInvites.isLoading) {
@@ -93,14 +115,17 @@ export function AthleteList() {
         </div>
         <Select
           value={sortOrder}
-          onValueChange={(value) => setSortOrder(value as SortOrder)}
+          onValueChange={(value) => setSortOrder(value as AthleteSortOrder)}
         >
           <SelectTrigger className="sm:w-48">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="newest">جدیدترین به قدیمی‌ترین</SelectItem>
-            <SelectItem value="oldest">قدیمی‌ترین به جدیدترین</SelectItem>
+            {(Object.keys(ATHLETE_SORT_LABEL) as AthleteSortOrder[]).map((value) => (
+              <SelectItem key={value} value={value}>
+                {ATHLETE_SORT_LABEL[value]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -155,6 +180,12 @@ export function AthleteList() {
                         ? `وزن: ${toPersianDigits(invite.weightKg)} کیلوگرم`
                         : ""}
                     </p>
+                    {(invite.workoutPlanCount > 0 || invite.nutritionPlanCount > 0) && (
+                      <p className="text-xs text-muted-foreground">
+                        {toPersianDigits(invite.workoutPlanCount)} برنامه تمرینی ·{" "}
+                        {toPersianDigits(invite.nutritionPlanCount)} برنامه غذایی
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -219,7 +250,9 @@ export function AthleteList() {
                       {athlete.name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      عضویت از {formatPersianDate(new Date(athlete.joinedAt))}
+                      عضویت از {formatPersianDate(new Date(athlete.joinedAt))} ·{" "}
+                      {toPersianDigits(athlete.workoutPlanCount)} برنامه تمرینی ·{" "}
+                      {toPersianDigits(athlete.nutritionPlanCount)} برنامه غذایی
                     </p>
                   </div>
                 </div>

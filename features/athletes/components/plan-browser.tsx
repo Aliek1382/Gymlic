@@ -42,6 +42,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
+import { ATHLETE_SORT_LABEL, type AthleteSortOrder } from "../constants/athletes";
 import { useAthletes } from "../hooks/use-athletes";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlanPrint } from "../hooks/use-plan-print";
@@ -56,23 +57,6 @@ import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
 import { PlanPrintArea } from "./plan-print-area";
 import { WorkoutDayBuilder } from "./workout-day-builder";
-
-type SortOrder =
-  | "newest"
-  | "oldest"
-  | "most-workout"
-  | "fewest-workout"
-  | "most-nutrition"
-  | "fewest-nutrition";
-
-const SORT_LABEL: Record<SortOrder, string> = {
-  newest: "جدیدترین به قدیمی‌ترین",
-  oldest: "قدیمی‌ترین به جدیدترین",
-  "most-workout": "بیشترین برنامه تمرینی",
-  "fewest-workout": "کمترین برنامه تمرینی",
-  "most-nutrition": "بیشترین برنامه غذایی",
-  "fewest-nutrition": "کمترین برنامه غذایی",
-};
 
 const ICON_BY_KIND = { workout: Dumbbell, nutrition: Apple } as const;
 
@@ -97,7 +81,7 @@ export function PlanBrowser({
   const Icon = ICON_BY_KIND[kind];
   const athletes = useAthletes();
   const [search, setSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  const [sortOrder, setSortOrder] = useState<AthleteSortOrder>("newest");
   const [selectedAthlete, setSelectedAthlete] = useState<{
     id: string;
     name: string;
@@ -420,15 +404,15 @@ export function PlanBrowser({
         </div>
         <Select
           value={sortOrder}
-          onValueChange={(value) => setSortOrder(value as SortOrder)}
+          onValueChange={(value) => setSortOrder(value as AthleteSortOrder)}
         >
           <SelectTrigger className="sm:w-48">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {(Object.keys(SORT_LABEL) as SortOrder[]).map((value) => (
+            {(Object.keys(ATHLETE_SORT_LABEL) as AthleteSortOrder[]).map((value) => (
               <SelectItem key={value} value={value}>
-                {SORT_LABEL[value]}
+                {ATHLETE_SORT_LABEL[value]}
               </SelectItem>
             ))}
           </SelectContent>
