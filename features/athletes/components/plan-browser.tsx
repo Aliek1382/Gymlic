@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatPersianDate } from "@/lib/persian";
+import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
@@ -57,7 +57,22 @@ import type { PlanKind } from "../types/athlete-types";
 import { PlanPrintArea } from "./plan-print-area";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
-type SortOrder = "newest" | "oldest";
+type SortOrder =
+  | "newest"
+  | "oldest"
+  | "most-workout"
+  | "fewest-workout"
+  | "most-nutrition"
+  | "fewest-nutrition";
+
+const SORT_LABEL: Record<SortOrder, string> = {
+  newest: "جدیدترین به قدیمی‌ترین",
+  oldest: "قدیمی‌ترین به جدیدترین",
+  "most-workout": "بیشترین برنامه تمرینی",
+  "fewest-workout": "کمترین برنامه تمرینی",
+  "most-nutrition": "بیشترین برنامه غذایی",
+  "fewest-nutrition": "کمترین برنامه غذایی",
+};
 
 const ICON_BY_KIND = { workout: Dumbbell, nutrition: Apple } as const;
 
@@ -95,11 +110,22 @@ export function PlanBrowser({
     const list = (athletes.data ?? []).filter((athlete) =>
       athlete.name.toLowerCase().includes(query)
     );
-    return list.sort((a, b) =>
-      sortOrder === "newest"
-        ? b.joinedAt.localeCompare(a.joinedAt)
-        : a.joinedAt.localeCompare(b.joinedAt)
-    );
+    return list.sort((a, b) => {
+      switch (sortOrder) {
+        case "newest":
+          return b.joinedAt.localeCompare(a.joinedAt);
+        case "oldest":
+          return a.joinedAt.localeCompare(b.joinedAt);
+        case "most-workout":
+          return b.workoutPlanCount - a.workoutPlanCount;
+        case "fewest-workout":
+          return a.workoutPlanCount - b.workoutPlanCount;
+        case "most-nutrition":
+          return b.nutritionPlanCount - a.nutritionPlanCount;
+        case "fewest-nutrition":
+          return a.nutritionPlanCount - b.nutritionPlanCount;
+      }
+    });
   }, [athletes.data, search, sortOrder]);
 
   const plans = usePlans(
@@ -400,8 +426,11 @@ export function PlanBrowser({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="newest">جدیدترین به قدیمی‌ترین</SelectItem>
-            <SelectItem value="oldest">قدیمی‌ترین به جدیدترین</SelectItem>
+            {(Object.keys(SORT_LABEL) as SortOrder[]).map((value) => (
+              <SelectItem key={value} value={value}>
+                {SORT_LABEL[value]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -429,15 +458,17 @@ export function PlanBrowser({
                     {athlete.name.slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground">
                     {athlete.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    عضویت از {formatPersianDate(new Date(athlete.joinedAt))}
+                    عضویت از {formatPersianDate(new Date(athlete.joinedAt))} ·{" "}
+                    {toPersianDigits(athlete.workoutPlanCount)} برنامه تمرینی ·{" "}
+                    {toPersianDigits(athlete.nutritionPlanCount)} برنامه غذایی
                   </p>
                 </div>
-                <ChevronLeft className="size-4 text-muted-foreground" />
+                <ChevronLeft className="size-4 shrink-0 text-muted-foreground" />
               </button>
             ))}
           </div>

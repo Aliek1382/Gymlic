@@ -2,6 +2,8 @@ export interface AthleteSummary {
   id: string;
   name: string;
   joinedAt: string;
+  workoutPlanCount: number;
+  nutritionPlanCount: number;
 }
 
 export interface PendingAthleteInvite {

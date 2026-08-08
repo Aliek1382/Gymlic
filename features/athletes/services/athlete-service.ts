@@ -17,6 +17,15 @@ async function getCurrentUserId(): Promise<string> {
   return user.id;
 }
 
+function countByAthlete(rows: { athlete_id: string | null }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.athlete_id) continue;
+    counts.set(row.athlete_id, (counts.get(row.athlete_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export async function listAthletes(): Promise<AthleteSummary[]> {
   const supabase = createClient();
   const trainerId = await getCurrentUserId();
@@ -24,28 +33,52 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
   // trainer_athletes has two foreign keys into profiles (trainer_id and
   // athlete_id) — the embed must be disambiguated via the column-based
   // hint, or PostgREST rejects the query as ambiguous.
-  const { data, error } = await supabase
-    .from("trainer_athletes")
-    .select("athlete_id, created_at, profiles!athlete_id(first_name, last_name)")
-    .eq("trainer_id", trainerId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .returns<
-      {
-        athlete_id: string;
-        created_at: string;
-        profiles: { first_name: string | null; last_name: string | null } | null;
-      }[]
-    >();
-  if (error) throw error;
+  const [athletesResult, workouts, nutrition] = await Promise.all([
+    supabase
+      .from("trainer_athletes")
+      .select("athlete_id, created_at, profiles!athlete_id(first_name, last_name)")
+      .eq("trainer_id", trainerId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .returns<
+        {
+          athlete_id: string;
+          created_at: string;
+          profiles: { first_name: string | null; last_name: string | null } | null;
+        }[]
+      >(),
+    // Counted for the "most/fewest plans" sort options — drafts don't
+    // count (never sent to the athlete) and templates never carry an
+    // athlete_id to begin with.
+    supabase
+      .from("workout_assignments")
+      .select("athlete_id")
+      .eq("trainer_id", trainerId)
+      .eq("is_template", false)
+      .neq("status", "draft"),
+    supabase
+      .from("nutrition_assignments")
+      .select("athlete_id")
+      .eq("trainer_id", trainerId)
+      .eq("is_template", false)
+      .neq("status", "draft"),
+  ]);
+  if (athletesResult.error) throw athletesResult.error;
+  if (workouts.error) throw workouts.error;
+  if (nutrition.error) throw nutrition.error;
 
-  return (data ?? []).map((row) => ({
+  const workoutCounts = countByAthlete(workouts.data ?? []);
+  const nutritionCounts = countByAthlete(nutrition.data ?? []);
+
+  return (athletesResult.data ?? []).map((row) => ({
     id: row.athlete_id,
     name:
       [row.profiles?.first_name, row.profiles?.last_name]
         .filter(Boolean)
         .join(" ") || "بدون نام",
     joinedAt: row.created_at,
+    workoutPlanCount: workoutCounts.get(row.athlete_id) ?? 0,
+    nutritionPlanCount: nutritionCounts.get(row.athlete_id) ?? 0,
   }));
 }
 
