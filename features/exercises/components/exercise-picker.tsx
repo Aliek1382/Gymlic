@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { useExercisesForPicker } from "../hooks/use-exercises-for-picker";
 import { useRecordExerciseUsage } from "../hooks/use-record-exercise-usage";
 import type { ExercisePickerItem } from "../types/exercise-types";
@@ -31,6 +32,36 @@ const MULTI_LABEL: Record<"superset" | "triset", string> = {
 };
 
 const SLOT_ORDINALS = ["اول", "دوم", "سوم"];
+
+// Reasonable rest-interval presets for athletes — short for supersets/
+// endurance work, longer for heavy compound lifts. Neither rest field has a
+// default: both start on REST_NONE ("بدون تعیین") and stay optional.
+const REST_NONE = "none";
+const REST_OPTIONS = ["۳۰ ثانیه", "۴۵ ثانیه", "۱ دقیقه", "۹۰ ثانیه", "۲ دقیقه", "۳ دقیقه"];
+
+function RestSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-full justify-start">
+        <SelectValue className="min-w-0 truncate" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={REST_NONE}>بدون تعیین</SelectItem>
+        {REST_OPTIONS.map((label) => (
+          <SelectItem key={label} value={label}>
+            {label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 interface Slot {
   exerciseId: string;
@@ -92,6 +123,11 @@ export function ExercisePicker({
   // superset/tri-set only: one {exerciseId, reps} slot per exercise in the
   // group, sharing the same "دور" (rounds) count as `sets` above.
   const [slots, setSlots] = useState<Slot[]>(emptySlots(2));
+  // Both optional, no default — only inserted into the line if a trainer
+  // actually picks something. restBetweenSets doesn't apply to drop-set
+  // (a drop-set is by definition no rest between drops).
+  const [restBetweenSets, setRestBetweenSets] = useState(REST_NONE);
+  const [restBetweenExercises, setRestBetweenExercises] = useState(REST_NONE);
 
   function handleTechniqueChange(next: Technique) {
     setTechnique(next);
@@ -100,6 +136,8 @@ export function ExercisePicker({
     setReps("");
     setDrops(["", ""]);
     setSlots(emptySlots(slotCountFor(next)));
+    setRestBetweenSets(REST_NONE);
+    setRestBetweenExercises(REST_NONE);
   }
 
   function updateSlot(index: number, patch: Partial<Slot>) {
@@ -116,6 +154,20 @@ export function ExercisePicker({
     return exercises.data?.find((exercise) => exercise.id === id);
   }
 
+  // Builds the optional "(استراحت بین ست‌ها: ..., استراحت بین حرکات: ...)"
+  // suffix appended to whichever line buildEntry() produces. Empty when
+  // neither rest field was set.
+  function restSuffix(): string {
+    const parts: string[] = [];
+    if (technique !== "dropset" && restBetweenSets !== REST_NONE) {
+      parts.push(`استراحت بین ست‌ها: ${restBetweenSets}`);
+    }
+    if (restBetweenExercises !== REST_NONE) {
+      parts.push(`استراحت بین حرکات: ${restBetweenExercises}`);
+    }
+    return parts.length > 0 ? ` (${parts.join("، ")})` : "";
+  }
+
   function buildEntry(): { line: string; exerciseIds: string[] } | null {
     if (technique === "normal") {
       const exercise = findExercise(exerciseId);
@@ -123,7 +175,7 @@ export function ExercisePicker({
       const repsNum = Number(reps);
       if (!exercise || !(setsNum > 0) || !(repsNum > 0)) return null;
       return {
-        line: `${exercise.name} — ${setsNum} ست × ${repsNum} تکرار`,
+        line: `${exercise.name} — ${setsNum} ست × ${repsNum} تکرار${restSuffix()}`,
         exerciseIds: [exercise.id],
       };
     }
@@ -143,7 +195,7 @@ export function ExercisePicker({
       }
 
       return {
-        line: `${MULTI_LABEL[technique]} (${setsNum} دور): ${parts.join(" + ")}`,
+        line: `${MULTI_LABEL[technique]} (${setsNum} دور): ${parts.join(" + ")}${restSuffix()}`,
         exerciseIds,
       };
     }
@@ -155,7 +207,7 @@ export function ExercisePicker({
       return null;
     }
     return {
-      line: `${exercise.name} — دراپ‌ست: ${dropNums.join(" ← ")} تکرار (بدون استراحت، وزن کاهشی در هر افت)`,
+      line: `${exercise.name} — دراپ‌ست: ${dropNums.join(" ← ")} تکرار (بدون استراحت، وزن کاهشی در هر افت)${restSuffix()}`,
       exerciseIds: [exercise.id],
     };
   }
@@ -175,6 +227,8 @@ export function ExercisePicker({
     setReps("");
     setDrops(["", ""]);
     setSlots(emptySlots(slotCountFor(technique)));
+    setRestBetweenSets(REST_NONE);
+    setRestBetweenExercises(REST_NONE);
   }
 
   return (
@@ -313,6 +367,24 @@ export function ExercisePicker({
           </div>
         </div>
       )}
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">
+          استراحت <span className="text-muted-foreground">(اختیاری)</span>
+        </p>
+        <div className={cn("grid gap-2", technique === "dropset" ? "grid-cols-1" : "grid-cols-2")}>
+          {technique !== "dropset" && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">بین ست‌ها</p>
+              <RestSelect value={restBetweenSets} onChange={setRestBetweenSets} />
+            </div>
+          )}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">بین حرکات</p>
+            <RestSelect value={restBetweenExercises} onChange={setRestBetweenExercises} />
+          </div>
+        </div>
+      </div>
 
       <Button
         type="button"
