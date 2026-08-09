@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -215,6 +216,16 @@ export function ExercisePicker({
   const entry = buildEntry();
   const canAdd = entry !== null;
 
+  const restSummary =
+    [
+      technique !== "dropset" && restBetweenSets !== REST_NONE
+        ? `بین ست‌ها: ${restBetweenSets}`
+        : null,
+      restBetweenExercises !== REST_NONE ? `بین حرکات: ${restBetweenExercises}` : null,
+    ]
+      .filter(Boolean)
+      .join("، ") || null;
+
   function handleAdd() {
     if (!entry) return;
     onInsert(entry.line);
@@ -368,10 +379,7 @@ export function ExercisePicker({
         </div>
       )}
 
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          استراحت <span className="text-muted-foreground">(اختیاری)</span>
-        </p>
+      <CollapsibleSection title="استراحت (اختیاری)" summary={restSummary}>
         <div className={cn("grid gap-2", technique === "dropset" ? "grid-cols-1" : "grid-cols-2")}>
           {technique !== "dropset" && (
             <div className="space-y-1">
@@ -384,7 +392,7 @@ export function ExercisePicker({
             <RestSelect value={restBetweenExercises} onChange={setRestBetweenExercises} />
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       <Button
         type="button"

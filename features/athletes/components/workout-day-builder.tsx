@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { ExercisePicker, useExercisesForPicker } from "@/features/exercises";
 import { WEEKDAYS } from "../utils/workout-plan-text";
 
@@ -57,10 +58,10 @@ export function WorkoutDayBuilder({
       </div>
 
       {muscleGroups.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">
-            گروه عضلانی <span className="text-muted-foreground">(اختیاری)</span>
-          </p>
+        <CollapsibleSection
+          title="گروه عضلانی (اختیاری)"
+          summary={selectedMuscleGroup}
+        >
           <div className="flex flex-wrap gap-1.5">
             {muscleGroups.map((group) => (
               <Button
@@ -74,7 +75,7 @@ export function WorkoutDayBuilder({
               </Button>
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
       )}
 
       <ExercisePicker onInsert={(line) => onInsertLine(heading, line)} />
