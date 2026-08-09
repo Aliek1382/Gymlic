@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type {
-  AthleteDashboardData,
-  MeasurementEntry,
-} from "../types/dashboard-types";
+import type { AthleteDashboardData } from "../types/dashboard-types";
 
 export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
   const supabase = createClient();
@@ -11,7 +8,7 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("نشست کاربر معتبر نیست.");
 
-  const [workout, nutrition, measurements] = await Promise.all([
+  const [workout, nutrition] = await Promise.all([
     supabase
       .from("workout_assignments")
       .select("title, description, assigned_at")
@@ -28,29 +25,7 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
       .order("assigned_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from("measurements")
-      .select("id, height_cm, weight_kg, body_fat_percent, recorded_at")
-      .eq("athlete_id", user.id)
-      .order("recorded_at", { ascending: false })
-      .limit(6),
   ]);
-
-  const mapMeasurement = (row: {
-    id: string;
-    height_cm: number | null;
-    weight_kg: number | null;
-    body_fat_percent: number | null;
-    recorded_at: string;
-  }): MeasurementEntry => ({
-    id: row.id,
-    heightCm: row.height_cm,
-    weightKg: row.weight_kg,
-    bodyFatPercent: row.body_fat_percent,
-    recordedAt: row.recorded_at,
-  });
-
-  const history = (measurements.data ?? []).map(mapMeasurement);
 
   return {
     todaysWorkout: workout.data
@@ -67,7 +42,5 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
           assignedAt: nutrition.data.assigned_at,
         }
       : null,
-    latestMeasurement: history[0] ?? null,
-    measurementHistory: history,
   };
 }

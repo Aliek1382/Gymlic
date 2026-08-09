@@ -113,17 +113,7 @@ export interface AthletePlanSummary {
   assignedAt: string;
 }
 
-export interface MeasurementEntry {
-  id: string;
-  heightCm: number | null;
-  weightKg: number | null;
-  bodyFatPercent: number | null;
-  recordedAt: string;
-}
-
 export interface AthleteDashboardData {
   todaysWorkout: AthletePlanSummary | null;
   nutritionPlan: AthletePlanSummary | null;
-  latestMeasurement: MeasurementEntry | null;
-  measurementHistory: MeasurementEntry[];
 }

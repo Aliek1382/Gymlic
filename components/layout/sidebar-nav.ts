@@ -7,6 +7,7 @@ import {
   Dumbbell,
   LayoutGrid,
   LineChart,
+  Ruler,
   Settings,
   User,
   UserCircle,
@@ -46,6 +47,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
         "قالب‌های آماده برای برنامه تمرینی و غذایی بسازید تا هنگام نوشتن برنامه برای ورزشکاران سریع‌تر شروع کنید.",
     },
     { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
+    {
+      label: "پیشرفت ورزشکاران",
+      href: "/progress",
+      icon: Ruler,
+      description:
+        "نمودار روند وزن، BMI، درصد چربی بدن، دور کمر و دور سینه‌ی هر ورزشکار را ببینید.",
+    },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "تنظیمات", href: "/settings", icon: Settings },
   ],

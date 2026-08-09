@@ -2,18 +2,20 @@
 
 import { Apple, Dumbbell } from "lucide-react";
 
+import { ProgressDashboardWidget } from "@/features/progress";
 import { useAthleteDashboard } from "../../hooks/use-athlete-dashboard";
 import { WelcomeSection } from "../shared/welcome-section";
 import { DashboardSkeleton } from "../shared/dashboard-skeleton";
 import { ErrorState } from "../shared/error-state";
 import { PlanSummaryCard } from "./plan-summary-card";
-import { MeasurementsCard } from "./measurements-card";
 import { CoachMessageCard } from "./coach-message-card";
 
 export function AthleteDashboard({
+  athleteId,
   athleteName,
   trainerName,
 }: {
+  athleteId: string;
   athleteName: string;
   trainerName: string | null;
 }) {
@@ -53,10 +55,7 @@ export function AthleteDashboard({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <MeasurementsCard
-          latest={dashboard.data.latestMeasurement}
-          history={dashboard.data.measurementHistory}
-        />
+        <ProgressDashboardWidget athleteId={athleteId} />
         <CoachMessageCard />
       </div>
     </div>

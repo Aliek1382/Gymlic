@@ -1,0 +1,76 @@
+"use client";
+
+import { Ruler } from "lucide-react";
+
+import { Card, CardTitle } from "@/components/ui/card";
+import { formatPersianDate, toPersianDigits } from "@/lib/persian";
+import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
+import { MeasurementFormDialog } from "./measurement-form-dialog";
+import type { MeasurementEntry } from "../types/progress-types";
+
+function metricLine(entry: MeasurementEntry): string {
+  const parts: string[] = [];
+  if (entry.weightKg !== null) parts.push(`وزن: ${toPersianDigits(entry.weightKg)} کیلوگرم`);
+  if (entry.heightCm !== null) parts.push(`قد: ${toPersianDigits(entry.heightCm)} سانتی‌متر`);
+  if (entry.bodyFatPercent !== null) parts.push(`چربی: ${toPersianDigits(entry.bodyFatPercent)}٪`);
+  if (entry.waistCm !== null) parts.push(`دور کمر: ${toPersianDigits(entry.waistCm)} سانتی‌متر`);
+  if (entry.chestCm !== null) parts.push(`دور سینه: ${toPersianDigits(entry.chestCm)} سانتی‌متر`);
+  return parts.join(" · ");
+}
+
+export function MeasurementLog({
+  athleteId,
+  entries,
+  currentUserId,
+  recorderLabel,
+}: {
+  athleteId: string;
+  entries: MeasurementEntry[];
+  currentUserId: string | undefined;
+  // Maps a recorder's id to a display label ("شما" / "مربی" / "ورزشکار").
+  recorderLabel: (recordedBy: string | null) => string;
+}) {
+  const descending = [...entries].reverse();
+
+  return (
+    <Card className="gap-4 py-5">
+      <div className="px-6">
+        <CardTitle className="text-base">تاریخچه‌ی اندازه‌گیری‌ها</CardTitle>
+      </div>
+      <div className="space-y-2 px-6">
+        {descending.length === 0 ? (
+          <EmptyState
+            icon={Ruler}
+            title="هنوز اندازه‌گیری‌ای ثبت نشده است."
+            description="با دکمه «ثبت اندازه‌گیری جدید» اولین مقدار را وارد کنید."
+          />
+        ) : (
+          descending.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-foreground">
+                    {formatPersianDate(new Date(entry.recordedAt))}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ثبت‌شده توسط {recorderLabel(entry.recordedBy)}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{metricLine(entry)}</p>
+                {entry.note && (
+                  <p className="text-xs text-muted-foreground">{entry.note}</p>
+                )}
+              </div>
+              {entry.recordedBy === currentUserId && (
+                <MeasurementFormDialog athleteId={athleteId} entry={entry} />
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}

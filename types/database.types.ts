@@ -217,6 +217,8 @@ export interface Database {
           height_cm: number | null;
           weight_kg: number | null;
           body_fat_percent: number | null;
+          waist_cm: number | null;
+          chest_cm: number | null;
           note: string | null;
           recorded_at: string;
         },
@@ -226,6 +228,8 @@ export interface Database {
           height_cm?: number | null;
           weight_kg?: number | null;
           body_fat_percent?: number | null;
+          waist_cm?: number | null;
+          chest_cm?: number | null;
           note?: string | null;
         }
       >;

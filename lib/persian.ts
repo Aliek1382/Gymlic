@@ -71,6 +71,14 @@ export function formatPersianDate(date: Date): string {
   }).format(date);
 }
 
+// Short "day month" label (no year) for chart axes — e.g. "۱۶ مرداد".
+export function formatShortPersianDate(date: Date): string {
+  return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 // ----------------------------------------------------------------------------
 // Jalali (Persian) calendar conversion
 //
