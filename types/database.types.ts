@@ -25,7 +25,9 @@ export type NotificationType =
   | "workout_completed"
   | "nutrition_completed"
   | "measurement_recorded"
-  | "member_joined";
+  | "member_joined"
+  | "complete_profile"
+  | "broadcast";
 
 type TableOf<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
@@ -47,6 +49,7 @@ export interface Database {
           avatar_url: string | null;
           birth_date: string | null;
           account_type: AccountType | null;
+          is_platform_admin: boolean;
           created_at: string;
           updated_at: string;
         },
@@ -59,6 +62,7 @@ export interface Database {
           avatar_url?: string | null;
           birth_date?: string | null;
           account_type?: AccountType | null;
+          is_platform_admin?: boolean;
         }
       >;
       clubs: TableOf<
@@ -367,6 +371,10 @@ export interface Database {
       };
       complete_nutrition_assignment: {
         Args: { p_id: string };
+        Returns: undefined;
+      };
+      create_broadcast_notification: {
+        Args: { p_title: string; p_body?: string | null; p_link?: string | null };
         Returns: undefined;
       };
     };

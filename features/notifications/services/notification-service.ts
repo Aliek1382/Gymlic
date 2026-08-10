@@ -63,3 +63,23 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
     .is("read_at", null);
   if (error) throw error;
 }
+
+export interface BroadcastNotificationInput {
+  title: string;
+  body?: string | null;
+  link?: string | null;
+}
+
+/** Fans out one notification row to every profile — restricted server-side
+ * (create_broadcast_notification) to profiles.is_platform_admin. */
+export async function sendBroadcastNotification(
+  input: BroadcastNotificationInput
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("create_broadcast_notification", {
+    p_title: input.title,
+    p_body: input.body ?? null,
+    p_link: input.link ?? null,
+  });
+  if (error) throw error;
+}

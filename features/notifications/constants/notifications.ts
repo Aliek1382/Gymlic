@@ -1,4 +1,13 @@
-import { Apple, Dumbbell, Ruler, UserPlus, Users, type LucideIcon } from "lucide-react";
+import {
+  Apple,
+  Dumbbell,
+  Megaphone,
+  Ruler,
+  Sparkles,
+  UserPlus,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
 import type { NotificationType } from "@/types/database.types";
 
@@ -10,4 +19,6 @@ export const NOTIFICATION_ICON: Record<NotificationType, LucideIcon> = {
   nutrition_completed: Apple,
   measurement_recorded: Ruler,
   member_joined: Users,
+  complete_profile: Sparkles,
+  broadcast: Megaphone,
 };
