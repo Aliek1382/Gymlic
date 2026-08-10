@@ -9,6 +9,7 @@ export interface Profile {
   avatarUrl: string | null;
   birthDate: string | null;
   accountType: AccountType | null;
+  isPlatformAdmin: boolean;
 }
 
 export interface SessionContext {

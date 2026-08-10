@@ -79,6 +79,24 @@ export function formatShortPersianDate(date: Date): string {
   }).format(date);
 }
 
+// Short relative label for timestamps like notifications — "همین الان",
+// "۵ دقیقه پیش", "۳ روز پیش" — falling back to the full date past a week.
+export function formatRelativeTime(date: Date): string {
+  const diffSeconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds < 60) return "همین الان";
+
+  const diffMinutes = Math.round(diffSeconds / 60);
+  if (diffMinutes < 60) return `${toPersianDigits(diffMinutes)} دقیقه پیش`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${toPersianDigits(diffHours)} ساعت پیش`;
+
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays < 7) return `${toPersianDigits(diffDays)} روز پیش`;
+
+  return formatPersianDate(date);
+}
+
 // ----------------------------------------------------------------------------
 // Jalali (Persian) calendar conversion
 //

@@ -40,6 +40,7 @@ export default async function DashboardLayout({
       fullName={fullName}
       roleLabel={ROLE_LABEL[context.accountType]}
       avatarUrl={context.avatarUrl}
+      userId={context.userId}
     >
       {children}
     </DashboardShell>

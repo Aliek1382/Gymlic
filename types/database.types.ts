@@ -15,6 +15,19 @@ export type InvitationRole = "trainer" | "reception" | "athlete";
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type WorkoutStatus = "active" | "completed" | "cancelled" | "draft";
 export type MembershipPlanTier = "elite" | "basic" | "daily";
+// Not a DB enum on purpose — `notifications.type` is plain text so new
+// kinds can be introduced later without a migration. This union only
+// covers the kinds the current triggers actually emit.
+export type NotificationType =
+  | "invitation_accepted"
+  | "workout_assigned"
+  | "nutrition_assigned"
+  | "workout_completed"
+  | "nutrition_completed"
+  | "measurement_recorded"
+  | "member_joined"
+  | "complete_profile"
+  | "broadcast";
 
 type TableOf<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
@@ -36,6 +49,7 @@ export interface Database {
           avatar_url: string | null;
           birth_date: string | null;
           account_type: AccountType | null;
+          is_platform_admin: boolean;
           created_at: string;
           updated_at: string;
         },
@@ -48,6 +62,7 @@ export interface Database {
           avatar_url?: string | null;
           birth_date?: string | null;
           account_type?: AccountType | null;
+          is_platform_admin?: boolean;
         }
       >;
       clubs: TableOf<
@@ -314,6 +329,31 @@ export interface Database {
           last_used_at?: string;
         }
       >;
+      notifications: TableOf<
+        {
+          id: string;
+          recipient_id: string;
+          actor_id: string | null;
+          type: NotificationType;
+          title: string;
+          body: string | null;
+          link: string | null;
+          metadata: Record<string, unknown>;
+          read_at: string | null;
+          created_at: string;
+        },
+        {
+          recipient_id: string;
+          actor_id?: string | null;
+          type: NotificationType;
+          title: string;
+          body?: string | null;
+          link?: string | null;
+          metadata?: Record<string, unknown>;
+          read_at?: string | null;
+        },
+        { read_at: string | null }
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -331,6 +371,10 @@ export interface Database {
       };
       complete_nutrition_assignment: {
         Args: { p_id: string };
+        Returns: undefined;
+      };
+      create_broadcast_notification: {
+        Args: { p_title: string; p_body?: string | null; p_link?: string | null };
         Returns: undefined;
       };
     };
