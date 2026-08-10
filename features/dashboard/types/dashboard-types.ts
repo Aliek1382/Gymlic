@@ -78,7 +78,7 @@ export interface ClubDashboardData {
 export interface TrainerStatistics {
   athletesCount: number;
   activeWorkoutProgramsCount: number;
-  todaysWorkoutsCount: number;
+  completedProgramsCount: number;
   activeNutritionPlansCount: number;
 }
 

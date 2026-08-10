@@ -1,6 +1,6 @@
 "use client";
 
-import { Apple, CalendarCheck2, Dumbbell, LineChart, UserPlus, Users } from "lucide-react";
+import { Apple, CheckCircle2, Dumbbell, LineChart, UserPlus, Users } from "lucide-react";
 
 import { toPersianDigits } from "@/lib/persian";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
@@ -68,13 +68,13 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
         {statistics.isLoading ? (
           <StatisticCardSkeleton />
         ) : statistics.isError || !statistics.data ? (
-          <StatisticCard icon={CalendarCheck2} title="تمرین‌های امروز" value="—" />
+          <StatisticCard icon={CheckCircle2} title="برنامه‌های تکمیل‌شده" value="—" />
         ) : (
           <StatisticCard
-            icon={CalendarCheck2}
+            icon={CheckCircle2}
             iconClassName="bg-info-muted text-info"
-            title="تمرین‌های امروز"
-            value={toPersianDigits(statistics.data.todaysWorkoutsCount)}
+            title="برنامه‌های تکمیل‌شده"
+            value={toPersianDigits(statistics.data.completedProgramsCount)}
           />
         )}
 

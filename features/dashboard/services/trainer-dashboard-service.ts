@@ -12,41 +12,49 @@ export async function getTrainerStatistics(): Promise<TrainerStatistics> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("نشست کاربر معتبر نیست.");
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const [athletes, activeWorkouts, todaysWorkouts, activeNutrition] =
-    await Promise.all([
-      supabase
-        .from("trainer_athletes")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", user.id)
-        .eq("status", "active"),
-      supabase
-        .from("workout_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", user.id)
-        .eq("status", "active")
-        .eq("is_template", false),
-      supabase
-        .from("workout_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", user.id)
-        .eq("status", "active")
-        .eq("is_template", false)
-        .gte("assigned_at", todayStart.toISOString()),
-      supabase
-        .from("nutrition_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", user.id)
-        .eq("status", "active")
-        .eq("is_template", false),
-    ]);
+  const [
+    athletes,
+    activeWorkouts,
+    completedWorkouts,
+    completedNutrition,
+    activeNutrition,
+  ] = await Promise.all([
+    supabase
+      .from("trainer_athletes")
+      .select("id", { count: "exact", head: true })
+      .eq("trainer_id", user.id)
+      .eq("status", "active"),
+    supabase
+      .from("workout_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("trainer_id", user.id)
+      .eq("status", "active")
+      .eq("is_template", false),
+    supabase
+      .from("workout_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("trainer_id", user.id)
+      .eq("status", "completed")
+      .eq("is_template", false),
+    supabase
+      .from("nutrition_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("trainer_id", user.id)
+      .eq("status", "completed")
+      .eq("is_template", false),
+    supabase
+      .from("nutrition_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("trainer_id", user.id)
+      .eq("status", "active")
+      .eq("is_template", false),
+  ]);
 
   return {
     athletesCount: athletes.count ?? 0,
     activeWorkoutProgramsCount: activeWorkouts.count ?? 0,
-    todaysWorkoutsCount: todaysWorkouts.count ?? 0,
+    completedProgramsCount:
+      (completedWorkouts.count ?? 0) + (completedNutrition.count ?? 0),
     activeNutritionPlansCount: activeNutrition.count ?? 0,
   };
 }
