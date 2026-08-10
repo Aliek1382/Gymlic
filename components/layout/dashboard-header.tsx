@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronLeft, CircleHelp, LogOut, User as UserIcon } from "lucide-react";
+import { ChevronLeft, CircleHelp, LogOut, User as UserIcon } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
+import { NotificationBell } from "@/features/notifications";
 import { GlobalSearch } from "./global-search";
 import { MobileSidebar } from "./mobile-sidebar";
 import { SIDEBAR_NAV } from "./sidebar-nav";
@@ -23,6 +24,7 @@ interface DashboardHeaderProps {
   fullName: string;
   roleLabel: string;
   avatarUrl: string | null;
+  userId: string;
 }
 
 export function DashboardHeader({
@@ -30,6 +32,7 @@ export function DashboardHeader({
   fullName,
   roleLabel,
   avatarUrl,
+  userId,
 }: DashboardHeaderProps) {
   const signOut = useSignOut();
   const pathname = usePathname();
@@ -85,14 +88,7 @@ export function DashboardHeader({
         <CircleHelp className="size-[18px]" />
       </button>
 
-      <button
-        type="button"
-        className="relative hidden size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted sm:flex"
-        aria-label="اعلان‌ها"
-      >
-        <Bell className="size-[18px]" />
-        <span className="absolute right-2 top-2 size-1.5 rounded-full bg-destructive" />
-      </button>
+      <NotificationBell userId={userId} />
 
       <GlobalSearch accountType={accountType} />
 

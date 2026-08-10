@@ -7,6 +7,7 @@ interface DashboardShellProps {
   fullName: string;
   roleLabel: string;
   avatarUrl: string | null;
+  userId: string;
   children: React.ReactNode;
 }
 
@@ -15,6 +16,7 @@ export function DashboardShell({
   fullName,
   roleLabel,
   avatarUrl,
+  userId,
   children,
 }: DashboardShellProps) {
   return (
@@ -30,6 +32,7 @@ export function DashboardShell({
           fullName={fullName}
           roleLabel={roleLabel}
           avatarUrl={avatarUrl}
+          userId={userId}
         />
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
