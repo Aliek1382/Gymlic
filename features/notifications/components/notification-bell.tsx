@@ -33,7 +33,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="relative hidden size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted sm:flex"
+          className="relative flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
           aria-label="اعلان‌ها"
         >
           <Bell className="size-[18px]" />
@@ -45,7 +45,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80 p-0">
+      <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] max-w-80 p-0">
         <div className="flex items-center justify-between px-3 py-2.5">
           <p className="text-sm font-semibold text-foreground">اعلان‌ها</p>
           {unreadCount > 0 && (
