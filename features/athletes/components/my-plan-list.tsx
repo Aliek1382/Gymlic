@@ -15,6 +15,7 @@ import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
 import { usePlanPrint } from "../hooks/use-plan-print";
 import { PlanPrintArea } from "./plan-print-area";
+import { PlanSections } from "./plan-sections";
 import type { PlanKind } from "../types/athlete-types";
 
 // Icon components can't cross the Server -> Client Component boundary as a
@@ -99,11 +100,10 @@ export function MyPlanList({
                 {formatPersianDate(new Date(plan.assignedAt))}
               </p>
             </div>
-            {plan.description && (
-              <p className="whitespace-pre-line text-sm text-muted-foreground">
-                {plan.description}
-              </p>
-            )}
+            <PlanSections
+              description={plan.description}
+              highlightToday={plan.id === latestPlanId}
+            />
             <div className="flex flex-wrap items-center gap-2">
               {plan.id === latestPlanId && (
                 <Badge variant="info">آخرین برنامه</Badge>
