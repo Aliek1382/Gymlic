@@ -15,6 +15,25 @@ export function getTodayWeekday(now: Date = new Date()): Weekday {
   return WEEKDAYS[(now.getDay() + 1) % 7];
 }
 
+// Midnight on the Saturday that opens the current Persian week — the window
+// a day's tick counts within, so it clears on its own when the week rolls
+// over rather than staying ticked forever.
+export function getPersianWeekStart(now: Date = new Date()): Date {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((now.getDay() + 1) % 7));
+  return start;
+}
+
+// "YYYY-MM-DD" in local time. toISOString() would shift the date across the
+// day boundary for anyone east of UTC, filing an evening session in Tehran
+// under the previous day.
+export function toDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 // A hand-typed heading may spell "سه‌شنبه" without its ZWNJ, so both sides
 // are compared with it stripped.
 function normalize(value: string): string {

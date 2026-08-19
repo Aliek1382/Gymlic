@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check, Circle } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { getErrorMessage } from "@/lib/get-error-message";
 import { toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
+import { useToggleWorkoutDay } from "../hooks/use-toggle-workout-day";
+import { useWorkoutDayLogs } from "../hooks/use-workout-day-logs";
 import {
   hasExerciseRows,
   parsePlanDescription,
@@ -113,12 +119,23 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
   );
 }
 
+// A day's "انجام دادم" control, or null for a section that can't be ticked
+// (no heading means no day_key to log it under, and only the plan in effect
+// is tickable at all).
+interface DayTick {
+  done: boolean;
+  pending: boolean;
+  onToggle: () => void;
+}
+
 function PlanSection({
   section,
   isToday,
+  tick,
 }: {
   section: ParsedSection;
   isToday: boolean;
+  tick: DayTick | null;
 }) {
   const exerciseCount = section.rows.filter((row) => row.kind === "exercise").length;
   let number = 0;
@@ -142,11 +159,24 @@ function PlanSection({
             <h3 className="text-sm font-bold text-foreground">{section.heading}</h3>
             {isToday && <Badge variant="info">امروز</Badge>}
           </div>
-          {exerciseCount > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {toPersianDigits(exerciseCount)} حرکت
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {exerciseCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {toPersianDigits(exerciseCount)} حرکت
+              </span>
+            )}
+            {tick && (
+              <Button
+                size="sm"
+                variant={tick.done ? "secondary" : "outline"}
+                disabled={tick.pending}
+                onClick={tick.onToggle}
+              >
+                {tick.done ? <Check /> : <Circle />}
+                {tick.done ? "انجام شد" : "انجام دادم"}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -180,13 +210,19 @@ function PlanSection({
 }
 
 export function PlanSections({
+  planId,
   description,
-  highlightToday = false,
+  isActivePlan = false,
+  dayLogging = false,
 }: {
+  planId: string;
   description: string | null;
-  // Only the plan actually in effect marks a day as "today" — pointing at
-  // today's block on a finished plan would suggest it's still due.
-  highlightToday?: boolean;
+  // Only the plan actually in effect marks a day as "today" or offers a
+  // tick — pointing at today's block on a finished plan would suggest it's
+  // still due, and logging a session against it would be meaningless.
+  isActivePlan?: boolean;
+  // Ticking is workout-only; workout_day_logs references workout_assignments.
+  dayLogging?: boolean;
 }) {
   const sections = parsePlanDescription(description);
   // A plan grouped by muscle group has no day to match against, so "today"
@@ -194,9 +230,47 @@ export function PlanSections({
   const hasWeekdayHeadings = sections.some(
     (section) => headingWeekday(section.heading) !== null
   );
-  const today = useTodayWeekday(highlightToday && hasWeekdayHeadings);
+  const today = useTodayWeekday(isActivePlan && hasWeekdayHeadings);
+
+  const ticksEnabled = isActivePlan && dayLogging;
+  const dayLogs = useWorkoutDayLogs(ticksEnabled);
+  const toggleDay = useToggleWorkoutDay(planId);
 
   if (sections.length === 0) return null;
+
+  // Only headed sections are tickable — the heading is the day_key.
+  const tickableHeadings = sections
+    .map((section) => section.heading)
+    .filter((heading): heading is string => heading !== null);
+
+  const logIdByDay = new Map(
+    (dayLogs.data ?? [])
+      .filter((log) => log.assignmentId === planId)
+      .map((log) => [log.dayKey, log.id])
+  );
+
+  function tickFor(heading: string | null): DayTick | null {
+    if (!ticksEnabled || heading === null) return null;
+    const existingLogId = logIdByDay.get(heading) ?? null;
+
+    return {
+      done: existingLogId !== null,
+      // Scoped to the day actually clicked, so one in-flight tick doesn't
+      // disable every other day's button.
+      pending: toggleDay.isPending && toggleDay.variables?.dayKey === heading,
+      onToggle: async () => {
+        try {
+          await toggleDay.mutateAsync({ dayKey: heading, existingLogId });
+        } catch (error) {
+          toast.error(getErrorMessage(error, "ثبت تمرین با خطا مواجه شد."));
+        }
+      },
+    };
+  }
+
+  const doneThisWeek = tickableHeadings.filter((heading) =>
+    logIdByDay.has(heading)
+  ).length;
 
   const todaysSection =
     today !== null &&
@@ -204,6 +278,13 @@ export function PlanSections({
 
   return (
     <div className="space-y-2">
+      {ticksEnabled && tickableHeadings.length > 0 && (
+        <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+          این هفته: {toPersianDigits(doneThisWeek)} از{" "}
+          {toPersianDigits(tickableHeadings.length)} جلسه انجام شده
+        </p>
+      )}
+
       {today !== null && !todaysSection && (
         <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
           امروز {today} است و در این برنامه تمرینی برای امروز ثبت نشده — روز استراحت.
@@ -215,6 +296,7 @@ export function PlanSections({
           key={index}
           section={section}
           isToday={today !== null && headingWeekday(section.heading) === today}
+          tick={tickFor(section.heading)}
         />
       ))}
     </div>
