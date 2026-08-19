@@ -10,6 +10,7 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useMeasurements } from "../hooks/use-measurements";
 import { calculateBmi, getLatestKnownHeight } from "../utils/bmi";
 import { buildPoints, seriesFor } from "../utils/build-points";
+import { deltaFor } from "../utils/deltas";
 import { MeasurementFormDialog } from "./measurement-form-dialog";
 import { MetricChart } from "./metric-chart";
 
@@ -25,6 +26,16 @@ export function ProgressDashboardWidget({ athleteId }: { athleteId: string }) {
   const latestKnownHeight = getLatestKnownHeight(entries);
   const bmi = latest ? calculateBmi(latest.weightKg, latest.heightCm ?? latestKnownHeight) : null;
   const points = buildPoints(entries);
+
+  const previousWeight =
+    entries
+      .slice(0, -1)
+      .reverse()
+      .find((entry) => entry.weightKg !== null)?.weightKg ?? null;
+  const weightDelta =
+    latest?.weightKg !== null && latest?.weightKg !== undefined && previousWeight !== null
+      ? deltaFor(latest.weightKg, previousWeight)
+      : null;
 
   return (
     <Card className="gap-4 py-5">
@@ -54,6 +65,11 @@ export function ProgressDashboardWidget({ athleteId }: { athleteId: string }) {
                 <p className="text-sm font-bold text-foreground">
                   {latest.weightKg ? toPersianDigits(latest.weightKg) : "—"}
                 </p>
+                {weightDelta && (
+                  <p className="text-xs text-muted-foreground">
+                    {weightDelta.label} نسبت به قبل
+                  </p>
+                )}
               </div>
               <div className="rounded-xl bg-muted p-3 text-center">
                 <p className="text-xs text-muted-foreground">BMI</p>

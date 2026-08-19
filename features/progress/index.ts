@@ -14,3 +14,4 @@ export * from "./services/progress-service";
 export * from "./types/progress-types";
 export * from "./utils/bmi";
 export * from "./utils/build-points";
+export * from "./utils/deltas";
