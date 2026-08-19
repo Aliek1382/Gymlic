@@ -19,6 +19,16 @@ export interface CompletedPlanEntry {
   assignedAt: string;
 }
 
+// How many of this week's training days an athlete has ticked off, against
+// how many their active plan actually has. `sessionsPerWeek` is 0 when the
+// athlete has no active workout plan to be measured against at all.
+export interface AthleteWeeklyAdherence {
+  athleteId: string;
+  name: string;
+  doneThisWeek: number;
+  sessionsPerWeek: number;
+}
+
 export interface TrainerCompletionRatesSummary {
   workoutCompletionRate: number;
   nutritionCompletionRate: number;
