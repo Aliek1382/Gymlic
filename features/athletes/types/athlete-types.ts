@@ -1,6 +1,9 @@
 export interface AthleteSummary {
   id: string;
   name: string;
+  // Shown on the printable plan sheet's athlete card (as an age) and avatar.
+  birthDate: string | null;
+  avatarUrl: string | null;
   joinedAt: string;
   workoutPlanCount: number;
   nutritionPlanCount: number;

@@ -196,9 +196,27 @@
   }
 }
 
+/* Paper margins live here rather than as padding on .print-area so they
+   apply to every page, not just the first. Paper size is deliberately left
+   unset: pinning it to A4 makes a browser shrink the whole sheet to fit
+   when someone picks A5, whereas letting the dialog decide reflows the
+   sheet into more A5 pages at full size. The layout survives either way —
+   type is sized in pt (physical, so identical on both) and only the
+   exercise-name column flexes. */
+@page {
+  margin: 12mm 10mm;
+}
+
 /* Isolates a single .print-area (used for "دانلود PDF" buttons) as the
    only thing printed, regardless of where it sits in the page. */
 @media print {
+  /* The app's tinted background would otherwise paint the part of the last
+     page the sheet doesn't reach — and print-color-adjust below makes the
+     browser honour it. Paper is white. */
+  html,
+  body {
+    background: #ffffff;
+  }
   body * {
     visibility: hidden;
   }
@@ -207,8 +225,34 @@
     visibility: visible;
   }
   .print-area {
+    /* Only the top and sides are pinned — an `inset: 0` would cap the sheet
+       at viewport height and clip everything past page one. */
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    left: 0;
     padding: 0;
+    /* Day headers, technique badges and the athlete/trainer cards carry
+       meaning through their fills, so the sheet opts into printing
+       backgrounds rather than relying on the browser's "background
+       graphics" checkbox (off by default). */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-sheet {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  /* Keep a day's exercises together on one page. Browsers fall back to
+     breaking a block that can't fit a page at all, so a long day still
+     prints rather than overflowing. */
+  .print-day {
+    break-inside: avoid;
+  }
+  .print-day-heading {
+    break-after: avoid;
+  }
+  .print-row {
+    break-inside: avoid;
   }
 }

@@ -74,9 +74,11 @@ function canEditPlan(plan: PlanEntry): boolean {
 export function PlanBrowser({
   kind,
   trainerName,
+  trainerAvatarUrl,
 }: {
   kind: PlanKind;
   trainerName?: string | null;
+  trainerAvatarUrl?: string | null;
 }) {
   const Icon = ICON_BY_KIND[kind];
   const athletes = useAthletes();
@@ -85,6 +87,8 @@ export function PlanBrowser({
   const [selectedAthlete, setSelectedAthlete] = useState<{
     id: string;
     name: string;
+    birthDate: string | null;
+    avatarUrl: string | null;
   } | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanEntry | null>(null);
   const [editingPlan, setEditingPlan] = useState<PlanEntry | null>(null);
@@ -295,7 +299,10 @@ export function PlanBrowser({
                     description: selectedPlan.description,
                     assignedAt: selectedPlan.assignedAt,
                     athleteName: selectedAthlete?.name,
+                    athleteBirthDate: selectedAthlete?.birthDate,
+                    athleteAvatarUrl: selectedAthlete?.avatarUrl,
                     trainerName: trainerName ?? undefined,
+                    trainerAvatarUrl,
                   })
                 }
               >

@@ -23,7 +23,11 @@ export default async function WorkoutProgramsPage() {
         </p>
       </div>
 
-      <PlanBrowser kind="workout" trainerName={trainerName} />
+      <PlanBrowser
+        kind="workout"
+        trainerName={trainerName}
+        trainerAvatarUrl={context.avatarUrl}
+      />
     </div>
   );
 }

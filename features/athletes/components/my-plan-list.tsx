@@ -26,12 +26,20 @@ export function MyPlanList({
   kind,
   emptyTitle,
   emptyDescription,
+  athleteName,
+  athleteBirthDate,
+  athleteAvatarUrl,
   trainerName,
+  trainerAvatarUrl,
 }: {
   kind: PlanKind;
   emptyTitle: string;
   emptyDescription: string;
+  athleteName?: string | null;
+  athleteBirthDate?: string | null;
+  athleteAvatarUrl?: string | null;
   trainerName?: string | null;
+  trainerAvatarUrl?: string | null;
 }) {
   const plans = useMyPlans(kind);
   const completePlan = useCompletePlan(kind);
@@ -123,7 +131,11 @@ export function MyPlanList({
                     title: plan.title,
                     description: plan.description,
                     assignedAt: plan.assignedAt,
+                    athleteName: athleteName ?? undefined,
+                    athleteBirthDate,
+                    athleteAvatarUrl,
                     trainerName: trainerName ?? undefined,
+                    trainerAvatarUrl,
                   })
                 }
               >

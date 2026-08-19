@@ -21,8 +21,9 @@ function heading(label: string): string {
 
 // A heading line is any standalone "چیزی:" line — not just a weekday —
 // since headings can now also be muscle-group labels sourced from the
-// exercise library.
-function isHeadingLine(line: string): boolean {
+// exercise library. Exported so the printable sheet splits the text into
+// day blocks on exactly the same rule the builder writes them with.
+export function isHeadingLine(line: string): boolean {
   const trimmed = line.trim();
   return trimmed.length > 1 && trimmed.endsWith(":");
 }
