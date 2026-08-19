@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
-import { listAthletes } from "@/features/athletes";
+import {
+  getPersianWeekStart,
+  listAthletes,
+  parsePlanDescription,
+  toDateKey,
+} from "@/features/athletes";
 import type {
   AthleteProgressSummary,
+  AthleteWeeklyAdherence,
   CompletedPlanEntry,
   TrainerCompletionRatesSummary,
   TrainerMonthlyStatsSummary,
@@ -87,6 +93,81 @@ export async function listAthleteProgress(): Promise<AthleteProgressSummary[]> {
     name: athlete.name,
     completedCount: counts.get(athlete.id) ?? 0,
   }));
+}
+
+// How many of this week's training days each athlete has ticked off. The
+// target isn't stored anywhere — a plan's "days" are the headings inside its
+// free-text description — so it's counted by parsing that description, the
+// same way the athlete's own screen counts the days it offers a tick for.
+export async function listWeeklyAdherence(): Promise<AthleteWeeklyAdherence[]> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+  const weekStart = toDateKey(getPersianWeekStart());
+
+  const [athletes, plans] = await Promise.all([
+    listAthletes(),
+    supabase
+      .from("workout_assignments")
+      .select("id, athlete_id, description")
+      .eq("trainer_id", trainerId)
+      .eq("is_template", false)
+      .eq("status", "active")
+      .order("assigned_at", { ascending: false }),
+  ]);
+  if (plans.error) throw plans.error;
+
+  // The athlete's own screen ticks against their most recent active plan, so
+  // adherence is measured against that same one — hence first-wins over a
+  // newest-first list.
+  const planByAthlete = new Map<string, { id: string; description: string | null }>();
+  for (const row of plans.data ?? []) {
+    if (!row.athlete_id || planByAthlete.has(row.athlete_id)) continue;
+    planByAthlete.set(row.athlete_id, { id: row.id, description: row.description });
+  }
+
+  const assignmentIds = [...planByAthlete.values()].map((plan) => plan.id);
+  const logs =
+    assignmentIds.length > 0
+      ? await supabase
+          .from("workout_day_logs")
+          .select("assignment_id, day_key")
+          .in("assignment_id", assignmentIds)
+          .gte("completed_on", weekStart)
+      : null;
+  if (logs?.error) throw logs.error;
+
+  // A day ticked on two dates in one week still counts once, matching how
+  // the athlete's own "this week" line counts it.
+  const doneDaysByPlan = new Map<string, Set<string>>();
+  for (const log of logs?.data ?? []) {
+    const days = doneDaysByPlan.get(log.assignment_id) ?? new Set<string>();
+    days.add(log.day_key);
+    doneDaysByPlan.set(log.assignment_id, days);
+  }
+
+  return athletes.map((athlete) => {
+    const plan = planByAthlete.get(athlete.id);
+    if (!plan) {
+      return {
+        athleteId: athlete.id,
+        name: athlete.name,
+        doneThisWeek: 0,
+        sessionsPerWeek: 0,
+      };
+    }
+
+    // Only headed sections are tickable — the heading is the day's key.
+    const sessionsPerWeek = parsePlanDescription(plan.description).filter(
+      (section) => section.heading !== null
+    ).length;
+
+    return {
+      athleteId: athlete.id,
+      name: athlete.name,
+      doneThisWeek: doneDaysByPlan.get(plan.id)?.size ?? 0,
+      sessionsPerWeek,
+    };
+  });
 }
 
 export async function getTrainerCompletionRates(): Promise<TrainerCompletionRatesSummary> {

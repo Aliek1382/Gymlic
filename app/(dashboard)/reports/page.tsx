@@ -5,6 +5,7 @@ import {
   AthleteProgressList,
   TrainerCompletionRates,
   TrainerMonthlyStats,
+  TrainerWeeklyAdherence,
 } from "@/features/reports";
 
 export const metadata = { title: "گزارش‌ها | جیم‌لیک" };
@@ -25,6 +26,7 @@ export default async function ReportsPage() {
 
       <TrainerMonthlyStats />
       <TrainerCompletionRates />
+      <TrainerWeeklyAdherence />
       <AthleteProgressList />
     </div>
   );

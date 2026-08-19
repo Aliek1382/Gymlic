@@ -101,8 +101,10 @@ export function MyPlanList({
               </p>
             </div>
             <PlanSections
+              planId={plan.id}
               description={plan.description}
-              highlightToday={plan.id === latestPlanId}
+              isActivePlan={plan.id === latestPlanId}
+              dayLogging={kind === "workout"}
             />
             <div className="flex flex-wrap items-center gap-2">
               {plan.id === latestPlanId && (
@@ -119,7 +121,7 @@ export function MyPlanList({
                   onClick={() => handleComplete(plan.id)}
                 >
                   <CheckCircle2 />
-                  این برنامه را انجام دادم
+                  این برنامه تمام شد
                 </Button>
               )}
               <Button

@@ -248,6 +248,22 @@ export interface Database {
           note?: string | null;
         }
       >;
+      workout_day_logs: TableOf<
+        {
+          id: string;
+          assignment_id: string;
+          athlete_id: string;
+          day_key: string;
+          completed_on: string;
+          created_at: string;
+        },
+        {
+          assignment_id: string;
+          athlete_id: string;
+          day_key: string;
+          completed_on?: string;
+        }
+      >;
       activity_logs: TableOf<
         {
           id: string;

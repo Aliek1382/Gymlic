@@ -20,12 +20,16 @@ export * from "./hooks/use-my-plans";
 export * from "./hooks/use-remove-athlete";
 export * from "./hooks/use-revoke-athlete-invite";
 export * from "./hooks/use-complete-plan";
+export * from "./hooks/use-workout-day-logs";
+export * from "./hooks/use-toggle-workout-day";
 export * from "./hooks/use-templates";
 export * from "./hooks/use-save-template";
 export * from "./hooks/use-delete-template";
 export * from "./hooks/use-plan-print";
 
 export * from "./services/athlete-service";
+export * from "./services/workout-log-service";
 export * from "./types/athlete-types";
+export * from "./utils/workout-plan-parse";
 export * from "./utils/workout-plan-text";
 export * from "./utils/workout-plan-weekday";
