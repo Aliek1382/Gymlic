@@ -38,7 +38,9 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
   const [athletesResult, workouts, nutrition] = await Promise.all([
     supabase
       .from("trainer_athletes")
-      .select("athlete_id, created_at, profiles!athlete_id(first_name, last_name)")
+      .select(
+        "athlete_id, created_at, profiles!athlete_id(first_name, last_name, birth_date, avatar_url)"
+      )
       .eq("trainer_id", trainerId)
       .eq("status", "active")
       .order("created_at", { ascending: false })
@@ -46,7 +48,12 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
         {
           athlete_id: string;
           created_at: string;
-          profiles: { first_name: string | null; last_name: string | null } | null;
+          profiles: {
+            first_name: string | null;
+            last_name: string | null;
+            birth_date: string | null;
+            avatar_url: string | null;
+          } | null;
         }[]
       >(),
     // Counted for the "most/fewest plans" sort options — drafts don't
@@ -78,6 +85,8 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
       [row.profiles?.first_name, row.profiles?.last_name]
         .filter(Boolean)
         .join(" ") || "بدون نام",
+    birthDate: row.profiles?.birth_date ?? null,
+    avatarUrl: row.profiles?.avatar_url ?? null,
     joinedAt: row.created_at,
     workoutPlanCount: workoutCounts.get(row.athlete_id) ?? 0,
     nutritionPlanCount: nutritionCounts.get(row.athlete_id) ?? 0,

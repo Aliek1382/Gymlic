@@ -11,6 +11,7 @@ export interface ServerAuthContext {
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
+  birthDate: string | null;
   accountType: AccountType | null;
   activeMembership: {
     clubId: string;
@@ -19,6 +20,7 @@ export interface ServerAuthContext {
   } | null;
   hasTrainer: boolean;
   trainerName: string | null;
+  trainerAvatarUrl: string | null;
 }
 
 /**
@@ -39,7 +41,9 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("phone, email, first_name, last_name, avatar_url, account_type")
+    .select(
+      "phone, email, first_name, last_name, avatar_url, birth_date, account_type"
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -63,24 +67,30 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
     .eq("status", "active");
 
   let trainerName: string | null = null;
+  let trainerAvatarUrl: string | null = null;
   if (profile?.account_type === "athlete") {
     // trainer_athletes has two foreign keys into profiles (trainer_id and
     // athlete_id) — the embed must be disambiguated via the column hint.
     const { data: trainerRelation } = await supabase
       .from("trainer_athletes")
-      .select("profiles!trainer_id(first_name, last_name)")
+      .select("profiles!trainer_id(first_name, last_name, avatar_url)")
       .eq("athlete_id", user.id)
       .eq("status", "active")
       .limit(1)
       .maybeSingle()
       .returns<{
-        profiles: { first_name: string | null; last_name: string | null } | null;
+        profiles: {
+          first_name: string | null;
+          last_name: string | null;
+          avatar_url: string | null;
+        } | null;
       }>();
 
     trainerName =
       [trainerRelation?.profiles?.first_name, trainerRelation?.profiles?.last_name]
         .filter(Boolean)
         .join(" ") || null;
+    trainerAvatarUrl = trainerRelation?.profiles?.avatar_url ?? null;
   }
 
   return {
@@ -90,6 +100,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
     firstName: profile?.first_name ?? null,
     lastName: profile?.last_name ?? null,
     avatarUrl: profile?.avatar_url ?? null,
+    birthDate: profile?.birth_date ?? null,
     accountType: (profile?.account_type as AccountType | null) ?? null,
     activeMembership: membership
       ? {
@@ -100,6 +111,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
       : null,
     hasTrainer: (trainerCount ?? 0) > 0,
     trainerName,
+    trainerAvatarUrl,
   };
 });
 

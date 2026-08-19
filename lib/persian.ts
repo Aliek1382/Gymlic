@@ -79,6 +79,25 @@ export function formatShortPersianDate(date: Date): string {
   }).format(date);
 }
 
+// "۲۷ ساله" from a stored birth date, or null when there's no usable date —
+// callers just omit the field rather than printing a placeholder age.
+export function formatAge(birthDate: string | null | undefined): string | null {
+  if (!birthDate) return null;
+
+  const born = new Date(birthDate);
+  if (Number.isNaN(born.getTime())) return null;
+
+  const now = new Date();
+  let age = now.getFullYear() - born.getFullYear();
+  const monthDiff = now.getMonth() - born.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < born.getDate())) {
+    age -= 1;
+  }
+  if (age < 0 || age > 120) return null;
+
+  return `${toPersianDigits(age)} ساله`;
+}
+
 // Short relative label for timestamps like notifications — "همین الان",
 // "۵ دقیقه پیش", "۳ روز پیش" — falling back to the full date past a week.
 export function formatRelativeTime(date: Date): string {
