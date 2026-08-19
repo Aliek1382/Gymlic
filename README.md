@@ -22,6 +22,11 @@
 
    سپس آدرس [http://localhost:3000](http://localhost:3000) را باز کنید.
 
+## استقرار (Vercel)
+
+- متغیرهای `NEXT_PUBLIC_SUPABASE_URL` و `NEXT_PUBLIC_SUPABASE_ANON_KEY` را در Settings → Environment Variables برای هر سه محیط Production / Preview / Development تعریف کنید. این متغیرها در Middleware خوانده می‌شوند و اگر تعریف نشوند، کاربر روی تمام مسیرهای محافظت‌شده به `/login` هدایت می‌شود (خطای مربوطه در Runtime Logs ثبت می‌شود).
+- پس از تغییر مقادیر، یک Redeploy لازم است تا متغیرهای جدید اعمال شوند.
+
 ## معماری
 
 - `app/` — مسیرهای Next.js App Router؛ گروه `(auth)` صفحات ورود/OTP/انتخاب نقش و گروه `(dashboard)` پنل اصلی را در بر می‌گیرد.
