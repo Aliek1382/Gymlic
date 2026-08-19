@@ -18,3 +18,8 @@ export interface CompletedPlanEntry {
   kind: PlanKind;
   assignedAt: string;
 }
+
+export interface TrainerCompletionRatesSummary {
+  workoutCompletionRate: number;
+  nutritionCompletionRate: number;
+}

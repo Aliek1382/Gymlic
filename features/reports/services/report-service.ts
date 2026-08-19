@@ -3,6 +3,7 @@ import { listAthletes } from "@/features/athletes";
 import type {
   AthleteProgressSummary,
   CompletedPlanEntry,
+  TrainerCompletionRatesSummary,
   TrainerMonthlyStatsSummary,
 } from "../types/report-types";
 
@@ -86,6 +87,52 @@ export async function listAthleteProgress(): Promise<AthleteProgressSummary[]> {
     name: athlete.name,
     completedCount: counts.get(athlete.id) ?? 0,
   }));
+}
+
+export async function getTrainerCompletionRates(): Promise<TrainerCompletionRatesSummary> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const [completedWorkouts, totalWorkouts, completedNutrition, totalNutrition] =
+    await Promise.all([
+      supabase
+        .from("workout_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("trainer_id", trainerId)
+        .eq("status", "completed")
+        .eq("is_template", false),
+      supabase
+        .from("workout_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("trainer_id", trainerId)
+        .neq("status", "draft")
+        .eq("is_template", false),
+      supabase
+        .from("nutrition_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("trainer_id", trainerId)
+        .eq("status", "completed")
+        .eq("is_template", false),
+      supabase
+        .from("nutrition_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("trainer_id", trainerId)
+        .neq("status", "draft")
+        .eq("is_template", false),
+    ]);
+  if (completedWorkouts.error) throw completedWorkouts.error;
+  if (totalWorkouts.error) throw totalWorkouts.error;
+  if (completedNutrition.error) throw completedNutrition.error;
+  if (totalNutrition.error) throw totalNutrition.error;
+
+  return {
+    workoutCompletionRate: totalWorkouts.count
+      ? Math.round(((completedWorkouts.count ?? 0) / totalWorkouts.count) * 100)
+      : 0,
+    nutritionCompletionRate: totalNutrition.count
+      ? Math.round(((completedNutrition.count ?? 0) / totalNutrition.count) * 100)
+      : 0,
+  };
 }
 
 export async function listCompletedPlansForAthlete(

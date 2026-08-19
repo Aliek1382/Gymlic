@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
-import { AthleteProgressList, TrainerMonthlyStats } from "@/features/reports";
+import {
+  AthleteProgressList,
+  TrainerCompletionRates,
+  TrainerMonthlyStats,
+} from "@/features/reports";
 
 export const metadata = { title: "گزارش‌ها | جیم‌لیک" };
 
@@ -20,6 +24,7 @@ export default async function ReportsPage() {
       </div>
 
       <TrainerMonthlyStats />
+      <TrainerCompletionRates />
       <AthleteProgressList />
     </div>
   );

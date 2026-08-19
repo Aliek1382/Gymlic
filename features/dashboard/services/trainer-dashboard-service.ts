@@ -16,8 +16,10 @@ export async function getTrainerStatistics(): Promise<TrainerStatistics> {
     athletes,
     activeWorkouts,
     completedWorkouts,
+    totalWorkouts,
     completedNutrition,
     activeNutrition,
+    totalNutrition,
   ] = await Promise.all([
     supabase
       .from("trainer_athletes")
@@ -37,6 +39,12 @@ export async function getTrainerStatistics(): Promise<TrainerStatistics> {
       .eq("status", "completed")
       .eq("is_template", false),
     supabase
+      .from("workout_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("trainer_id", user.id)
+      .neq("status", "draft")
+      .eq("is_template", false),
+    supabase
       .from("nutrition_assignments")
       .select("id", { count: "exact", head: true })
       .eq("trainer_id", user.id)
@@ -48,6 +56,12 @@ export async function getTrainerStatistics(): Promise<TrainerStatistics> {
       .eq("trainer_id", user.id)
       .eq("status", "active")
       .eq("is_template", false),
+    supabase
+      .from("nutrition_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("trainer_id", user.id)
+      .neq("status", "draft")
+      .eq("is_template", false),
   ]);
 
   return {
@@ -56,6 +70,12 @@ export async function getTrainerStatistics(): Promise<TrainerStatistics> {
     completedProgramsCount:
       (completedWorkouts.count ?? 0) + (completedNutrition.count ?? 0),
     activeNutritionPlansCount: activeNutrition.count ?? 0,
+    workoutCompletionRate: totalWorkouts.count
+      ? Math.round(((completedWorkouts.count ?? 0) / totalWorkouts.count) * 100)
+      : 0,
+    nutritionCompletionRate: totalNutrition.count
+      ? Math.round(((completedNutrition.count ?? 0) / totalNutrition.count) * 100)
+      : 0,
   };
 }
 

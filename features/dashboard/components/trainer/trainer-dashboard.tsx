@@ -1,7 +1,16 @@
 "use client";
 
-import { Apple, CheckCircle2, Dumbbell, LineChart, UserPlus, Users } from "lucide-react";
+import {
+  Apple,
+  CheckCircle2,
+  Dumbbell,
+  LineChart,
+  Percent,
+  UserPlus,
+  Users,
+} from "lucide-react";
 
+import { Progress } from "@/components/ui/progress";
 import { toPersianDigits } from "@/lib/persian";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
 import { useTrainerRecentActivities } from "../../hooks/use-trainer-recent-activities";
@@ -88,6 +97,34 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
             iconClassName="bg-success-muted text-success"
             title="رژیم‌های فعال"
             value={toPersianDigits(statistics.data.activeNutritionPlansCount)}
+          />
+        )}
+
+        {statistics.isLoading ? (
+          <StatisticCardSkeleton />
+        ) : statistics.isError || !statistics.data ? (
+          <StatisticCard icon={Percent} title="نرخ تکمیل برنامه تمرینی" value="—" />
+        ) : (
+          <StatisticCard
+            icon={Percent}
+            iconClassName="bg-warning-muted text-warning"
+            title="نرخ تکمیل برنامه تمرینی"
+            value={`${toPersianDigits(statistics.data.workoutCompletionRate)}٪`}
+            footer={<Progress value={statistics.data.workoutCompletionRate} />}
+          />
+        )}
+
+        {statistics.isLoading ? (
+          <StatisticCardSkeleton />
+        ) : statistics.isError || !statistics.data ? (
+          <StatisticCard icon={Percent} title="نرخ تکمیل برنامه غذایی" value="—" />
+        ) : (
+          <StatisticCard
+            icon={Percent}
+            iconClassName="bg-success-muted text-success"
+            title="نرخ تکمیل برنامه غذایی"
+            value={`${toPersianDigits(statistics.data.nutritionCompletionRate)}٪`}
+            footer={<Progress value={statistics.data.nutritionCompletionRate} />}
           />
         )}
       </StatisticsGrid>
