@@ -11,6 +11,7 @@ import type { PlanKind } from "../types/athlete-types";
 import {
   hasExerciseRows,
   parsePlanDescription,
+  sectionMuscleGroups,
   techniqueLabel,
   type ParsedExerciseRow,
   type ParsedSection,
@@ -32,6 +33,10 @@ const TECHNIQUE_BADGE: Record<Exclude<PlanTechnique, "normal">, string> = {
   triset: "border-[#a5e8f2] bg-[#e0fafd] text-[#0e7490]",
   dropset: "border-[#fbd6ab] bg-[#fff1de] text-[#b45309]",
 };
+
+// Neutral on purpose — the muscle group sits on every row, so it stays
+// quieter than the technique badges that mark the exceptions.
+const GROUP_BADGE = "border-[#dfe3ee] bg-white text-[#6b7280]";
 
 // Shared by the column header and every row, so the two stay aligned even
 // though rows are separate elements (they each need their own break-inside
@@ -112,7 +117,14 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
       <div className={cn(ROW_GRID, "print-row border-t border-[#eceef5] py-1.5")}>
         {number}
         <div className="min-w-0">
-          <p className="truncate text-[9.5pt] font-bold text-[#111827]">{move.name}</p>
+          <p className="truncate text-[9.5pt] font-bold text-[#111827]">
+            {row.muscleGroup && (
+              <Badge className={cn(GROUP_BADGE, "ml-1 font-normal")}>
+                {row.muscleGroup}
+              </Badge>
+            )}
+            {move.name}
+          </p>
           {row.rest.betweenExercises && (
             <RestNote>استراحت تا حرکت بعد: {row.rest.betweenExercises}</RestNote>
           )}
@@ -137,6 +149,9 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
       <span className="pt-0.5">{number}</span>
       <div className="col-span-4 min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
+          {row.muscleGroup && (
+            <Badge className={cn(GROUP_BADGE, "font-normal")}>{row.muscleGroup}</Badge>
+          )}
           {label && (
             <Badge className={TECHNIQUE_BADGE[row.technique]}>{label}</Badge>
           )}
@@ -176,17 +191,23 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
 
 function Section({ section }: { section: ParsedSection }) {
   const exerciseCount = section.rows.filter((row) => row.kind === "exercise").length;
+  const groups = sectionMuscleGroups(section);
   let number = 0;
 
   return (
     <section className="print-day mb-3 overflow-hidden rounded-lg border border-[#dfe3ee]">
       {section.heading && (
         <div className="print-day-heading flex items-center justify-between gap-2 border-b border-[#dfe3ee] bg-[#eef2ff] px-3 py-1.5">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-block h-3.5 w-1 rounded-full bg-[#3b5bfb]" />
             <h2 className="text-[10.5pt] font-bold text-[#1b2a6b]">
               {section.heading}
             </h2>
+            {groups.map((group) => (
+              <Badge key={group} className={cn(GROUP_BADGE, "font-normal")}>
+                {group}
+              </Badge>
+            ))}
           </div>
           {exerciseCount > 0 && (
             <span className="text-[8pt] text-[#5566b8]">

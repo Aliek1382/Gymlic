@@ -31,10 +31,14 @@ export function WorkoutDayBuilder({
     setSelectedMuscleGroup((current) => (current === group ? null : group));
   }
 
-  // Day and muscle group are independent — a trainer can pick either, both
-  // (combined into one heading, e.g. "شنبه — پا"), or neither.
-  const heading =
-    [selectedDay, selectedMuscleGroup].filter(Boolean).join(" — ") || null;
+  // With a day chosen, the day alone is the heading and the muscle group
+  // tags each exercise instead — so coming back to the same day always lands
+  // in that day's existing block rather than starting a rival one beside it,
+  // which would read as two separate days to both the athlete and the tick.
+  // With no day, the group stays the heading, so a program organised purely
+  // by muscle group still gets blocks.
+  const heading = selectedDay ?? selectedMuscleGroup;
+  const lineMuscleGroup = selectedDay ? selectedMuscleGroup : null;
 
   return (
     <div className="space-y-3">
@@ -78,7 +82,10 @@ export function WorkoutDayBuilder({
         </CollapsibleSection>
       )}
 
-      <ExercisePicker onInsert={(line) => onInsertLine(heading, line)} />
+      <ExercisePicker
+        muscleGroup={lineMuscleGroup}
+        onInsert={(line) => onInsertLine(heading, line)}
+      />
     </div>
   );
 }
