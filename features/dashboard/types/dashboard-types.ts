@@ -108,6 +108,7 @@ export interface TrainerDraftPlan {
 // ---------------------------------------------------------------------------
 
 export interface AthletePlanSummary {
+  id: string;
   title: string;
   description: string | null;
   assignedAt: string;
