@@ -30,6 +30,10 @@ export interface ParsedExerciseRow {
   // Descending rep targets of a drop-set, e.g. ["12", "10", "8"].
   drops: string[] | null;
   rest: ParsedRest;
+  // The group the trainer had selected when inserting this line, when they
+  // picked one at all. It rides on the row rather than the day heading so
+  // that picking the same day twice always lands in the same block.
+  muscleGroup: string | null;
 }
 
 export interface ParsedTextRow {
@@ -65,7 +69,23 @@ const MULTI_MOVE = /^(.+?)\s*×\s*(\d+)\s*تکرار$/;
 const NORMAL_LINE = /^(.+?)\s+—\s+(\d+)\s*ست\s*×\s*(\d+)\s*تکرار$/;
 const DROPSET_LINE = /^(.+?)\s+—\s+دراپ‌ست\s*:\s*(.+?)\s*تکرار(?:\s*\([^)]*\))?$/;
 
+// The optional "[پا] " prefix ExercisePicker puts in front of a line when the
+// trainer had a muscle group selected alongside a weekday.
+const MUSCLE_PREFIX = /^\s*\[([^\]]+)\]\s*/;
+
 const EMPTY_REST: ParsedRest = { betweenSets: null, betweenExercises: null };
+
+// Pulled off before any technique pattern runs, so those keep matching the
+// exercise name at the start of the line exactly as they did before the
+// prefix existed.
+function splitMuscleGroup(line: string): {
+  body: string;
+  muscleGroup: string | null;
+} {
+  const match = line.match(MUSCLE_PREFIX);
+  if (!match) return { body: line, muscleGroup: null };
+  return { body: line.slice(match[0].length), muscleGroup: match[1].trim() };
+}
 
 function splitRest(line: string): { body: string; rest: ParsedRest } {
   const match = line.match(REST_SUFFIX);
@@ -88,7 +108,8 @@ function splitRest(line: string): { body: string; rest: ParsedRest } {
 }
 
 function parseLine(line: string): ParsedRow {
-  const { body, rest } = splitRest(line);
+  const { body: unprefixed, muscleGroup } = splitMuscleGroup(line);
+  const { body, rest } = splitRest(unprefixed);
 
   const multi = body.match(MULTI_LINE);
   if (multi) {
@@ -107,6 +128,7 @@ function parseLine(line: string): ParsedRow {
       sets: multi[2],
       drops: null,
       rest,
+      muscleGroup,
     };
   }
 
@@ -119,6 +141,7 @@ function parseLine(line: string): ParsedRow {
       sets: null,
       drops: dropset[2].split("←").map((drop) => drop.trim()).filter(Boolean),
       rest,
+      muscleGroup,
     };
   }
 
@@ -131,6 +154,7 @@ function parseLine(line: string): ParsedRow {
       sets: normal[2],
       drops: null,
       rest,
+      muscleGroup,
     };
   }
 
@@ -169,4 +193,17 @@ export function parsePlanDescription(
 // than a block of freehand notes.
 export function hasExerciseRows(section: ParsedSection): boolean {
   return section.rows.some((row) => row.kind === "exercise");
+}
+
+// Distinct muscle groups across a section's exercise rows, in the order they
+// first appear. Shown on the day heading so what the day covers reads at a
+// glance — derived from the rows rather than stored in the heading, which is
+// what keeps the heading stable enough to key a day's tick by.
+export function sectionMuscleGroups(section: ParsedSection): string[] {
+  const groups: string[] = [];
+  for (const row of section.rows) {
+    if (row.kind !== "exercise" || !row.muscleGroup) continue;
+    if (!groups.includes(row.muscleGroup)) groups.push(row.muscleGroup);
+  }
+  return groups;
 }

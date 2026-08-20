@@ -14,6 +14,7 @@ import { useWorkoutDayLogs } from "../hooks/use-workout-day-logs";
 import {
   hasExerciseRows,
   parsePlanDescription,
+  sectionMuscleGroups,
   techniqueLabel,
   type ParsedExerciseRow,
   type ParsedSection,
@@ -37,6 +38,12 @@ const TECHNIQUE_VARIANT: Record<
 
 // Shared by the column header and every straight-sets row so the two line up.
 const ROW_GRID = "grid grid-cols-[1.25rem_1fr_2.25rem_2.75rem] items-center gap-x-2";
+
+// Bordered rather than filled so the same chip reads on a row, on a muted
+// day heading, and on the tinted heading of today's block. Quiet enough to
+// sit on every row without competing with the exercise name.
+const GROUP_CHIP =
+  "shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground";
 
 // Resolved after mount rather than during render: the server renders in UTC
 // and the athlete's browser in local time, which can disagree on which day
@@ -72,7 +79,12 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
           {number}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">{move.name}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {row.muscleGroup && (
+              <span className={GROUP_CHIP}>{row.muscleGroup}</span>
+            )}
+            <p className="text-sm font-medium text-foreground">{move.name}</p>
+          </div>
           {rest && <p className="mt-0.5 text-xs text-muted-foreground">{rest}</p>}
         </div>
         <span className="text-center text-sm font-bold text-primary">
@@ -94,6 +106,9 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
+          {row.muscleGroup && (
+            <span className={GROUP_CHIP}>{row.muscleGroup}</span>
+          )}
           {label && (
             <Badge variant={TECHNIQUE_VARIANT[row.technique]}>{label}</Badge>
           )}
@@ -138,6 +153,7 @@ function PlanSection({
   tick: DayTick | null;
 }) {
   const exerciseCount = section.rows.filter((row) => row.kind === "exercise").length;
+  const groups = sectionMuscleGroups(section);
   let number = 0;
 
   return (
@@ -154,9 +170,14 @@ function PlanSection({
             isToday ? "bg-primary/10" : "bg-muted/50"
           )}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-block h-3.5 w-1 rounded-full bg-primary" />
             <h3 className="text-sm font-bold text-foreground">{section.heading}</h3>
+            {groups.map((group) => (
+              <span key={group} className={GROUP_CHIP}>
+                {group}
+              </span>
+            ))}
             {isToday && <Badge variant="info">امروز</Badge>}
           </div>
           <div className="flex items-center gap-2">

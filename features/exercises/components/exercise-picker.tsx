@@ -107,8 +107,13 @@ function ExerciseSelect({
 
 export function ExercisePicker({
   onInsert,
+  muscleGroup = null,
 }: {
   onInsert: (line: string) => void;
+  // Tags the inserted line as "[پا] …" so the group travels with the
+  // exercise instead of with the day heading. Null when the trainer picked
+  // no group, or when the group is already serving as the heading itself.
+  muscleGroup?: string | null;
 }) {
   const exercises = useExercisesForPicker();
   const recordUsage = useRecordExerciseUsage();
@@ -169,6 +174,13 @@ export function ExercisePicker({
     return parts.length > 0 ? ` (${parts.join("، ")})` : "";
   }
 
+  // Leading "[گروه] " tag, empty when no group is in play. Kept as a prefix
+  // so every technique's pattern still sees the exercise name where it
+  // expects it once the tag is stripped back off.
+  function groupPrefix(): string {
+    return muscleGroup ? `[${muscleGroup}] ` : "";
+  }
+
   function buildEntry(): { line: string; exerciseIds: string[] } | null {
     if (technique === "normal") {
       const exercise = findExercise(exerciseId);
@@ -176,7 +188,7 @@ export function ExercisePicker({
       const repsNum = Number(reps);
       if (!exercise || !(setsNum > 0) || !(repsNum > 0)) return null;
       return {
-        line: `${exercise.name} — ${setsNum} ست × ${repsNum} تکرار${restSuffix()}`,
+        line: `${groupPrefix()}${exercise.name} — ${setsNum} ست × ${repsNum} تکرار${restSuffix()}`,
         exerciseIds: [exercise.id],
       };
     }
@@ -196,7 +208,7 @@ export function ExercisePicker({
       }
 
       return {
-        line: `${MULTI_LABEL[technique]} (${setsNum} دور): ${parts.join(" + ")}${restSuffix()}`,
+        line: `${groupPrefix()}${MULTI_LABEL[technique]} (${setsNum} دور): ${parts.join(" + ")}${restSuffix()}`,
         exerciseIds,
       };
     }
@@ -208,7 +220,7 @@ export function ExercisePicker({
       return null;
     }
     return {
-      line: `${exercise.name} — دراپ‌ست: ${dropNums.join(" ← ")} تکرار (بدون استراحت، وزن کاهشی در هر افت)${restSuffix()}`,
+      line: `${groupPrefix()}${exercise.name} — دراپ‌ست: ${dropNums.join(" ← ")} تکرار (بدون استراحت، وزن کاهشی در هر افت)${restSuffix()}`,
       exerciseIds: [exercise.id],
     };
   }
