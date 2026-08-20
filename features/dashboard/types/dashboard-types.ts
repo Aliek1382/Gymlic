@@ -80,8 +80,6 @@ export interface TrainerStatistics {
   activeWorkoutProgramsCount: number;
   completedProgramsCount: number;
   activeNutritionPlansCount: number;
-  workoutCompletionRate: number;
-  nutritionCompletionRate: number;
 }
 
 export type TrainerActivityType = "workout" | "nutrition";
