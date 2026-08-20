@@ -8,6 +8,7 @@
 // freehand, or a nutrition plan — falls back to a plain text row, so the
 // sheet never loses content it failed to parse.
 import { isHeadingLine } from "./workout-plan-text";
+import { splitWeekdayHeading } from "./workout-plan-weekday";
 
 export type PlanTechnique = "normal" | "superset" | "triset" | "dropset";
 
@@ -161,6 +162,51 @@ function parseLine(line: string): ParsedRow {
   return { kind: "text", text: line };
 }
 
+// Plans written before the muscle group moved onto the exercise line carry
+// headings like "شنبه — پا", so a single day could span several rival blocks
+// that read as separate days. Those are folded back together here: the day
+// alone becomes the heading, and the group from the old heading tags the rows
+// that don't already carry one, so an existing plan renders exactly like a
+// newly written one — in the app and on the printed sheet alike.
+//
+// Only headings that actually start with a weekday are merged; a program
+// grouped purely by muscle group keeps each block as its own section.
+function mergeSectionsByWeekday(sections: ParsedSection[]): ParsedSection[] {
+  const merged: ParsedSection[] = [];
+  const byWeekday = new Map<string, ParsedSection>();
+
+  for (const section of sections) {
+    const split = section.heading ? splitWeekdayHeading(section.heading) : null;
+    if (!split) {
+      merged.push(section);
+      continue;
+    }
+
+    const { weekday, label } = split;
+    const rows = label
+      ? section.rows.map((row) =>
+          row.kind === "exercise" && row.muscleGroup === null
+            ? { ...row, muscleGroup: label }
+            : row
+        )
+      : section.rows;
+
+    const existing = byWeekday.get(weekday);
+    if (existing) {
+      existing.rows.push(...rows);
+      continue;
+    }
+
+    // The heading is normalised to the canonical weekday so a day keys its
+    // tick the same way however its heading was originally spelled.
+    const next: ParsedSection = { heading: weekday, rows: [...rows] };
+    byWeekday.set(weekday, next);
+    merged.push(next);
+  }
+
+  return merged;
+}
+
 export function parsePlanDescription(
   description: string | null | undefined
 ): ParsedSection[] {
@@ -186,7 +232,7 @@ export function parsePlanDescription(
     current.rows.push(parseLine(line));
   }
 
-  return sections;
+  return mergeSectionsByWeekday(sections);
 }
 
 // True when a section is a real exercise table (worth column headers) rather
