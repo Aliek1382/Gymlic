@@ -44,6 +44,7 @@ export function AthleteDashboard({
           plan={dashboard.data.todaysWorkout}
           emptyTitle="برنامه تمرینی فعالی ندارید."
           emptyDescription="مربی شما به‌زودی یک برنامه تمرینی برایتان تنظیم می‌کند."
+          dayLogging
         />
         <PlanSummaryCard
           title="برنامه غذایی"
