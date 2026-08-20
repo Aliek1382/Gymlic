@@ -40,6 +40,33 @@ function normalize(value: string): string {
   return value.replace(ZWNJ, "").trim();
 }
 
+// The " — " (or "-", "،") a legacy heading put between its day and its
+// muscle group.
+const HEADING_SEPARATOR = /^[\s—–\-،,]+/;
+
+// Splits a heading into the day it names and whatever label followed it, so
+// a pre-existing "شنبه — پا" can be folded back into that day's block with
+// "پا" applied to its exercises. Returns null when the heading doesn't start
+// with a weekday at all (a program grouped purely by muscle group).
+export function splitWeekdayHeading(
+  heading: string
+): { weekday: Weekday; label: string | null } | null {
+  const weekday = headingWeekday(heading);
+  if (!weekday) return null;
+
+  const trimmed = heading.trim();
+  // The heading may spell the weekday with or without its ZWNJ, so the
+  // canonical form is tried first and the stripped one second.
+  for (const form of [weekday, weekday.replace(ZWNJ, "")]) {
+    if (trimmed.startsWith(form)) {
+      const label = trimmed.slice(form.length).replace(HEADING_SEPARATOR, "").trim();
+      return { weekday, label: label || null };
+    }
+  }
+
+  return { weekday, label: null };
+}
+
 // Every weekday name ends in "شنبه", so a substring test would read
 // "سه‌شنبه — پا" as Saturday's block. Matching from the start of the
 // heading and requiring the next character to be a separator (the " — "
