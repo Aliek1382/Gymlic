@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
+import { PlanFormatHint } from "./plan-format-hint";
 import { useDeleteTemplate } from "../hooks/use-delete-template";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
@@ -232,12 +233,7 @@ export function PlanDialog({
               className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
               {...form.register("description")}
             />
-            {kind === "workout" && (
-              <p className="text-xs text-muted-foreground">
-                اگر درمورد سیستم انجام دادن حرکات توضیحی دارید اضافه کنید،
-                مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
-              </p>
-            )}
+            {kind === "workout" && <PlanFormatHint />}
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">

@@ -10,6 +10,7 @@ export * from "./components/template-form-dialog";
 export * from "./components/template-list";
 export * from "./components/plan-print-area";
 export * from "./components/plan-sections";
+export * from "./components/plan-format-hint";
 
 export * from "./hooks/use-athletes";
 export * from "./hooks/use-pending-athlete-invites";

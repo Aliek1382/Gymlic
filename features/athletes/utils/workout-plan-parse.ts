@@ -66,20 +66,93 @@ export function techniqueLabel(technique: PlanTechnique): string | null {
 // The optional "(استراحت بین ست‌ها: ...، استراحت بین حرکات: ...)" tail that
 // restSuffix() appends to every technique's line.
 const REST_SUFFIX = /\s*\(\s*استراحت[^)]*\)\s*$/;
+
+// ---------------------------------------------------------------------------
+// Line grammar
+//
+// ExercisePicker writes one canonical shape per technique, but a trainer may
+// also type straight into the description box, so each technique accepts a
+// few equivalent shapes. They're tried in order and the first match wins;
+// every shape lands on the same ParsedExerciseRow, so the table, badges and
+// printed sheet look identical no matter which one was written.
+// ---------------------------------------------------------------------------
+
 // Matches ASCII digits alongside Persian (۰-۹) and Arabic-Indic (٠-٩) ones —
 // a trainer typing a number by hand on a Persian keyboard usually gets one
-// of the latter two, not ASCII. The captured group is normalized back to
-// ASCII with toAsciiDigits() below so it parses/renders exactly like a
-// number ExercisePicker would have written.
+// of the latter two, not ASCII. Captured groups are normalized back to ASCII
+// with toAsciiDigits() so they render exactly like a number the picker wrote.
 const DIGITS = "[0-9۰-۹٠-٩]";
-const MULTI_LINE = new RegExp(
-  `^(سوپرست|تری‌ست)\\s*\\(\\s*(${DIGITS}+)\\s*دور\\s*\\)\\s*:\\s*(.+)$`
-);
-const MULTI_MOVE = new RegExp(`^(.+?)\\s*×\\s*(${DIGITS}+)\\s*تکرار$`);
-const NORMAL_LINE = new RegExp(
-  `^(.+?)\\s+—\\s+(${DIGITS}+)\\s*ست\\s*×\\s*(${DIGITS}+)\\s*تکرار$`
-);
-const DROPSET_LINE = /^(.+?)\s+—\s+دراپ‌ست\s*:\s*(.+?)\s*تکرار(?:\s*\([^)]*\))?$/;
+
+// Between an exercise name and its numbers: an em dash, hyphen or colon, or
+// nothing at all. SEP_REQUIRED is used by the one shape that would otherwise
+// end in a bare number, so "دستگاه شماره 2" isn't read as name + 2 reps.
+const SEP = String.raw`\s*[—–\-:]?\s*`;
+const SEP_REQUIRED = String.raw`\s*[—–\-:]\s*`;
+// "تکرار", its casual short form "تا", or omitted entirely.
+const REPS_WORD = "(?:تکرار|تا)";
+// Hand typing often drops the ZWNJ inside "تری‌ست" / "دراپ‌ست".
+const ZWNJ = String.raw`‌?`;
+const TIMES = "[×xX]";
+
+// A single straight-sets exercise: name, set count, rep count.
+const SINGLE_PATTERNS = [
+  // "پرس سینه — 4 ست × 12 تکرار" (canonical), and the looser hand-typed
+  // shapes it subsumes: no separator, no ×, "تا" for "تکرار", or no word.
+  new RegExp(
+    `^(.+?)${SEP}(${DIGITS}+)\\s*ست\\s*(?:${TIMES}\\s*)?(${DIGITS}+)\\s*${REPS_WORD}?$`
+  ),
+  // "پرس سینه — 4x12"
+  new RegExp(`^(.+?)${SEP}(${DIGITS}+)\\s*${TIMES}\\s*(${DIGITS}+)\\s*${REPS_WORD}?$`),
+  // "پرس سینه: 4/12"
+  new RegExp(`^(.+?)${SEP}(${DIGITS}+)\\s*/\\s*(${DIGITS}+)\\s*${REPS_WORD}?$`),
+];
+
+// A superset / tri-set line, whose round count covers every move in it.
+const MULTI_LINE_PATTERNS = [
+  new RegExp(
+    `^(سوپرست|تری${ZWNJ}ست)\\s*\\(\\s*(${DIGITS}+)\\s*دور\\s*\\)\\s*:\\s*(.+)$`
+  ),
+  new RegExp(`^(سوپرست|تری${ZWNJ}ست)\\s*(${DIGITS}+)\\s*دور\\s*:\\s*(.+)$`),
+];
+
+// Moves within a superset are joined by "+" or a standalone "و". The spaces
+// around "و" are required: without them any name containing the letter would
+// be torn apart.
+const MULTI_CONNECTOR = /\s*\+\s*|\s+و\s+/;
+
+// One move inside a superset — reps only, since the line's round count is
+// what covers sets.
+const MOVE_PATTERNS = [
+  // "پرس سینه × 12 تکرار" (canonical), "پرس سینه x12"
+  new RegExp(`^(.+?)\\s*${TIMES}\\s*(${DIGITS}+)\\s*${REPS_WORD}?$`),
+  // "پرس سینه 4 ست 12 تکرار" — a per-move set count is accepted but ignored,
+  // because the line's own "N دور" is what actually applies.
+  new RegExp(
+    `^(.+?)${SEP}${DIGITS}+\\s*ست\\s*(?:${TIMES}\\s*)?(${DIGITS}+)\\s*${REPS_WORD}?$`
+  ),
+  // "پرس سینه 12 تکرار" / "پرس سینه 12 تا"
+  new RegExp(`^(.+?)${SEP}(${DIGITS}+)\\s*${REPS_WORD}$`),
+  // "پرس سینه: 12" — separator required, per SEP_REQUIRED above.
+  new RegExp(`^(.+?)${SEP_REQUIRED}(${DIGITS}+)$`),
+];
+
+const DROPSET_PATTERNS = [
+  new RegExp(
+    `^(.+?)${SEP}دراپ${ZWNJ}ست\\s*:\\s*(.+?)\\s*${REPS_WORD}?\\s*(?:\\([^)]*\\))?$`
+  ),
+];
+
+// The descending rep targets of a drop-set. "←" is what the picker writes;
+// the rest are what's reachable from a keyboard.
+const DROP_SEPARATOR = /[←،,\-]/;
+
+function matchFirst(body: string, patterns: RegExp[]): RegExpMatchArray | null {
+  for (const pattern of patterns) {
+    const match = body.match(pattern);
+    if (match) return match;
+  }
+  return null;
+}
 
 // The optional "[پا] " prefix ExercisePicker puts in front of a line when the
 // trainer had a muscle group selected alongside a weekday.
@@ -123,13 +196,15 @@ function parseLine(line: string): ParsedRow {
   const { body: unprefixed, muscleGroup } = splitMuscleGroup(line);
   const { body, rest } = splitRest(unprefixed);
 
-  const multi = body.match(MULTI_LINE);
+  const multi = matchFirst(body, MULTI_LINE_PATTERNS);
   if (multi) {
     const moves: ParsedMove[] = [];
-    for (const part of multi[3].split("+")) {
-      const move = part.trim().match(MULTI_MOVE);
+    for (const part of multi[3].split(MULTI_CONNECTOR)) {
+      const move = matchFirst(part.trim(), MOVE_PATTERNS);
       // A half-recognised group would silently drop exercises, so bail out
-      // to a text row and keep the trainer's line intact instead.
+      // to a text row and keep the trainer's line intact instead. This is
+      // also what catches a "و" that belonged to a name rather than joining
+      // two moves — the stray half has no reps, so nothing is invented.
       if (!move) return { kind: "text", text: line };
       moves.push({ name: move[1].trim(), reps: toAsciiDigits(move[2]) });
     }
@@ -144,26 +219,34 @@ function parseLine(line: string): ParsedRow {
     };
   }
 
-  const dropset = body.match(DROPSET_LINE);
+  const dropset = matchFirst(body, DROPSET_PATTERNS);
   if (dropset) {
-    return {
-      kind: "exercise",
-      technique: "dropset",
-      moves: [{ name: dropset[1].trim(), reps: null }],
-      sets: null,
-      drops: dropset[2].split("←").map((drop) => drop.trim()).filter(Boolean),
-      rest,
-      muscleGroup,
-    };
+    const drops = dropset[2]
+      .split(DROP_SEPARATOR)
+      .map((drop) => toAsciiDigits(drop.trim()))
+      .filter(Boolean);
+    // A single value isn't a drop-set — treat the line as prose rather than
+    // rendering a one-step "drop".
+    if (drops.length >= 2) {
+      return {
+        kind: "exercise",
+        technique: "dropset",
+        moves: [{ name: dropset[1].trim(), reps: null }],
+        sets: null,
+        drops,
+        rest,
+        muscleGroup,
+      };
+    }
   }
 
-  const normal = body.match(NORMAL_LINE);
-  if (normal) {
+  const single = matchFirst(body, SINGLE_PATTERNS);
+  if (single) {
     return {
       kind: "exercise",
       technique: "normal",
-      moves: [{ name: normal[1].trim(), reps: toAsciiDigits(normal[3]) }],
-      sets: toAsciiDigits(normal[2]),
+      moves: [{ name: single[1].trim(), reps: toAsciiDigits(single[3]) }],
+      sets: toAsciiDigits(single[2]),
       drops: null,
       rest,
       muscleGroup,
