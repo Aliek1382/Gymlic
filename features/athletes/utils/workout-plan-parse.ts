@@ -7,6 +7,7 @@
 // buildEntry() produces. Any line it can't recognise — a trainer typing
 // freehand, or a nutrition plan — falls back to a plain text row, so the
 // sheet never loses content it failed to parse.
+import { toAsciiDigits } from "@/lib/persian";
 import { isHeadingLine } from "./workout-plan-text";
 import { splitWeekdayHeading } from "./workout-plan-weekday";
 
@@ -65,9 +66,19 @@ export function techniqueLabel(technique: PlanTechnique): string | null {
 // The optional "(استراحت بین ست‌ها: ...، استراحت بین حرکات: ...)" tail that
 // restSuffix() appends to every technique's line.
 const REST_SUFFIX = /\s*\(\s*استراحت[^)]*\)\s*$/;
-const MULTI_LINE = /^(سوپرست|تری‌ست)\s*\(\s*(\d+)\s*دور\s*\)\s*:\s*(.+)$/;
-const MULTI_MOVE = /^(.+?)\s*×\s*(\d+)\s*تکرار$/;
-const NORMAL_LINE = /^(.+?)\s+—\s+(\d+)\s*ست\s*×\s*(\d+)\s*تکرار$/;
+// Matches ASCII digits alongside Persian (۰-۹) and Arabic-Indic (٠-٩) ones —
+// a trainer typing a number by hand on a Persian keyboard usually gets one
+// of the latter two, not ASCII. The captured group is normalized back to
+// ASCII with toAsciiDigits() below so it parses/renders exactly like a
+// number ExercisePicker would have written.
+const DIGITS = "[0-9۰-۹٠-٩]";
+const MULTI_LINE = new RegExp(
+  `^(سوپرست|تری‌ست)\\s*\\(\\s*(${DIGITS}+)\\s*دور\\s*\\)\\s*:\\s*(.+)$`
+);
+const MULTI_MOVE = new RegExp(`^(.+?)\\s*×\\s*(${DIGITS}+)\\s*تکرار$`);
+const NORMAL_LINE = new RegExp(
+  `^(.+?)\\s+—\\s+(${DIGITS}+)\\s*ست\\s*×\\s*(${DIGITS}+)\\s*تکرار$`
+);
 const DROPSET_LINE = /^(.+?)\s+—\s+دراپ‌ست\s*:\s*(.+?)\s*تکرار(?:\s*\([^)]*\))?$/;
 
 // The optional "[پا] " prefix ExercisePicker puts in front of a line when the
@@ -120,13 +131,13 @@ function parseLine(line: string): ParsedRow {
       // A half-recognised group would silently drop exercises, so bail out
       // to a text row and keep the trainer's line intact instead.
       if (!move) return { kind: "text", text: line };
-      moves.push({ name: move[1].trim(), reps: move[2] });
+      moves.push({ name: move[1].trim(), reps: toAsciiDigits(move[2]) });
     }
     return {
       kind: "exercise",
       technique: multi[1] === "سوپرست" ? "superset" : "triset",
       moves,
-      sets: multi[2],
+      sets: toAsciiDigits(multi[2]),
       drops: null,
       rest,
       muscleGroup,
@@ -151,8 +162,8 @@ function parseLine(line: string): ParsedRow {
     return {
       kind: "exercise",
       technique: "normal",
-      moves: [{ name: normal[1].trim(), reps: normal[3] }],
-      sets: normal[2],
+      moves: [{ name: normal[1].trim(), reps: toAsciiDigits(normal[3]) }],
+      sets: toAsciiDigits(normal[2]),
       drops: null,
       rest,
       muscleGroup,
