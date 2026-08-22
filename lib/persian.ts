@@ -1,4 +1,5 @@
 const PERSIAN_DIGITS = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
+const ARABIC_INDIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
 
 export const PERSIAN_MONTH_NAMES = [
   "فروردین",
@@ -17,6 +18,15 @@ export const PERSIAN_MONTH_NAMES = [
 
 export function toPersianDigits(value: number | string): string {
   return String(value).replace(/[0-9]/g, (digit) => PERSIAN_DIGITS[Number(digit)]);
+}
+
+// Inverse of toPersianDigits — normalizes Persian and Arabic-Indic digits
+// (both produced by a Persian keyboard, depending on OS/input method) back
+// to ASCII, e.g. before matching a number a user hand-typed into free text.
+export function toAsciiDigits(value: string): string {
+  return value
+    .replace(/[۰-۹]/g, (digit) => String(PERSIAN_DIGITS.indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String(ARABIC_INDIC_DIGITS.indexOf(digit)));
 }
 
 export function formatNumber(value: number): string {
