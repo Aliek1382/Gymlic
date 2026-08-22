@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/features/authentication";
+import { TrainingCalendar } from "@/features/athletes";
 import { useMeasurements } from "../hooks/use-measurements";
 import { getLatestKnownHeight } from "../utils/bmi";
 import { MeasurementFormDialog } from "./measurement-form-dialog";
@@ -57,6 +58,8 @@ export function ProgressPageContent({ athleteId }: { athleteId: string }) {
       </div>
 
       <ProgressCharts entries={entries} />
+
+      <TrainingCalendar athleteId={athleteId} />
 
       <MeasurementLog
         athleteId={athleteId}

@@ -12,12 +12,17 @@ async function getCurrentUserId(): Promise<string> {
   return user.id;
 }
 
-// Every log from `fromDate` onward, for the signed-in athlete. Callers pass
-// the start of the current week, so one request covers every plan card on
-// the page rather than one per plan.
-export async function listDayLogsSince(fromDate: string): Promise<WorkoutDayLog[]> {
+// Every log from `fromDate` onward. Defaults to the signed-in athlete — the
+// week query on the plan cards passes nothing, so one request covers every
+// card rather than one per plan. The history view passes an id explicitly,
+// which also lets a trainer read their own athlete's logs (the select policy
+// admits is_trainer_of).
+export async function listDayLogsSince(
+  fromDate: string,
+  forAthleteId?: string
+): Promise<WorkoutDayLog[]> {
   const supabase = createClient();
-  const athleteId = await getCurrentUserId();
+  const athleteId = forAthleteId ?? (await getCurrentUserId());
 
   const { data, error } = await supabase
     .from("workout_day_logs")
