@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Clock, Copy, Search, Users } from "lucide-react";
+import { Clock, Copy, Flame, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -21,11 +21,27 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { ATHLETE_SORT_LABEL, type AthleteSortOrder } from "../constants/athletes";
 import { useAthletes } from "../hooks/use-athletes";
+import { useAthleteStreaks } from "../hooks/use-athlete-streaks";
 import { usePendingAthleteInvites } from "../hooks/use-pending-athlete-invites";
 import { useRemoveAthlete } from "../hooks/use-remove-athlete";
 import { useRevokeAthleteInvite } from "../hooks/use-revoke-athlete-invite";
+import { STREAK_MIN_SESSIONS } from "../utils/streak";
 import { PlanDialog } from "./plan-dialog";
 import { RemoveAthleteButton } from "./remove-athlete-button";
+
+function StreakBadge({ weeks }: { weeks: number }) {
+  if (weeks <= 0) return null;
+
+  return (
+    <span
+      title={`${weeks} هفته پیاپی، حداقل ${STREAK_MIN_SESSIONS} جلسه در هفته`}
+      className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+    >
+      <Flame className="size-3" />
+      {toPersianDigits(weeks)} هفته پیاپی
+    </span>
+  );
+}
 
 function compareByCount(
   order: AthleteSortOrder,
@@ -48,6 +64,12 @@ function compareByCount(
 
 export function AthleteList() {
   const athletes = useAthletes();
+  const streaks = useAthleteStreaks(
+    (athletes.data ?? []).map((athlete) => athlete.id)
+  );
+  const streakByAthlete = new Map(
+    (streaks.data ?? []).map((entry) => [entry.athleteId, entry.streakWeeks])
+  );
   const pendingInvites = usePendingAthleteInvites();
   const removeAthlete = useRemoveAthlete();
   const revokeInvite = useRevokeAthleteInvite();
@@ -246,9 +268,12 @@ export function AthleteList() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {athlete.name}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="text-sm font-medium text-foreground">
+                        {athlete.name}
+                      </p>
+                      <StreakBadge weeks={streakByAthlete.get(athlete.id) ?? 0} />
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       عضویت از {formatPersianDate(new Date(athlete.joinedAt))} ·{" "}
                       {toPersianDigits(athlete.workoutPlanCount)} برنامه تمرینی ·{" "}

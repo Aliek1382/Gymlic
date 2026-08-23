@@ -24,6 +24,7 @@ export * from "./hooks/use-revoke-athlete-invite";
 export * from "./hooks/use-complete-plan";
 export * from "./hooks/use-workout-day-logs";
 export * from "./hooks/use-training-history";
+export * from "./hooks/use-athlete-streaks";
 export * from "./hooks/use-toggle-workout-day";
 export * from "./hooks/use-templates";
 export * from "./hooks/use-save-template";
