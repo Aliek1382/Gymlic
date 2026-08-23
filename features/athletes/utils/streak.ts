@@ -2,8 +2,9 @@
 //
 // A day-based streak is the wrong shape for a gym app: rest days are part of
 // the program, so "days in a row" would break every single week and mean
-// nothing. A week counts as trained when it carries at least one logged
-// session, and the streak is the run of consecutive such weeks.
+// nothing. A week counts as trained when it carries at least
+// STREAK_MIN_SESSIONS logged sessions, and the streak is the run of
+// consecutive such weeks.
 import {
   dateFromKey,
   getPersianWeekStart,
@@ -11,8 +12,12 @@ import {
 } from "./workout-plan-weekday";
 import type { WorkoutDayLog } from "../types/athlete-types";
 
+// Sessions a week needs before it counts toward the streak. Distinct *days*,
+// so a day ticked twice (a plan split across two blocks) doesn't inflate it.
+export const STREAK_MIN_SESSIONS = 3;
+
 export interface StreakSummary {
-  // Consecutive trained weeks ending at the current week — or at last week
+  // Consecutive qualifying weeks ending at the current week — or at last week
   // while the current one is still in progress.
   current: number;
   // Longest run anywhere in the supplied logs. Bounded by whatever window
@@ -38,7 +43,23 @@ export function computeWeekStreak(
 ): StreakSummary {
   if (logs.length === 0) return EMPTY;
 
-  const trainedWeeks = new Set(logs.map((log) => weekKeyOf(log.completedOn)));
+  // Distinct dates per week, not raw log count: a day ticked twice because
+  // the plan splits it across two blocks is still one trip to the gym, and
+  // shouldn't count as two toward the threshold.
+  const daysByWeek = new Map<string, Set<string>>();
+  for (const log of logs) {
+    const weekKey = weekKeyOf(log.completedOn);
+    const days = daysByWeek.get(weekKey) ?? new Set<string>();
+    days.add(log.completedOn);
+    daysByWeek.set(weekKey, days);
+  }
+
+  const trainedWeeks = new Set(
+    [...daysByWeek.entries()]
+      .filter(([, days]) => days.size >= STREAK_MIN_SESSIONS)
+      .map(([weekKey]) => weekKey)
+  );
+  if (trainedWeeks.size === 0) return EMPTY;
 
   // Longest run. Weeks are compared by key rather than by elapsed
   // milliseconds, so a DST shift can't make two adjacent weeks look apart.
@@ -53,9 +74,11 @@ export function computeWeekStreak(
     previous = weekKey;
   }
 
-  // Current run, counting backwards. A current week with nothing logged yet
-  // hasn't broken anything — it just hasn't started — so the count begins at
-  // last week instead of resetting to zero.
+  // Current run, counting backwards. The current week never breaks a streak,
+  // however few sessions it holds so far — right up to Friday night there is
+  // still time to train and reach the threshold, so calling it broken early
+  // would be wrong. It simply doesn't contribute until it qualifies, and the
+  // run ends at the first *fully past* week that fell short.
   const currentWeek = getPersianWeekStart(now);
   let cursor = trainedWeeks.has(toDateKey(currentWeek))
     ? currentWeek

@@ -9,7 +9,11 @@ import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useTrainingHistory } from "../hooks/use-training-history";
-import { computeWeekStreak, type StreakSummary } from "../utils/streak";
+import {
+  computeWeekStreak,
+  STREAK_MIN_SESSIONS,
+  type StreakSummary,
+} from "../utils/streak";
 import { buildTrainingCalendar, type CalendarDay } from "../utils/training-calendar";
 import { WEEKDAYS } from "../utils/workout-plan-text";
 
@@ -104,19 +108,27 @@ export function TrainingCalendar({ athleteId }: { athleteId: string }) {
         </div>
       ) : (
         <div className="space-y-4 px-6">
-          {streak && streak.current > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 px-3 py-2">
-              <Flame className="size-4 shrink-0 text-primary" />
-              <span className="text-sm font-bold text-foreground">
-                {toPersianDigits(streak.current)} هفته پیاپی
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {streak.best > streak.current
-                  ? `بهترین رکورد شما ${toPersianDigits(streak.best)} هفته بوده است.`
-                  : "این بهترین رکورد شماست."}
-              </span>
-            </div>
-          )}
+          {streak &&
+            (streak.current > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 px-3 py-2">
+                <Flame className="size-4 shrink-0 text-primary" />
+                <span className="text-sm font-bold text-foreground">
+                  {toPersianDigits(streak.current)} هفته پیاپی
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {streak.best > streak.current
+                    ? `بهترین رکورد شما ${toPersianDigits(streak.best)} هفته بوده است.`
+                    : "این بهترین رکورد شماست."}
+                </span>
+              </div>
+            ) : (
+              // The rule is worth stating exactly when it isn't being met —
+              // otherwise a week with one or two sessions reads as a bug.
+              <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                هفته‌ای حداقل {toPersianDigits(STREAK_MIN_SESSIONS)} جلسه تمرین
+                کنید تا استریک شما شروع شود.
+              </p>
+            ))}
 
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
             <span>
