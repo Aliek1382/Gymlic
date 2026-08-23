@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck, Users } from "lucide-react";
+import { CalendarCheck, Flame, Users } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +33,18 @@ function AthleteRow({ athlete }: { athlete: AthleteWeeklyAdherence }) {
           <p className="truncate text-sm font-medium text-foreground">
             {athlete.name}
           </p>
-          {isComplete && <Badge variant="success">کامل</Badge>}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {athlete.streakWeeks > 0 && (
+              <span
+                title={`${athlete.streakWeeks} هفته پیاپی تمرین کرده است`}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+              >
+                <Flame className="size-3" />
+                {toPersianDigits(athlete.streakWeeks)}
+              </span>
+            )}
+            {isComplete && <Badge variant="success">کامل</Badge>}
+          </div>
         </div>
 
         {hasPlan ? (
