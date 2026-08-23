@@ -7,7 +7,7 @@
 // buildEntry() produces. Any line it can't recognise — a trainer typing
 // freehand, or a nutrition plan — falls back to a plain text row, so the
 // sheet never loses content it failed to parse.
-import { toAsciiDigits } from "@/lib/persian";
+import { toAsciiDigits, toPersianDigits } from "@/lib/persian";
 import { isHeadingLine } from "./workout-plan-text";
 import { splitWeekdayHeading } from "./workout-plan-weekday";
 
@@ -82,6 +82,17 @@ const REST_SUFFIX = /\s*\(\s*استراحت[^)]*\)\s*$/;
 // of the latter two, not ASCII. Captured groups are normalized back to ASCII
 // with toAsciiDigits() so they render exactly like a number the picker wrote.
 const DIGITS = "[0-9۰-۹٠-٩]";
+const NON_DIGIT = "[^0-9۰-۹٠-٩]";
+
+// The bare rest note a trainer types by hand — "… استراحت 60 ثانیه" — with no
+// parentheses, comma or dash. The word itself is what makes this safe to read
+// off the end of a line: it is only ever stripped from a line that goes on to
+// match an exercise shape, and a line that doesn't keeps its original text.
+// Any words between the word and the number (e.g. "بین حرکات") pick which
+// rest it is; anything else falls to the between-sets reading, the common one.
+const REST_BARE = new RegExp(
+  `\\s+استراحت\\s*(${NON_DIGIT}*)\\s*(${DIGITS}+)\\s*(ثانیه|دقیقه)\\s*$`
+);
 
 // Between an exercise name and its numbers: an em dash, hyphen or colon, or
 // nothing at all. SEP_REQUIRED is used by the one shape that would otherwise
@@ -173,23 +184,43 @@ function splitMuscleGroup(line: string): {
 }
 
 function splitRest(line: string): { body: string; rest: ParsedRest } {
+  // The parenthesised form ExercisePicker writes, which can carry both rests
+  // at once, is tried first.
   const match = line.match(REST_SUFFIX);
-  if (!match || match.index === undefined) return { body: line, rest: EMPTY_REST };
+  if (match && match.index !== undefined) {
+    const rest: ParsedRest = { betweenSets: null, betweenExercises: null };
+    const inner = match[0].trim().slice(1, -1);
+    for (const part of inner.split("،")) {
+      const separator = part.indexOf(":");
+      if (separator === -1) continue;
+      const label = part.slice(0, separator);
+      const value = part.slice(separator + 1).trim();
+      // "حرکات" is checked first because "استراحت" itself contains the
+      // substring "ست", which would otherwise match both labels.
+      if (label.includes("حرکات")) rest.betweenExercises = value;
+      else if (label.includes("ست")) rest.betweenSets = value;
+    }
 
-  const rest: ParsedRest = { betweenSets: null, betweenExercises: null };
-  const inner = match[0].trim().slice(1, -1);
-  for (const part of inner.split("،")) {
-    const separator = part.indexOf(":");
-    if (separator === -1) continue;
-    const label = part.slice(0, separator);
-    const value = part.slice(separator + 1).trim();
-    // "حرکات" is checked first because "استراحت" itself contains the
-    // substring "ست", which would otherwise match both labels.
-    if (label.includes("حرکات")) rest.betweenExercises = value;
-    else if (label.includes("ست")) rest.betweenSets = value;
+    return { body: line.slice(0, match.index).trim(), rest };
   }
 
-  return { body: line.slice(0, match.index).trim(), rest };
+  const bare = line.match(REST_BARE);
+  if (bare && bare.index !== undefined) {
+    // Rendered raw next to picker-written values like "۹۰ ثانیه", so the
+    // number is normalized to Persian digits to sit beside them unchanged.
+    const value = `${toPersianDigits(toAsciiDigits(bare[2]))} ${bare[3]}`;
+    // Both spellings, since "حرکات" does not contain "حرکت" — the alef sits
+    // between the kaf and the te.
+    const label = bare[1];
+    const betweenMoves = label.includes("حرکات") || label.includes("حرکت");
+    const rest: ParsedRest = betweenMoves
+      ? { betweenSets: null, betweenExercises: value }
+      : { betweenSets: value, betweenExercises: null };
+
+    return { body: line.slice(0, bare.index).trim(), rest };
+  }
+
+  return { body: line, rest: EMPTY_REST };
 }
 
 function parseLine(line: string): ParsedRow {
