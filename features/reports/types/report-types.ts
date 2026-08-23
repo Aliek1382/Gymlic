@@ -27,6 +27,9 @@ export interface AthleteWeeklyAdherence {
   name: string;
   doneThisWeek: number;
   sessionsPerWeek: number;
+  // Consecutive weeks with at least one session, ending at the current week
+  // (or last week while this one is still in progress).
+  streakWeeks: number;
 }
 
 export interface TrainerCompletionRatesSummary {

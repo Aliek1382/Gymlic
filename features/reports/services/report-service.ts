@@ -1,10 +1,17 @@
 import { createClient } from "@/lib/supabase/client";
 import {
+  calendarWindowStart,
+  computeWeekStreak,
   getPersianWeekStart,
   listAthletes,
   parsePlanDescription,
   toDateKey,
+  type WorkoutDayLog,
 } from "@/features/athletes";
+
+// How far back the streak query looks. Matches the training calendar's
+// window, so the two never disagree about a run they both show.
+const STREAK_WEEKS = 12;
 import type {
   AthleteProgressSummary,
   AthleteWeeklyAdherence,
@@ -125,34 +132,58 @@ export async function listWeeklyAdherence(): Promise<AthleteWeeklyAdherence[]> {
     planByAthlete.set(row.athlete_id, { id: row.id, description: row.description });
   }
 
-  const assignmentIds = [...planByAthlete.values()].map((plan) => plan.id);
+  // Fetched by athlete rather than by assignment, and over the streak window
+  // rather than just this week: a streak shouldn't reset because the trainer
+  // issued a new plan, so it has to see logs from the athlete's earlier ones
+  // too. The select policy admits is_trainer_of, so this reads fine.
+  const athleteIds = athletes.map((athlete) => athlete.id);
+  const streakFrom = calendarWindowStart(STREAK_WEEKS);
   const logs =
-    assignmentIds.length > 0
+    athleteIds.length > 0
       ? await supabase
           .from("workout_day_logs")
-          .select("assignment_id, day_key")
-          .in("assignment_id", assignmentIds)
-          .gte("completed_on", weekStart)
+          .select("assignment_id, athlete_id, day_key, completed_on")
+          .in("athlete_id", athleteIds)
+          .gte("completed_on", streakFrom)
       : null;
   if (logs?.error) throw logs.error;
 
-  // A day ticked on two dates in one week still counts once, matching how
-  // the athlete's own "this week" line counts it.
+  const rows = logs?.data ?? [];
+
+  // "This week" still counts only the active plan's own ticks, matching how
+  // the athlete's own line counts them — and a day ticked on two dates in one
+  // week still counts once.
   const doneDaysByPlan = new Map<string, Set<string>>();
-  for (const log of logs?.data ?? []) {
+  for (const log of rows) {
+    if (log.completed_on < weekStart) continue;
     const days = doneDaysByPlan.get(log.assignment_id) ?? new Set<string>();
     days.add(log.day_key);
     doneDaysByPlan.set(log.assignment_id, days);
   }
 
+  const logsByAthlete = new Map<string, WorkoutDayLog[]>();
+  for (const log of rows) {
+    const existing = logsByAthlete.get(log.athlete_id) ?? [];
+    existing.push({
+      id: `${log.assignment_id}-${log.day_key}-${log.completed_on}`,
+      assignmentId: log.assignment_id,
+      dayKey: log.day_key,
+      completedOn: log.completed_on,
+    });
+    logsByAthlete.set(log.athlete_id, existing);
+  }
+
   return athletes.map((athlete) => {
+    const streak = computeWeekStreak(logsByAthlete.get(athlete.id) ?? []);
     const plan = planByAthlete.get(athlete.id);
+
     if (!plan) {
       return {
         athleteId: athlete.id,
         name: athlete.name,
         doneThisWeek: 0,
         sessionsPerWeek: 0,
+        streakWeeks: streak.current,
       };
     }
 
@@ -166,6 +197,7 @@ export async function listWeeklyAdherence(): Promise<AthleteWeeklyAdherence[]> {
       name: athlete.name,
       doneThisWeek: doneDaysByPlan.get(plan.id)?.size ?? 0,
       sessionsPerWeek,
+      streakWeeks: streak.current,
     };
   });
 }

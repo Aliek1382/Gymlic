@@ -33,6 +33,7 @@ export * from "./hooks/use-plan-print";
 export * from "./services/athlete-service";
 export * from "./services/workout-log-service";
 export * from "./types/athlete-types";
+export * from "./utils/streak";
 export * from "./utils/training-calendar";
 export * from "./utils/workout-plan-parse";
 export * from "./utils/workout-plan-text";

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck, Users } from "lucide-react";
+import { CalendarCheck, Flame, Users } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toPersianDigits } from "@/lib/persian";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useWeeklyAdherence } from "../hooks/use-weekly-adherence";
+import { STREAK_MIN_SESSIONS } from "@/features/athletes";
 import { byNeedsAttention } from "../utils/adherence";
 import type { AthleteWeeklyAdherence } from "../types/report-types";
 
@@ -33,7 +34,18 @@ function AthleteRow({ athlete }: { athlete: AthleteWeeklyAdherence }) {
           <p className="truncate text-sm font-medium text-foreground">
             {athlete.name}
           </p>
-          {isComplete && <Badge variant="success">کامل</Badge>}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {athlete.streakWeeks > 0 && (
+              <span
+                title={`${athlete.streakWeeks} هفته پیاپی، حداقل ${STREAK_MIN_SESSIONS} جلسه در هفته`}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+              >
+                <Flame className="size-3" />
+                {toPersianDigits(athlete.streakWeeks)}
+              </span>
+            )}
+            {isComplete && <Badge variant="success">کامل</Badge>}
+          </div>
         </div>
 
         {hasPlan ? (

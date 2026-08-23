@@ -34,6 +34,13 @@ export function toDateKey(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+// Parses a "YYYY-MM-DD" key back to a local Date. new Date("2026-08-15")
+// reads as UTC midnight, which lands on the previous day for anyone west of
+// UTC; anchoring at noon keeps the date itself stable in every timezone.
+export function dateFromKey(dateKey: string): Date {
+  return new Date(`${dateKey}T12:00:00`);
+}
+
 // A hand-typed heading may spell "سه‌شنبه" without its ZWNJ, so both sides
 // are compared with it stripped.
 function normalize(value: string): string {
