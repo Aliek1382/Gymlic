@@ -9,7 +9,7 @@
 export type AccountType = "club" | "trainer" | "athlete";
 export type MembershipRole = "owner" | "trainer" | "reception" | "athlete";
 export type MembershipStatus = "active" | "pending" | "suspended";
-export type ClubStatus = "active" | "suspended";
+export type ClubStatus = "active" | "suspended" | "pending";
 export type SubscriptionStatus = "active" | "expiring" | "expired";
 export type InvitationRole = "trainer" | "reception" | "athlete";
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
@@ -183,6 +183,7 @@ export interface Database {
           name: string;
           price_toman: number;
           duration_days: number;
+          max_members: number | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -191,6 +192,7 @@ export interface Database {
           name: string;
           price_toman: number;
           duration_days: number;
+          max_members?: number | null;
           is_active?: boolean;
         }
       >;
@@ -433,7 +435,12 @@ export interface Database {
         Returns: undefined;
       };
       create_broadcast_notification: {
-        Args: { p_title: string; p_body?: string | null; p_link?: string | null };
+        Args: {
+          p_title: string;
+          p_body?: string | null;
+          p_link?: string | null;
+          p_club_ids?: string[] | null;
+        };
         Returns: undefined;
       };
       submit_payment_request: {

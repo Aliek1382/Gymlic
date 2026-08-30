@@ -22,11 +22,13 @@ export const metadata = { title: "باشگاه‌ها | پنل مدیریت جی
 const CLUB_STATUS_LABEL: Record<ClubStatus, string> = {
   active: "فعال",
   suspended: "معلق",
+  pending: "در انتظار تایید",
 };
 
-const CLUB_STATUS_VARIANT: Record<ClubStatus, "success" | "destructive"> = {
+const CLUB_STATUS_VARIANT: Record<ClubStatus, "success" | "destructive" | "warning"> = {
   active: "success",
   suspended: "destructive",
+  pending: "warning",
 };
 
 const SUB_STATUS_LABEL: Record<SubscriptionStatus, string> = {
@@ -70,7 +72,14 @@ export default async function AdminClubsPage() {
     memberCounts.set(m.club_id, (memberCounts.get(m.club_id) ?? 0) + 1);
   }
 
-  const rows = clubs ?? [];
+  // Pending clubs need attention first — surface them above everything else
+  // regardless of registration date.
+  const rows = [...(clubs ?? [])].sort((a, b) => {
+    if (a.status === "pending" && b.status !== "pending") return -1;
+    if (b.status === "pending" && a.status !== "pending") return 1;
+    return 0;
+  });
+  const pendingCount = rows.filter((c) => c.status === "pending").length;
 
   return (
     <div className="space-y-6">
@@ -82,10 +91,13 @@ export default async function AdminClubsPage() {
       </div>
 
       <Card className="gap-4 py-5">
-        <div className="px-6">
+        <div className="flex items-center gap-2 px-6">
           <CardTitle className="text-base">
             لیست باشگاه‌ها ({formatNumber(rows.length)})
           </CardTitle>
+          {pendingCount > 0 && (
+            <Badge variant="warning">{formatNumber(pendingCount)} در انتظار تایید</Badge>
+          )}
         </div>
 
         {rows.length === 0 ? (

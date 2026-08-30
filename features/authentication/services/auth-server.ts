@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
-import type { AccountType, MembershipRole } from "@/types/database.types";
+import type { AccountType, ClubStatus, MembershipRole } from "@/types/database.types";
 
 export interface ServerAuthContext {
   userId: string;
@@ -19,6 +19,7 @@ export interface ServerAuthContext {
     clubId: string;
     role: MembershipRole;
     clubName: string;
+    clubStatus: ClubStatus;
   } | null;
   hasTrainer: boolean;
   trainerName: string | null;
@@ -51,7 +52,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
 
   const { data: membership } = await supabase
     .from("memberships")
-    .select("club_id, role, clubs(name)")
+    .select("club_id, role, clubs(name, status)")
     .eq("user_id", user.id)
     .eq("status", "active")
     .limit(1)
@@ -59,7 +60,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
     .returns<{
       club_id: string;
       role: MembershipRole;
-      clubs: { name: string } | null;
+      clubs: { name: string; status: ClubStatus } | null;
     }>();
 
   const { count: trainerCount } = await supabase
@@ -111,6 +112,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
           clubId: membership.club_id,
           role: membership.role,
           clubName: membership.clubs?.name ?? "",
+          clubStatus: membership.clubs?.status ?? "active",
         }
       : null,
     hasTrainer: (trainerCount ?? 0) > 0,

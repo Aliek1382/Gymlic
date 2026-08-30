@@ -27,7 +27,13 @@ import {
 } from "../validators/admin-schemas";
 
 interface PlanFormDialogProps {
-  plan?: { id: string; name: string; priceToman: number; durationDays: number };
+  plan?: {
+    id: string;
+    name: string;
+    priceToman: number;
+    durationDays: number;
+    maxMembers: number | null;
+  };
 }
 
 export function PlanFormDialog({ plan }: PlanFormDialogProps) {
@@ -41,18 +47,20 @@ export function PlanFormDialog({ plan }: PlanFormDialogProps) {
       name: plan?.name ?? "",
       priceToman: plan?.priceToman ?? 0,
       durationDays: plan?.durationDays ?? 30,
+      maxMembers: plan?.maxMembers != null ? String(plan.maxMembers) : "",
     },
   });
 
   async function onSubmit(values: PlanFormValues) {
+    const maxMembers = values.maxMembers ? Number(values.maxMembers) : null;
     try {
       if (isEdit) {
-        await updatePlan(plan.id, values);
+        await updatePlan(plan.id, { ...values, maxMembers });
         toast.success("پلن به‌روزرسانی شد.");
       } else {
-        await createPlan(values);
+        await createPlan({ ...values, maxMembers });
         toast.success("پلن جدید ثبت شد.");
-        form.reset({ name: "", priceToman: 0, durationDays: 30 });
+        form.reset({ name: "", priceToman: 0, durationDays: 30, maxMembers: "" });
       }
       setOpen(false);
       router.refresh();
@@ -119,6 +127,22 @@ export function PlanFormDialog({ plan }: PlanFormDialogProps) {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="plan-max-members">سقف تعداد عضو (اختیاری)</Label>
+            <Input
+              id="plan-max-members"
+              type="number"
+              dir="ltr"
+              placeholder="بدون محدودیت"
+              {...form.register("maxMembers")}
+            />
+            {form.formState.errors.maxMembers && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.maxMembers.message}
+              </p>
+            )}
           </div>
 
           <DialogFooter>

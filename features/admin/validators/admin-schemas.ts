@@ -26,6 +26,17 @@ export const planFormSchema = z.object({
   name: z.string().trim().min(2, "نام پلن را وارد کنید."),
   priceToman: z.coerce.number().int().min(0, "مبلغ نمی‌تواند منفی باشد."),
   durationDays: z.coerce.number().int().min(1, "مدت باید حداقل ۱ روز باشد."),
+  // Kept as a plain string (not z.coerce.number()) since it's optional —
+  // empty means "no member cap from this plan" and is parsed by the caller,
+  // not by zod, which keeps this field out of the input/output typing
+  // dance the numeric-coercion fields already need.
+  maxMembers: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || /^[0-9]+$/.test(value), {
+      message: "سقف اعضا باید یک عدد صحیح باشد.",
+    }),
 });
 
 // Two shapes: the raw pre-coercion form input (numeric fields typed

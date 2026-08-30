@@ -3,7 +3,6 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/features/authentication";
-import { BroadcastNotificationForm } from "@/features/notifications";
 import { EmailForm } from "./email-form";
 import { PasswordForm } from "./password-form";
 import { ProfileInfoForm } from "./profile-info-form";
@@ -37,7 +36,6 @@ export function SettingsView() {
       <ProfileInfoForm profile={profile.data} />
       <EmailForm currentEmail={profile.data.email} />
       <PasswordForm />
-      {profile.data.isPlatformAdmin && <BroadcastNotificationForm />}
       <SignOutSection />
     </div>
   );

@@ -63,6 +63,8 @@ export interface PlanInput {
   name: string;
   priceToman: number;
   durationDays: number;
+  // null = no cap from this plan (clubs.member_capacity stays unlimited).
+  maxMembers?: number | null;
   isActive?: boolean;
 }
 
@@ -72,6 +74,7 @@ export async function createPlan(input: PlanInput) {
     name: input.name,
     price_toman: input.priceToman,
     duration_days: input.durationDays,
+    max_members: input.maxMembers ?? null,
     is_active: input.isActive ?? true,
   });
   if (error) throw error;
@@ -85,6 +88,7 @@ export async function updatePlan(planId: string, input: Partial<PlanInput>) {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.priceToman !== undefined && { price_toman: input.priceToman }),
       ...(input.durationDays !== undefined && { duration_days: input.durationDays }),
+      ...(input.maxMembers !== undefined && { max_members: input.maxMembers }),
       ...(input.isActive !== undefined && { is_active: input.isActive }),
     })
     .eq("id", planId);

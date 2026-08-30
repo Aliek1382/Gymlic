@@ -1,5 +1,6 @@
 import {
   Banknote,
+  Clock,
   Dumbbell,
   ReceiptText,
   Users,
@@ -18,6 +19,7 @@ export default async function AdminOverviewPage() {
 
   const [
     { count: clubsCount },
+    { count: pendingClubsCount },
     { count: trainersCount },
     { count: athletesCount },
     { count: pendingRequestsCount },
@@ -25,6 +27,10 @@ export default async function AdminOverviewPage() {
     { data: approvedRequests },
   ] = await Promise.all([
     supabase.from("clubs").select("id", { count: "exact", head: true }),
+    supabase
+      .from("clubs")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
     supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })
@@ -73,6 +79,14 @@ export default async function AdminOverviewPage() {
           icon={UsersRound}
           title="تعداد ورزشکاران"
           value={formatNumber(athletesCount ?? 0)}
+        />
+        <StatisticCard
+          icon={Clock}
+          title="باشگاه‌های در انتظار تایید"
+          value={formatNumber(pendingClubsCount ?? 0)}
+          iconClassName={
+            (pendingClubsCount ?? 0) > 0 ? "bg-warning-muted text-warning" : undefined
+          }
         />
         <StatisticCard
           icon={ReceiptText}

@@ -20,12 +20,17 @@ export function ClubStatusToggle({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  function toggle() {
-    const next: ClubStatus = status === "active" ? "suspended" : "active";
+  function setStatus(next: ClubStatus) {
     startTransition(async () => {
       try {
         await setClubStatus(clubId, next);
-        toast.success(next === "active" ? "باشگاه فعال شد." : "باشگاه معلق شد.");
+        toast.success(
+          next === "active"
+            ? "باشگاه فعال شد."
+            : next === "suspended"
+              ? "باشگاه معلق شد."
+              : "باشگاه به حالت در انتظار تایید بازگشت."
+        );
         router.refresh();
       } catch (error) {
         toast.error(getErrorMessage(error, "خطا در تغییر وضعیت باشگاه."));
@@ -33,14 +38,32 @@ export function ClubStatusToggle({
     });
   }
 
+  if (status === "pending") {
+    return (
+      <div className="flex items-center gap-2">
+        <Button onClick={() => setStatus("active")} disabled={isPending}>
+          {isPending && <Loader2 className="animate-spin" />}
+          تایید و فعال‌سازی باشگاه
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={() => setStatus("suspended")}
+          disabled={isPending}
+        >
+          رد درخواست باشگاه
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <Button
       variant={status === "active" ? "destructive" : "default"}
-      onClick={toggle}
+      onClick={() => setStatus(status === "active" ? "suspended" : "active")}
       disabled={isPending}
     >
       {isPending && <Loader2 className="animate-spin" />}
-      {status === "active" ? "معلق‌سازی باشگاه" : "فعال‌سازی باشگاه"}
+      {status === "active" ? "معلق‌سازی باشگاه" : "فعال‌سازی مجدد باشگاه"}
     </Button>
   );
 }
