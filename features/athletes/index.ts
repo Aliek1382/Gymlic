@@ -11,6 +11,7 @@ export * from "./components/template-list";
 export * from "./components/plan-print-area";
 export * from "./components/plan-sections";
 export * from "./components/plan-format-hint";
+export * from "./components/plan-comments";
 export * from "./components/training-calendar";
 
 export * from "./hooks/use-athletes";
@@ -30,9 +31,12 @@ export * from "./hooks/use-templates";
 export * from "./hooks/use-save-template";
 export * from "./hooks/use-delete-template";
 export * from "./hooks/use-plan-print";
+export * from "./hooks/use-plan-comments";
+export * from "./hooks/use-add-plan-comment";
 
 export * from "./services/athlete-service";
 export * from "./services/workout-log-service";
+export * from "./services/plan-comment-service";
 export * from "./types/athlete-types";
 export * from "./utils/streak";
 export * from "./utils/training-calendar";

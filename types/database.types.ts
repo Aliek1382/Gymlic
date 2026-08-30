@@ -28,7 +28,8 @@ export type NotificationType =
   | "measurement_recorded"
   | "member_joined"
   | "complete_profile"
-  | "broadcast";
+  | "broadcast"
+  | "plan_comment";
 
 type TableOf<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
@@ -414,6 +415,22 @@ export interface Database {
           read_at?: string | null;
         },
         { read_at: string | null }
+      >;
+      plan_comments: TableOf<
+        {
+          id: string;
+          kind: "workout" | "nutrition";
+          assignment_id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+        },
+        {
+          kind: "workout" | "nutrition";
+          assignment_id: string;
+          author_id: string;
+          body: string;
+        }
       >;
     };
     Views: Record<string, never>;
