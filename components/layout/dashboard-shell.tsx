@@ -20,7 +20,10 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   return (
-    <div className="flex min-h-screen bg-background">
+    // The pl/pr insets are the landscape case on a notched iPhone: with
+    // viewport-fit=cover the page paints under the notch, and these keep the
+    // panel clear of it. Both collapse to 0 in a browser tab.
+    <div className="flex min-h-screen bg-background pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <Sidebar accountType={accountType} />
       {/* min-w-0 is required: without it this flex-1 column can't shrink
           below the natural width of its widest un-wrapped content (e.g. a
@@ -34,7 +37,11 @@ export function DashboardShell({
           avatarUrl={avatarUrl}
           userId={userId}
         />
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        {/* py-6 is split so the bottom keeps its 1.5rem above whatever the
+            home indicator reserves, instead of being overlapped by it. */}
+        <main className="flex-1 px-4 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -81,7 +81,7 @@ export function SidebarContent({
         </TooltipProvider>
       </nav>
 
-      <div className="space-y-2 px-4 pb-6 pt-4">
+      <div className="space-y-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
         {accountType === "club" && (
           <Button className="w-full" size="lg" asChild>
             <Link href="/members?new=1" onClick={onNavigate}>
