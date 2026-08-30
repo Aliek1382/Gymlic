@@ -26,6 +26,7 @@ export default async function NutritionPage() {
         kind="nutrition"
         emptyTitle="هنوز برنامه غذایی ثبت نشده است."
         emptyDescription="به محض ثبت برنامه توسط مربی، اینجا نمایش داده می‌شود."
+        currentUserId={context.userId}
         athleteName={athleteName}
         athleteBirthDate={context.birthDate}
         athleteAvatarUrl={context.avatarUrl}

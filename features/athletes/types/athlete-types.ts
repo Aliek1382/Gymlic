@@ -41,3 +41,15 @@ export interface PlanTemplate {
   description: string | null;
   createdAt: string;
 }
+
+// One message in the back-and-forth on an assigned plan — a trainer and
+// athlete telling each other things like "برنامه این هفته خیلی سخته" or
+// "این حرکت برام درد داشت".
+export interface PlanComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  body: string;
+  createdAt: string;
+}

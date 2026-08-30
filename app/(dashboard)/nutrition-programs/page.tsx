@@ -25,6 +25,7 @@ export default async function NutritionProgramsPage() {
 
       <PlanBrowser
         kind="nutrition"
+        currentUserId={context.userId}
         trainerName={trainerName}
         trainerAvatarUrl={context.avatarUrl}
       />

@@ -2,6 +2,7 @@ import {
   Apple,
   Dumbbell,
   Megaphone,
+  MessageSquare,
   Ruler,
   Sparkles,
   UserPlus,
@@ -21,4 +22,5 @@ export const NOTIFICATION_ICON: Record<NotificationType, LucideIcon> = {
   member_joined: Users,
   complete_profile: Sparkles,
   broadcast: Megaphone,
+  plan_comment: MessageSquare,
 };

@@ -55,6 +55,7 @@ import {
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
+import { PlanComments } from "./plan-comments";
 import { PlanPrintArea } from "./plan-print-area";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
@@ -73,10 +74,12 @@ function canEditPlan(plan: PlanEntry): boolean {
 
 export function PlanBrowser({
   kind,
+  currentUserId,
   trainerName,
   trainerAvatarUrl,
 }: {
   kind: PlanKind;
+  currentUserId: string;
   trainerName?: string | null;
   trainerAvatarUrl?: string | null;
 }) {
@@ -309,6 +312,16 @@ export function PlanBrowser({
                 <Download />
                 دانلود PDF
               </Button>
+              <div className="space-y-2 border-t border-border pt-4">
+                <p className="text-sm font-medium text-foreground">
+                  گفتگو درباره این برنامه
+                </p>
+                <PlanComments
+                  kind={kind}
+                  assignmentId={selectedPlan.id}
+                  currentUserId={currentUserId}
+                />
+              </div>
             </DialogContent>
           )}
         </Dialog>

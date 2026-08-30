@@ -3,6 +3,7 @@
 import { Apple, CheckCircle2, Download, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
 import { usePlanPrint } from "../hooks/use-plan-print";
+import { PlanComments } from "./plan-comments";
 import { PlanPrintArea } from "./plan-print-area";
 import { PlanSections } from "./plan-sections";
 import type { PlanKind } from "../types/athlete-types";
@@ -27,6 +29,7 @@ export function MyPlanList({
   kind,
   emptyTitle,
   emptyDescription,
+  currentUserId,
   athleteName,
   athleteBirthDate,
   athleteAvatarUrl,
@@ -36,6 +39,7 @@ export function MyPlanList({
   kind: PlanKind;
   emptyTitle: string;
   emptyDescription: string;
+  currentUserId: string;
   athleteName?: string | null;
   athleteBirthDate?: string | null;
   athleteAvatarUrl?: string | null;
@@ -145,6 +149,13 @@ export function MyPlanList({
                 دانلود PDF
               </Button>
             </div>
+            <CollapsibleSection title="گفتگو درباره این برنامه">
+              <PlanComments
+                kind={kind}
+                assignmentId={plan.id}
+                currentUserId={currentUserId}
+              />
+            </CollapsibleSection>
           </CardContent>
         </Card>
       ))}
