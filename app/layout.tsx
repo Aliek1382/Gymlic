@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Vazirmatn } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import "./globals.css";
 
 const vazirmatn = Vazirmatn({
@@ -50,6 +51,7 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" className={vazirmatn.variable}>
       <body className="antialiased">
         <QueryProvider>
+          <ServiceWorkerRegistrar />
           {children}
           <Toaster position="top-center" richColors dir="rtl" />
         </QueryProvider>
