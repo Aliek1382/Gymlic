@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ROLE_LABEL } from "@/components/layout/sidebar-nav";
+import { SuspendedNotice } from "@/components/suspended-notice";
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
 
 export default async function DashboardLayout({
@@ -15,6 +16,10 @@ export default async function DashboardLayout({
   // valid session. Middleware already redirects unauthenticated requests,
   // this is the defensive Server Component check.
   if (!context) redirect("/login");
+
+  // A platform admin can suspend any account — block the panel entirely
+  // rather than letting a suspended user reach a half-working dashboard.
+  if (context.isSuspended) return <SuspendedNotice />;
 
   // Rule 2 / Rule 7 — Redirect Rules: role must be chosen before anything else.
   if (!context.accountType) redirect("/choose-role");
