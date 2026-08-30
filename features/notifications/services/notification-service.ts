@@ -68,10 +68,14 @@ export interface BroadcastNotificationInput {
   title: string;
   body?: string | null;
   link?: string | null;
+  // Omitted or empty = every profile on the platform; otherwise only the
+  // active members (any role) of these clubs.
+  clubIds?: string[];
 }
 
-/** Fans out one notification row to every profile — restricted server-side
- * (create_broadcast_notification) to profiles.is_platform_admin. */
+/** Fans out one notification row to every profile (or every member of the
+ * given clubs) — restricted server-side (create_broadcast_notification) to
+ * profiles.is_platform_admin. */
 export async function sendBroadcastNotification(
   input: BroadcastNotificationInput
 ): Promise<void> {
@@ -80,6 +84,7 @@ export async function sendBroadcastNotification(
     p_title: input.title,
     p_body: input.body ?? null,
     p_link: input.link ?? null,
+    p_club_ids: input.clubIds && input.clubIds.length > 0 ? input.clubIds : null,
   });
   if (error) throw error;
 }

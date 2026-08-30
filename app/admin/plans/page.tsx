@@ -22,7 +22,7 @@ export default async function AdminPlansPage() {
 
   const { data: plans } = await supabase
     .from("plans")
-    .select("id, name, price_toman, duration_days, is_active")
+    .select("id, name, price_toman, duration_days, max_members, is_active")
     .order("price_toman", { ascending: true });
 
   const rows = plans ?? [];
@@ -61,6 +61,7 @@ export default async function AdminPlansPage() {
                 <TableHead>نام پلن</TableHead>
                 <TableHead>قیمت</TableHead>
                 <TableHead>مدت</TableHead>
+                <TableHead>سقف عضو</TableHead>
                 <TableHead>فعال</TableHead>
                 <TableHead />
               </TableRow>
@@ -75,6 +76,11 @@ export default async function AdminPlansPage() {
                   <TableCell className="text-muted-foreground">
                     {formatNumber(plan.duration_days)} روز
                   </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {plan.max_members != null
+                      ? `${formatNumber(plan.max_members)} نفر`
+                      : "بدون محدودیت"}
+                  </TableCell>
                   <TableCell>
                     <PlanActiveToggle planId={plan.id} isActive={plan.is_active} />
                   </TableCell>
@@ -85,6 +91,7 @@ export default async function AdminPlansPage() {
                         name: plan.name,
                         priceToman: plan.price_toman,
                         durationDays: plan.duration_days,
+                        maxMembers: plan.max_members,
                       }}
                     />
                   </TableCell>

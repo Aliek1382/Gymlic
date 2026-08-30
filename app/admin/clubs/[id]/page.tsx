@@ -22,11 +22,20 @@ import type {
 const CLUB_STATUS_LABEL: Record<ClubStatus, string> = {
   active: "فعال",
   suspended: "معلق",
+  pending: "در انتظار تایید",
 };
 
-const CLUB_STATUS_VARIANT: Record<ClubStatus, "success" | "destructive"> = {
+const CLUB_STATUS_VARIANT: Record<ClubStatus, "success" | "destructive" | "warning"> = {
   active: "success",
   suspended: "destructive",
+  pending: "warning",
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  owner: "صاحب باشگاه",
+  trainer: "مربی",
+  reception: "پذیرش",
+  athlete: "ورزشکار",
 };
 
 const SUB_STATUS_LABEL: Record<SubscriptionStatus, string> = {
@@ -79,7 +88,19 @@ export default async function AdminClubDetailPage({
           owner: { first_name: string | null; last_name: string | null; phone: string | null; email: string | null } | null;
           subscriptions: { status: SubscriptionStatus; plan_name: string; started_at: string; expires_at: string }[];
         } | null>(),
-      supabase.from("memberships").select("role").eq("club_id", id).eq("status", "active"),
+      supabase
+        .from("memberships")
+        .select("role, joined_at, profiles(first_name, last_name, phone)")
+        .eq("club_id", id)
+        .eq("status", "active")
+        .order("joined_at", { ascending: false })
+        .returns<
+          {
+            role: string;
+            joined_at: string;
+            profiles: { first_name: string | null; last_name: string | null; phone: string | null } | null;
+          }[]
+        >(),
       supabase
         .from("payment_requests")
         .select("id, amount_toman, reference_note, status, admin_note, created_at, reviewed_at, plans(name)")
@@ -105,8 +126,9 @@ export default async function AdminClubDetailPage({
     [club.owner?.first_name, club.owner?.last_name].filter(Boolean).join(" ") ||
     "بدون نام";
   const subscription = club.subscriptions?.[0];
-  const athleteCount = (memberships ?? []).filter((m) => m.role === "athlete").length;
-  const trainerCount = (memberships ?? []).filter((m) => m.role === "trainer").length;
+  const memberRows = memberships ?? [];
+  const athleteCount = memberRows.filter((m) => m.role === "athlete").length;
+  const trainerCount = memberRows.filter((m) => m.role === "trainer").length;
   const requests = paymentRequests ?? [];
 
   return (
@@ -160,11 +182,66 @@ export default async function AdminClubDetailPage({
               {formatNumber(athleteCount)} ورزشکار · {formatNumber(trainerCount)} مربی
             </p>
             <p className="text-xs text-muted-foreground">
+              {club.member_capacity != null
+                ? `سقف اعضا طبق پلن: ${formatNumber(club.member_capacity)} نفر`
+                : "بدون سقف تعیین‌شده برای تعداد اعضا"}
+            </p>
+            <p className="text-xs text-muted-foreground">
               ثبت‌نام: {formatPersianDate(new Date(club.created_at))}
             </p>
           </div>
         </Card>
       </div>
+
+      <Card className="gap-4 py-5">
+        <div className="px-6">
+          <CardTitle className="text-base">
+            اعضای باشگاه ({formatNumber(memberRows.length)})
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            نمای فقط‌خواندنی برای پشتیبانی — بدون امکان ورود به‌جای کاربر.
+          </p>
+        </div>
+
+        {memberRows.length === 0 ? (
+          <p className="px-6 text-sm text-muted-foreground">
+            این باشگاه هنوز عضوی ندارد.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>نام</TableHead>
+                <TableHead>نقش</TableHead>
+                <TableHead>تماس</TableHead>
+                <TableHead>تاریخ عضویت</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {memberRows.map((member, index) => {
+                const memberName =
+                  [member.profiles?.first_name, member.profiles?.last_name]
+                    .filter(Boolean)
+                    .join(" ") || "بدون نام";
+                return (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium text-foreground">{memberName}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {ROLE_LABEL[member.role] ?? member.role}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground" dir="ltr">
+                      {member.profiles?.phone ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatPersianDate(new Date(member.joined_at))}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
 
       <Card className="gap-4 py-5">
         <div className="px-6">
