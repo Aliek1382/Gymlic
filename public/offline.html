@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4f6fb" />
+    <title>آفلاین | جیم‌لیک</title>
+    <!--
+      Deliberately a plain file in public/ rather than an app route, and
+      deliberately dependency-free: no external CSS, no font file, no script.
+      A Next.js page would serve HTML that references content-hashed chunks,
+      and those are only cached once that page has been rendered online —
+      which for a fallback never happens. The document then loads from cache,
+      hydration fails on the missing chunk and Next replaces it with its error
+      screen. Anything this page needs has to be inline.
+    -->
+    <style>
+      :root {
+        --background: #f4f6fb;
+        --foreground: #1c2233;
+        --muted-foreground: #6b7280;
+        --primary: #3b5bfb;
+        --accent: #eef2ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        padding: 24px calc(24px + env(safe-area-inset-right))
+          calc(24px + env(safe-area-inset-bottom))
+          calc(24px + env(safe-area-inset-left));
+        text-align: center;
+        background: var(--background);
+        color: var(--foreground);
+        /* Vazirmatn is loaded by the app as a hashed font file this page
+           can't reference, so it falls back to whatever renders Persian on
+           the device. */
+        font-family: Vazirmatn, "Segoe UI", Tahoma, system-ui, sans-serif;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; }
+      .brand-tile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        background: var(--primary);
+        color: #fff;
+      }
+      .brand-name { font-size: 18px; font-weight: 700; }
+      .status-tile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: var(--accent);
+        color: var(--primary);
+      }
+      h1 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+      p {
+        margin: 0;
+        max-width: 24rem;
+        font-size: 14px;
+        line-height: 1.8;
+        color: var(--muted-foreground);
+      }
+      a.retry {
+        display: inline-block;
+        padding: 10px 20px;
+        border-radius: 12px;
+        background: var(--primary);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="brand">
+      <span class="brand-tile">
+        <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+          <rect x="17" y="28" width="15" height="44" rx="7.5" fill="currentColor" />
+          <rect x="68" y="28" width="15" height="44" rx="7.5" fill="currentColor" />
+          <rect x="30" y="43" width="40" height="14" rx="7" fill="currentColor" />
+        </svg>
+      </span>
+      <span class="brand-name">جیم‌لیک</span>
+    </div>
+
+    <span class="status-tile">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20h.01" />
+        <path d="M8.5 16.429a5 5 0 0 1 7 0" />
+        <path d="M5 12.859a10 10 0 0 1 5.17-2.69" />
+        <path d="M19 12.859a10 10 0 0 0-2.007-1.523" />
+        <path d="M2 8.82a15 15 0 0 1 4.177-2.643" />
+        <path d="M22 8.82a15 15 0 0 0-11.288-3.764" />
+        <path d="m2 2 20 20" />
+      </svg>
+    </span>
+
+    <div>
+      <h1>اتصال اینترنت برقرار نیست</h1>
+      <p>
+        برای دیدن اطلاعات باشگاه به اینترنت نیاز است. اتصال خود را بررسی کنید و
+        دوباره تلاش کنید.
+      </p>
+    </div>
+
+    <a class="retry" href="/dashboard">تلاش دوباره</a>
+  </body>
+</html>
