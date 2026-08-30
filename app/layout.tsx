@@ -50,6 +50,15 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" className={vazirmatn.variable}>
       <body className="antialiased">
+        {/* Chrome fires beforeinstallprompt exactly once, typically before
+            React has hydrated, and the event is lost if nothing is listening.
+            This runs inline ahead of hydration and parks it on window for
+            InstallAppPrompt to pick up. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__gymlicInstallPrompt=null;window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__gymlicInstallPrompt=e;window.dispatchEvent(new Event("gymlic:installavailable"))});`,
+          }}
+        />
         <QueryProvider>
           <ServiceWorkerRegistrar />
           {children}
