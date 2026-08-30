@@ -18,7 +18,7 @@ const DISMISSED_KEY = "gymlic:install-prompt-dismissed-at";
 // who says "not now" on a borrowed phone shouldn't lose the entry point.
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
 
-type Platform = "android" | "ios" | null;
+type Platform = "android" | "desktop" | "ios" | null;
 
 function isStandalone() {
   return (
@@ -27,6 +27,10 @@ function isStandalone() {
     // installed iOS web app reports.
     (window.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
+}
+
+function isAndroid() {
+  return /Android/i.test(window.navigator.userAgent);
 }
 
 function isIos() {
@@ -53,6 +57,7 @@ function wasDismissedRecently() {
 export function InstallAppPrompt() {
   const [platform, setPlatform] = useState<Platform>(null);
   const [showIosGuide, setShowIosGuide] = useState(false);
+  const [showAndroidNote, setShowAndroidNote] = useState(false);
 
   useEffect(() => {
     if (isStandalone() || wasDismissedRecently()) return;
@@ -66,10 +71,11 @@ export function InstallAppPrompt() {
     // hydrated. The inline script in the root layout catches it and parks it
     // on window, so this reads whatever already arrived and then listens for
     // the rest.
+    const installable = isAndroid() ? "android" : "desktop";
     if (window.__gymlicInstallPrompt) {
-      setPlatform("android");
+      setPlatform(installable);
     }
-    const onAvailable = () => setPlatform("android");
+    const onAvailable = () => setPlatform(installable);
     const onInstalled = () => setPlatform(null);
 
     window.addEventListener("gymlic:installavailable", onAvailable);
@@ -92,6 +98,11 @@ export function InstallAppPrompt() {
   const install = useCallback(async () => {
     const deferred = window.__gymlicInstallPrompt;
     if (!deferred) return;
+
+    // Closing first keeps our dialog from sitting behind Chrome's. prompt()
+    // still counts as user-activated: the tap that ran this handler is the
+    // gesture, and closing a dialog doesn't consume it.
+    setShowAndroidNote(false);
 
     await deferred.prompt();
     const { outcome } = await deferred.userChoice;
@@ -126,7 +137,13 @@ export function InstallAppPrompt() {
         <Button
           size="sm"
           className="shrink-0"
-          onClick={platform === "ios" ? () => setShowIosGuide(true) : install}
+          onClick={
+            platform === "ios"
+              ? () => setShowIosGuide(true)
+              : platform === "android"
+                ? () => setShowAndroidNote(true)
+                : install
+          }
         >
           <Download />
           نصب
@@ -141,6 +158,44 @@ export function InstallAppPrompt() {
           <X className="size-4" />
         </button>
       </div>
+
+      {/* Android gets a step in front of Chrome's own dialog purely to carry
+          the VPN note. Minting a WebAPK needs Google's servers, and when they
+          are unreachable Chrome falls back to a shortcut without saying so —
+          the user is left with a home-screen icon that never reaches the app
+          drawer and no clue why. */}
+      <Dialog open={showAndroidNote} onOpenChange={setShowAndroidNote}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>قبل از نصب</DialogTitle>
+            <DialogDescription>
+              برای نصب جیم‌لیک روی اندروید، یک نکته را در نظر داشته باشید.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 rounded-xl bg-muted p-3 text-sm leading-7 text-muted-foreground">
+            <p>
+              <span className="font-semibold text-foreground">
+                فیلترشکن (VPN) خود را روشن کنید.
+              </span>{" "}
+              اندروید برای ساخت اپ یک‌بار به سرورهای گوگل وصل می‌شود؛ بدون آن
+              به‌جای اپ فقط یک میان‌بر ساخته می‌شود که در لیست برنامه‌ها دیده
+              نمی‌شود.
+            </p>
+            <p>
+              <span className="font-semibold text-foreground">
+                پس از نصب دیگر به فیلترشکن نیازی نیست.
+              </span>{" "}
+              اپ نصب‌شده مستقیم و بدون واسطه کار می‌کند.
+            </p>
+          </div>
+
+          <Button onClick={install} className="w-full">
+            <Download />
+            ادامه و نصب
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showIosGuide} onOpenChange={setShowIosGuide}>
         <DialogContent className="max-w-sm">
