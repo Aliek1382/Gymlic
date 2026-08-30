@@ -1,5 +1,6 @@
 import { Sidebar } from "./sidebar";
 import { DashboardHeader } from "./dashboard-header";
+import { InstallAppPrompt } from "@/components/pwa/install-app-prompt";
 import type { AccountType } from "@/types/database.types";
 
 interface DashboardShellProps {
@@ -40,6 +41,7 @@ export function DashboardShell({
         {/* py-6 is split so the bottom keeps its 1.5rem above whatever the
             home indicator reserves, instead of being overlapped by it. */}
         <main className="flex-1 px-4 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+          <InstallAppPrompt />
           {children}
         </main>
       </div>
