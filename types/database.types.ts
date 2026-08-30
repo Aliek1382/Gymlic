@@ -15,6 +15,7 @@ export type InvitationRole = "trainer" | "reception" | "athlete";
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type WorkoutStatus = "active" | "completed" | "cancelled" | "draft";
 export type MembershipPlanTier = "elite" | "basic" | "daily";
+export type PaymentRequestStatus = "pending" | "approved" | "rejected";
 // Not a DB enum on purpose — `notifications.type` is plain text so new
 // kinds can be introduced later without a migration. This union only
 // covers the kinds the current triggers actually emit.
@@ -50,6 +51,7 @@ export interface Database {
           birth_date: string | null;
           account_type: AccountType | null;
           is_platform_admin: boolean;
+          is_suspended: boolean;
           created_at: string;
           updated_at: string;
         },
@@ -63,6 +65,7 @@ export interface Database {
           birth_date?: string | null;
           account_type?: AccountType | null;
           is_platform_admin?: boolean;
+          is_suspended?: boolean;
         }
       >;
       clubs: TableOf<
@@ -172,6 +175,46 @@ export interface Database {
           plan_name: string;
           expires_at: string;
           status?: SubscriptionStatus;
+        }
+      >;
+      plans: TableOf<
+        {
+          id: string;
+          name: string;
+          price_toman: number;
+          duration_days: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          name: string;
+          price_toman: number;
+          duration_days: number;
+          is_active?: boolean;
+        }
+      >;
+      payment_requests: TableOf<
+        {
+          id: string;
+          club_id: string;
+          plan_id: string;
+          submitted_by: string;
+          amount_toman: number;
+          reference_note: string | null;
+          status: PaymentRequestStatus;
+          admin_note: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+        },
+        {
+          club_id: string;
+          plan_id: string;
+          submitted_by: string;
+          amount_toman: number;
+          reference_note?: string | null;
+          status?: PaymentRequestStatus;
         }
       >;
       workout_assignments: TableOf<
@@ -391,6 +434,37 @@ export interface Database {
       };
       create_broadcast_notification: {
         Args: { p_title: string; p_body?: string | null; p_link?: string | null };
+        Returns: undefined;
+      };
+      submit_payment_request: {
+        Args: { p_plan_id: string; p_amount_toman: number; p_reference_note?: string | null };
+        Returns: string;
+      };
+      approve_payment_request: {
+        Args: { p_request_id: string; p_admin_note?: string | null };
+        Returns: undefined;
+      };
+      reject_payment_request: {
+        Args: { p_request_id: string; p_admin_note?: string | null };
+        Returns: undefined;
+      };
+      admin_set_club_status: {
+        Args: { p_club_id: string; p_status: ClubStatus };
+        Returns: undefined;
+      };
+      admin_set_profile_suspended: {
+        Args: { p_user_id: string; p_suspended: boolean };
+        Returns: undefined;
+      };
+      admin_update_profile: {
+        Args: {
+          p_user_id: string;
+          p_first_name: string | null;
+          p_last_name: string | null;
+          p_email: string | null;
+          p_phone: string | null;
+          p_birth_date: string | null;
+        };
         Returns: undefined;
       };
     };

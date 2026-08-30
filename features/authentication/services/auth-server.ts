@@ -13,6 +13,8 @@ export interface ServerAuthContext {
   avatarUrl: string | null;
   birthDate: string | null;
   accountType: AccountType | null;
+  isPlatformAdmin: boolean;
+  isSuspended: boolean;
   activeMembership: {
     clubId: string;
     role: MembershipRole;
@@ -42,7 +44,7 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "phone, email, first_name, last_name, avatar_url, birth_date, account_type"
+      "phone, email, first_name, last_name, avatar_url, birth_date, account_type, is_platform_admin, is_suspended"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -102,6 +104,8 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
     avatarUrl: profile?.avatar_url ?? null,
     birthDate: profile?.birth_date ?? null,
     accountType: (profile?.account_type as AccountType | null) ?? null,
+    isPlatformAdmin: profile?.is_platform_admin ?? false,
+    isSuspended: profile?.is_suspended ?? false,
     activeMembership: membership
       ? {
           clubId: membership.club_id,

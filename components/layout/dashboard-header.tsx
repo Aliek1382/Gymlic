@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, CircleHelp, LogOut, User as UserIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  CircleHelp,
+  LogOut,
+  ShieldCheck,
+  User as UserIcon,
+} from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -12,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useProfile } from "@/features/authentication/hooks/use-profile";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { NotificationBell } from "@/features/notifications";
 import { GlobalSearch } from "./global-search";
@@ -35,6 +42,7 @@ export function DashboardHeader({
   userId,
 }: DashboardHeaderProps) {
   const signOut = useSignOut();
+  const profile = useProfile();
   const pathname = usePathname();
   const initials = fullName.trim().slice(0, 2) || "کا";
   const pageTitle =
@@ -68,6 +76,14 @@ export function DashboardHeader({
               تنظیمات حساب
             </Link>
           </DropdownMenuItem>
+          {profile.data?.isPlatformAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin">
+                <ShieldCheck />
+                پنل مدیریت
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
