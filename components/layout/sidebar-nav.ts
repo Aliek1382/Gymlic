@@ -56,6 +56,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
       description:
         "نمودار روند وزن، BMI، درصد چربی بدن، دور کمر و دور سینه‌ی هر ورزشکار را ببینید.",
     },
+    {
+      label: "درآمد من",
+      href: "/earnings",
+      icon: Wallet,
+      description:
+        "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
+    },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "تنظیمات", href: "/settings", icon: Settings },
   ],

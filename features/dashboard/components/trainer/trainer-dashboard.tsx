@@ -1,8 +1,12 @@
 "use client";
 
-import { Apple, CheckCircle2, Dumbbell, LineChart, UserPlus, Users } from "lucide-react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
+import { Apple, CheckCircle2, Dumbbell, LineChart, UserPlus, Users, Wallet } from "lucide-react";
 
 import { toPersianDigits } from "@/lib/persian";
+import { MonthlyEarningsCard } from "@/features/earnings/components/monthly-earnings-card";
+import { useTrainerEarningsSeries } from "@/features/earnings/hooks/use-trainer-earnings-series";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
 import { useTrainerRecentActivities } from "../../hooks/use-trainer-recent-activities";
 import { useTrainerDraftPlans } from "../../hooks/use-trainer-draft-plans";
@@ -10,6 +14,7 @@ import { WelcomeSection } from "../shared/welcome-section";
 import { StatisticsGrid } from "../shared/statistics-grid";
 import { StatisticCard } from "../shared/statistic-card";
 import {
+  ChartCardSkeleton,
   StatisticCardSkeleton,
   TableCardSkeleton,
 } from "../shared/dashboard-skeleton";
@@ -19,17 +24,31 @@ import { TrainerRecentActivities } from "./trainer-recent-activities";
 import { TrainerDraftPlans } from "./trainer-draft-plans";
 import type { QuickAction } from "../../types/dashboard-types";
 
+// Code-split out of the dashboard bundle for the same reason the club
+// dashboard splits its charts: recharts is heavy, and ResponsiveContainer
+// can't measure correctly during server rendering.
+const TrainerEarningsChart = dynamic(
+  () =>
+    import("@/features/earnings/components/trainer-earnings-chart").then(
+      (m) => m.TrainerEarningsChart
+    ),
+  { ssr: false, loading: () => <ChartCardSkeleton className="lg:col-span-2" /> }
+);
+
 const QUICK_ACTIONS: QuickAction[] = [
   { label: "افزودن ورزشکار جدید", href: "/athletes?new=1", icon: UserPlus },
   { label: "ساخت برنامه تمرینی", href: "/workout-programs?new=1", icon: Dumbbell },
   { label: "ساخت برنامه غذایی", href: "/nutrition-programs?new=1", icon: Apple },
   { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
+  { label: "ثبت درآمد", href: "/earnings", icon: Wallet },
 ];
 
 export function TrainerDashboard({ trainerName }: { trainerName: string }) {
+  const [earningsRange, setEarningsRange] = useState("6");
   const statistics = useTrainerStatistics();
   const activities = useTrainerRecentActivities();
   const draftPlans = useTrainerDraftPlans();
+  const earningsSeries = useTrainerEarningsSeries(Number(earningsRange));
 
   return (
     <div className="space-y-6">
@@ -91,6 +110,22 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
           />
         )}
       </StatisticsGrid>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {earningsSeries.isLoading ? (
+          <ChartCardSkeleton className="lg:col-span-2" />
+        ) : earningsSeries.isError ? (
+          <ErrorState message="خطا در دریافت نمودار درآمد" />
+        ) : (
+          <TrainerEarningsChart
+            data={earningsSeries.data ?? []}
+            range={earningsRange}
+            onRangeChange={setEarningsRange}
+          />
+        )}
+
+        <MonthlyEarningsCard />
+      </div>
 
       {activities.isLoading ? (
         <TableCardSkeleton />

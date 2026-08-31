@@ -342,6 +342,28 @@ export interface Database {
           occurred_at?: string;
         }
       >;
+      // A trainer's own income ledger — one row per fee received from one of
+      // their athletes. Unrelated to revenue_entries (club-level income) and
+      // to payment_requests (a club paying the platform).
+      trainer_payments: TableOf<
+        {
+          id: string;
+          trainer_id: string;
+          athlete_id: string | null;
+          amount_toman: number;
+          paid_at: string;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          trainer_id: string;
+          athlete_id: string;
+          amount_toman: number;
+          paid_at?: string;
+          note?: string | null;
+        }
+      >;
       class_attendance_logs: TableOf<
         {
           id: string;
