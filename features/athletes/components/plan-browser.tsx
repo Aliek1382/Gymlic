@@ -52,7 +52,9 @@ import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
+import { NutritionFormatHint } from "./nutrition-format-hint";
 import { PlanComments } from "./plan-comments";
+import { PlanFormatHint } from "./plan-format-hint";
 import { PlanPrintArea } from "./plan-print-area";
 import { NutritionDayBuilder } from "./nutrition-day-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
@@ -378,6 +380,7 @@ export function PlanBrowser({
                       کنید، مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
                     </p>
                   )}
+                  {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
                 </div>
 
                 <Button

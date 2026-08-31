@@ -52,7 +52,7 @@ const ROW_GRID = "grid grid-cols-[1.5rem_1fr_2.2rem_2.6rem_4.5rem] items-center 
 
 // A food row has three columns to the exercise row's four, so it gets its
 // own track sizing rather than leaving a blank column on every line.
-const FOOD_ROW_GRID = "grid grid-cols-[1.5rem_1fr_3rem_5rem] items-center gap-x-2";
+const FOOD_ROW_GRID = "grid grid-cols-[1.5rem_1fr_4rem_5rem] items-center gap-x-2";
 
 function InfoCard({
   label,

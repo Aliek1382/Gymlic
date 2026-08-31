@@ -39,7 +39,13 @@ export interface ParsedMealSection {
 const DIGITS = "[0-9۰-۹٠-٩]";
 // Whole numbers plus the decimals and halves a trainer actually writes —
 // "1.5 لیوان", "۱/۲ لیوان".
-const AMOUNT = `${DIGITS}+(?:[.,٫/]${DIGITS}+)?`;
+const NUMBER = `${DIGITS}+(?:[.,٫/]${DIGITS}+)?`;
+// A range — "100-150 گرم", "100 تا 150 گرم" — is how a trainer leaves room
+// in an amount. Only the ASCII hyphen and "تا" join one: an em dash is what
+// separates the food name from its amount, so accepting it here would let
+// "مکمل ب-12 — 1 عدد" read as the single range "12 — 1".
+const RANGE = String.raw`\s*(?:-|تا)\s*`;
+const AMOUNT = `${NUMBER}(?:${RANGE}${NUMBER})?`;
 // An em dash, hyphen or colon between the food name and its amount. Unlike
 // the workout grammar this is required in the free-unit shape: without it
 // a sentence like "قبل از خواب 2 لیوان آب بنوشید" would read as a food row.
@@ -63,6 +69,14 @@ const FOOD_PATTERNS = [
   new RegExp(`^(.+?)\\s+(${AMOUNT})\\s*(${KNOWN_UNIT})${NOTE}$`),
 ];
 
+// A matched name that still carries "جداکننده + عدد" means the pattern
+// swallowed an earlier amount — a second food crammed onto one line, or a
+// shape the grammar doesn't cover. Rendering that as a row would show the
+// athlete a number that isn't the one written, so such a line falls back to
+// plain text instead. The cost is a food whose own name ends in "-<عدد>"
+// ("مکمل ب-12") staying plain text, which loses nothing.
+const NAME_CARRIES_AMOUNT = new RegExp(`[—–\\-:]\\s*${DIGITS}`);
+
 // The optional "[منابع پروتئینی] " prefix FoodPicker puts in front of a line
 // when the trainer had a category selected alongside a meal. Pulled off
 // before the patterns run, so they keep matching the food name at the start
@@ -75,17 +89,25 @@ function splitCategory(line: string): { body: string; category: string | null } 
   return { body: line.slice(match[0].length), category: match[1].trim() };
 }
 
+// "100 تا 150" and "100-150" are the same amount, so both are stored the
+// same way — the rendered column then stays narrow and predictable.
+function normalizeAmount(raw: string): string {
+  return toAsciiDigits(raw).replace(new RegExp(RANGE), "-");
+}
+
 function parseLine(line: string): ParsedNutritionRow {
   const { body, category } = splitCategory(line);
 
   for (const pattern of FOOD_PATTERNS) {
     const match = body.match(pattern);
     if (!match) continue;
+    const name = match[1].trim();
+    if (NAME_CARRIES_AMOUNT.test(name)) continue;
     const unit = match[3]?.trim();
     return {
       kind: "food",
-      name: match[1].trim(),
-      amount: toAsciiDigits(match[2]),
+      name,
+      amount: normalizeAmount(match[2]),
       unit: unit || null,
       note: match[4]?.trim() || null,
       category,
