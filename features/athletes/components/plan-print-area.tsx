@@ -17,6 +17,13 @@ import {
   type ParsedSection,
   type PlanTechnique,
 } from "../utils/workout-plan-parse";
+import {
+  hasFoodRows,
+  parseNutritionDescription,
+  sectionFoodCategories,
+  type ParsedFoodRow,
+  type ParsedMealSection,
+} from "../utils/nutrition-plan-parse";
 
 const KIND_LABEL: Record<PlanKind, string> = {
   workout: "برنامه تمرینی",
@@ -42,6 +49,10 @@ const GROUP_BADGE = "border-[#dfe3ee] bg-white text-[#6b7280]";
 // though rows are separate elements (they each need their own break-inside
 // rule, which a single table row set wouldn't give per-section).
 const ROW_GRID = "grid grid-cols-[1.5rem_1fr_2.2rem_2.6rem_4.5rem] items-center gap-x-2";
+
+// A food row has three columns to the exercise row's four, so it gets its
+// own track sizing rather than leaving a blank column on every line.
+const FOOD_ROW_GRID = "grid grid-cols-[1.5rem_1fr_3rem_5rem] items-center gap-x-2";
 
 function InfoCard({
   label,
@@ -97,9 +108,10 @@ function Badge({
   );
 }
 
-// The "استراحت بین حرکات" note that hangs under a row — kept off the main
-// line so the exercise itself stays scannable.
-function RestNote({ children }: { children: React.ReactNode }) {
+// The secondary note that hangs under a row — a rest interval on a workout
+// sheet, a preparation note on a nutrition one — kept off the main line so
+// the exercise or food itself stays scannable.
+function RowNote({ children }: { children: React.ReactNode }) {
   return <p className="mt-0.5 text-[7.5pt] text-[#8b93a5]">{children}</p>;
 }
 
@@ -126,7 +138,7 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
             {move.name}
           </p>
           {row.rest.betweenExercises && (
-            <RestNote>استراحت تا حرکت بعد: {row.rest.betweenExercises}</RestNote>
+            <RowNote>استراحت تا حرکت بعد: {row.rest.betweenExercises}</RowNote>
           )}
         </div>
         <span className="text-center text-[9pt] font-bold text-[#3b5bfb]">
@@ -174,7 +186,7 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
             .join(" + ")}
         </p>
         {(row.rest.betweenSets || row.rest.betweenExercises) && (
-          <RestNote>
+          <RowNote>
             {[
               row.rest.betweenSets && `استراحت بین ست‌ها: ${row.rest.betweenSets}`,
               row.rest.betweenExercises &&
@@ -182,14 +194,14 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
             ]
               .filter(Boolean)
               .join(" • ")}
-          </RestNote>
+          </RowNote>
         )}
       </div>
     </div>
   );
 }
 
-function Section({ section }: { section: ParsedSection }) {
+function WorkoutSection({ section }: { section: ParsedSection }) {
   const exerciseCount = section.rows.filter((row) => row.kind === "exercise").length;
   const groups = sectionMuscleGroups(section);
   let number = 0;
@@ -247,11 +259,105 @@ function Section({ section }: { section: ParsedSection }) {
   );
 }
 
+function FoodRow({ row, index }: { row: ParsedFoodRow; index: number }) {
+  return (
+    <div className={cn(FOOD_ROW_GRID, "print-row border-t border-[#eceef5] py-1.5")}>
+      <span className="text-center text-[8pt] font-bold text-[#9aa2b5]">
+        {toPersianDigits(index)}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-[9.5pt] font-bold text-[#111827]">
+          {row.category && (
+            <Badge className={cn(GROUP_BADGE, "ml-1 font-normal")}>
+              {row.category}
+            </Badge>
+          )}
+          {row.name}
+        </p>
+        {row.note && <RowNote>{row.note}</RowNote>}
+      </div>
+      <span className="text-center text-[9pt] font-bold text-[#3b5bfb]">
+        {row.amount ? toPersianDigits(row.amount) : "—"}
+      </span>
+      <span className="truncate text-center text-[8pt] text-[#6b7280]">
+        {row.unit ?? "—"}
+      </span>
+    </div>
+  );
+}
+
+function NutritionSection({ section }: { section: ParsedMealSection }) {
+  const foodCount = section.rows.filter((row) => row.kind === "food").length;
+  const categories = sectionFoodCategories(section);
+  let number = 0;
+
+  return (
+    <section className="print-day mb-3 overflow-hidden rounded-lg border border-[#dfe3ee]">
+      {section.heading && (
+        <div className="print-day-heading flex items-center justify-between gap-2 border-b border-[#dfe3ee] bg-[#eef2ff] px-3 py-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-block h-3.5 w-1 rounded-full bg-[#3b5bfb]" />
+            <h2 className="text-[10.5pt] font-bold text-[#1b2a6b]">
+              {section.heading}
+            </h2>
+            {categories.map((category) => (
+              <Badge key={category} className={cn(GROUP_BADGE, "font-normal")}>
+                {category}
+              </Badge>
+            ))}
+          </div>
+          {foodCount > 0 && (
+            <span className="text-[8pt] text-[#5566b8]">
+              {toPersianDigits(foodCount)} مورد
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="px-3 pb-1.5">
+        {hasFoodRows(section) && (
+          <div className={cn(FOOD_ROW_GRID, "pt-1.5 text-[7.5pt] font-bold text-[#8b93a5]")}>
+            <span />
+            <span>ماده غذایی</span>
+            <span className="text-center">مقدار</span>
+            <span className="text-center">واحد</span>
+          </div>
+        )}
+
+        {section.rows.map((row, rowIndex) => {
+          if (row.kind === "text") {
+            return (
+              <p
+                key={rowIndex}
+                className="print-row border-t border-[#eceef5] py-1.5 text-[9.5pt] leading-6 text-[#374151] first:border-t-0"
+              >
+                {row.text}
+              </p>
+            );
+          }
+          number += 1;
+          return <FoodRow key={rowIndex} row={row} index={number} />;
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
   if (!plan) return null;
 
   const KindIcon = KIND_ICON[plan.kind];
-  const sections = parsePlanDescription(plan.description);
+  // Each plan kind parses to its own shape — day blocks of exercises, or
+  // meal blocks of foods — so the sheet's body is built here rather than
+  // rendered from one shared section list.
+  const body =
+    plan.kind === "nutrition"
+      ? parseNutritionDescription(plan.description).map((section, index) => (
+          <NutritionSection key={index} section={section} />
+        ))
+      : parsePlanDescription(plan.description).map((section, index) => (
+          <WorkoutSection key={index} section={section} />
+        ));
   const assignedLabel = formatPersianDate(new Date(plan.assignedAt));
   const athleteAge = formatAge(plan.athleteBirthDate);
   const watermarkLabel = plan.trainerName
@@ -327,10 +433,8 @@ export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
                 </div>
               )}
 
-              {sections.length > 0 ? (
-                sections.map((section, index) => (
-                  <Section key={index} section={section} />
-                ))
+              {body.length > 0 ? (
+                body
               ) : (
                 <p className="text-[9.5pt] leading-7 text-[#374151]">
                   توضیحاتی برای این برنامه ثبت نشده است.
