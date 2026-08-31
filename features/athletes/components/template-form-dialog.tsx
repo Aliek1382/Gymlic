@@ -17,6 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { NutritionFormatHint } from "./nutrition-format-hint";
+import { PlanFormatHint } from "./plan-format-hint";
 import { PLAN_DESCRIPTION_PLACEHOLDER } from "../constants/athletes";
 import { useSaveTemplate } from "../hooks/use-save-template";
 import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
@@ -124,6 +126,7 @@ export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
               className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
               {...form.register("description")}
             />
+            {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
           </div>
 
           <Button type="submit" className="w-full" disabled={saveTemplate.isPending}>

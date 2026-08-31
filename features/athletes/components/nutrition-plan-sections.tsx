@@ -13,7 +13,9 @@ import {
 // The nutrition counterpart of PlanSections: meal blocks with a row per
 // food, instead of the day blocks and sets × reps rows a workout plan gets.
 
-const ROW_GRID = "grid grid-cols-[1.25rem_1fr_2.75rem_4rem] items-center gap-x-2";
+// The amount column is sized for a range ("۱۰۰-۱۵۰"), not just a single
+// number, so a range row doesn't wrap mid-value.
+const ROW_GRID = "grid grid-cols-[1.25rem_1fr_4.25rem_4rem] items-center gap-x-2";
 
 // Same quiet bordered chip the workout sheet uses for a muscle group — it
 // sits on every row, so it stays out of the food name's way.
