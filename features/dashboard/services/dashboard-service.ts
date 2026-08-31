@@ -1,13 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
 import { getPersianMonthLabel } from "@/lib/persian";
 import { SUBSCRIPTION_WARNING_DAYS } from "../constants/dashboard";
+import { trendFromChange } from "../utils/trend";
 import type {
   ClubDashboardData,
   ClubStatistics,
   MemberDistribution,
   RecentActivityItem,
   RevenuePoint,
-  StatTrend,
   SubscriptionInfo,
 } from "../types/dashboard-types";
 
@@ -22,19 +22,6 @@ const PLAN_TIER_COLOR: Record<string, string> = {
   basic: "var(--chart-2)",
   daily: "var(--border)",
 };
-
-function trendFromChange(current: number, previous: number): StatTrend {
-  if (previous <= 0) {
-    return current > 0
-      ? { direction: "up", label: "+۱۰۰٪" }
-      : { direction: "flat", label: "پایدار" };
-  }
-  const change = ((current - previous) / previous) * 100;
-  if (Math.abs(change) < 1) return { direction: "flat", label: "پایدار" };
-  const direction = change > 0 ? "up" : "down";
-  const sign = change > 0 ? "+" : "";
-  return { direction, label: `${sign}${Math.round(change)}٪` };
-}
 
 /** Finds the club the current user manages/works at (their first active membership). */
 export async function getActiveClubId(): Promise<string | null> {
