@@ -87,6 +87,7 @@ export async function getClubStatistics(
     attendanceThisMonth,
     attendanceLastMonth,
     club,
+    monthlyRevenueSeries,
   ] = await Promise.all([
     countMembers(clubId, "athlete", startOfThisMonth),
     countMembers(clubId, "athlete", startOfLastMonth, startOfThisMonth),
@@ -116,9 +117,8 @@ export async function getClubStatistics(
     attendanceRate(clubId, startOfThisMonth),
     attendanceRate(clubId, startOfLastMonth, startOfThisMonth),
     supabase.from("clubs").select("member_capacity").eq("id", clubId).single(),
+    getRevenueSparkline(clubId),
   ]);
-
-  const monthlyRevenueSeries = await getRevenueSparkline(clubId);
 
   return {
     classAttendancePercent: attendanceThisMonth,

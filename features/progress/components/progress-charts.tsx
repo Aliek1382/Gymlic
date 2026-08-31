@@ -1,11 +1,19 @@
 "use client";
 
 import { useMemo } from "react";
+import dynamic from "next/dynamic";
 
 import { Card, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { buildPoints, METRICS, seriesFor } from "../utils/build-points";
 import type { MeasurementEntry } from "../types/progress-types";
-import { MetricChart } from "./metric-chart";
+
+// Code-split out of the main bundle: recharts is heavy and this widget
+// isn't needed until progress data has already loaded and rendered.
+const MetricChart = dynamic(
+  () => import("./metric-chart").then((m) => m.MetricChart),
+  { ssr: false, loading: () => <Skeleton className="h-[208px] w-full rounded-xl" /> }
+);
 
 export function ProgressCharts({ entries }: { entries: MeasurementEntry[] }) {
   const points = useMemo(() => buildPoints(entries), [entries]);

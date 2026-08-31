@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Banknote, CalendarCheck2, Dumbbell, Settings, UserPlus, Users } from "lucide-react";
 
 import { formatToman, toPersianDigits } from "@/lib/persian";
@@ -23,12 +24,22 @@ import { ErrorState } from "../shared/error-state";
 import { MiniBarSparkline } from "../shared/mini-bar-sparkline";
 import { AvatarStack } from "../shared/avatar-stack";
 import { Progress } from "@/components/ui/progress";
-import { MemberDistributionChart } from "./member-distribution-chart";
-import { RevenueChart } from "./revenue-chart";
 import { RecentActivitiesTable } from "./recent-activities-table";
 import { SubscriptionCard } from "../shared/subscription-card";
 import { QuickActions } from "../shared/quick-actions";
 import type { QuickAction } from "../../types/dashboard-types";
+
+// Code-split out of the main dashboard bundle: recharts is heavy, the data
+// these need isn't ready until their own query resolves anyway, and
+// ResponsiveContainer can't measure correctly during server rendering.
+const MemberDistributionChart = dynamic(
+  () => import("./member-distribution-chart").then((m) => m.MemberDistributionChart),
+  { ssr: false, loading: () => <ChartCardSkeleton /> }
+);
+const RevenueChart = dynamic(
+  () => import("./revenue-chart").then((m) => m.RevenueChart),
+  { ssr: false, loading: () => <ChartCardSkeleton className="lg:col-span-2" /> }
+);
 
 const QUICK_ACTIONS: QuickAction[] = [
   { label: "افزودن عضو جدید", href: "/members?new=1", icon: UserPlus },
