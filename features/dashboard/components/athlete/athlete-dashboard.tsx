@@ -44,7 +44,7 @@ export function AthleteDashboard({
           plan={dashboard.data.todaysWorkout}
           emptyTitle="برنامه تمرینی فعالی ندارید."
           emptyDescription="مربی شما به‌زودی یک برنامه تمرینی برایتان تنظیم می‌کند."
-          dayLogging
+          planKind="workout"
         />
         <PlanSummaryCard
           title="برنامه غذایی"
@@ -52,6 +52,7 @@ export function AthleteDashboard({
           plan={dashboard.data.nutritionPlan}
           emptyTitle="برنامه غذایی فعالی ندارید."
           emptyDescription="مربی شما به‌زودی یک برنامه غذایی برایتان تنظیم می‌کند."
+          planKind="nutrition"
         />
       </div>
 

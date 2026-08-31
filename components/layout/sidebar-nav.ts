@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   LineChart,
   Ruler,
+  Salad,
   Settings,
   User,
   UserCircle,
@@ -47,6 +48,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
         "قالب‌های آماده برای برنامه تمرینی و غذایی بسازید تا هنگام نوشتن برنامه برای ورزشکاران سریع‌تر شروع کنید.",
     },
     { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
+    { label: "کتابخانه غذاها", href: "/foods", icon: Salad },
     {
       label: "پیشرفت ورزشکاران",
       href: "/progress",

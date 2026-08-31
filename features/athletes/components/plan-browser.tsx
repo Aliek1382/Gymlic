@@ -48,15 +48,13 @@ import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlanPrint } from "../hooks/use-plan-print";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
-import {
-  appendExerciseLine,
-  insertExerciseLineUnderHeading,
-} from "../utils/workout-plan-text";
+import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
 import { PlanComments } from "./plan-comments";
 import { PlanPrintArea } from "./plan-print-area";
+import { NutritionDayBuilder } from "./nutrition-day-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
 const ICON_BY_KIND = { workout: Dumbbell, nutrition: Apple } as const;
@@ -151,11 +149,11 @@ export function PlanBrowser({
     }
   }, [editingPlan, editForm]);
 
-  function handleInsertExerciseLine(heading: string | null, line: string) {
+  function handleInsertLine(heading: string | null, line: string) {
     const current = editForm.getValues("description") ?? "";
     const next = heading
-      ? insertExerciseLineUnderHeading(current, heading, line)
-      : appendExerciseLine(current, line);
+      ? insertLineUnderHeading(current, heading, line)
+      : appendLine(current, line);
     editForm.setValue("description", next, { shouldDirty: true });
   }
 
@@ -358,8 +356,10 @@ export function PlanBrowser({
                   )}
                 </div>
 
-                {kind === "workout" && (
-                  <WorkoutDayBuilder onInsertLine={handleInsertExerciseLine} />
+                {kind === "workout" ? (
+                  <WorkoutDayBuilder onInsertLine={handleInsertLine} />
+                ) : (
+                  <NutritionDayBuilder onInsertLine={handleInsertLine} />
                 )}
 
                 <div className="space-y-2">
@@ -368,7 +368,7 @@ export function PlanBrowser({
                   </Label>
                   <textarea
                     id="edit-plan-description"
-                    rows={kind === "workout" ? 6 : 4}
+                    rows={6}
                     className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
                     {...editForm.register("description")}
                   />

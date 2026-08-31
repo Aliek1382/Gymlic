@@ -107,6 +107,7 @@ export function MyPlanList({
             <PlanSections
               planId={plan.id}
               description={plan.description}
+              kind={kind}
               isActivePlan={plan.id === latestPlanId}
               dayLogging={kind === "workout"}
             />

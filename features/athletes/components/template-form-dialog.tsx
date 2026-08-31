@@ -17,13 +17,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { PLAN_DESCRIPTION_PLACEHOLDER } from "../constants/athletes";
 import { useSaveTemplate } from "../hooks/use-save-template";
-import {
-  appendExerciseLine,
-  insertExerciseLineUnderHeading,
-} from "../utils/workout-plan-text";
+import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind } from "../types/athlete-types";
+import { NutritionDayBuilder } from "./nutrition-day-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
 const KIND_COPY: Record<
@@ -54,11 +53,11 @@ export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
     defaultValues: { title: "", description: "" },
   });
 
-  function handleInsertExerciseLine(heading: string | null, line: string) {
+  function handleInsertLine(heading: string | null, line: string) {
     const current = form.getValues("description") ?? "";
     const next = heading
-      ? insertExerciseLineUnderHeading(current, heading, line)
-      : appendExerciseLine(current, line);
+      ? insertLineUnderHeading(current, heading, line)
+      : appendLine(current, line);
     form.setValue("description", next, { shouldDirty: true });
   }
 
@@ -108,8 +107,10 @@ export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
             )}
           </div>
 
-          {kind === "workout" && (
-            <WorkoutDayBuilder onInsertLine={handleInsertExerciseLine} />
+          {kind === "workout" ? (
+            <WorkoutDayBuilder onInsertLine={handleInsertLine} />
+          ) : (
+            <NutritionDayBuilder onInsertLine={handleInsertLine} />
           )}
 
           <div className="space-y-2">
@@ -118,8 +119,8 @@ export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
             </Label>
             <textarea
               id={`template-${kind}-description`}
-              rows={kind === "workout" ? 5 : 3}
-              placeholder="توضیحات آزاد برای شرح حرکات، ست و تکرار یا وعده‌های غذایی..."
+              rows={5}
+              placeholder={PLAN_DESCRIPTION_PLACEHOLDER[kind]}
               className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
               {...form.register("description")}
             />

@@ -21,18 +21,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
+import { NutritionFormatHint } from "./nutrition-format-hint";
 import { PlanFormatHint } from "./plan-format-hint";
+import { PLAN_DESCRIPTION_PLACEHOLDER } from "../constants/athletes";
 import { useDeleteTemplate } from "../hooks/use-delete-template";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
 import { useSaveTemplate } from "../hooks/use-save-template";
 import { useTemplates } from "../hooks/use-templates";
-import {
-  appendExerciseLine,
-  insertExerciseLineUnderHeading,
-} from "../utils/workout-plan-text";
+import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind, PlanTarget } from "../types/athlete-types";
+import { NutritionDayBuilder } from "./nutrition-day-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
 const KIND_LABEL: Record<PlanKind, { title: string; icon: typeof Dumbbell }> = {
@@ -104,11 +104,11 @@ export function PlanDialog({
     }
   }
 
-  function handleInsertExerciseLine(heading: string | null, line: string) {
+  function handleInsertLine(heading: string | null, line: string) {
     const current = form.getValues("description") ?? "";
     const next = heading
-      ? insertExerciseLineUnderHeading(current, heading, line)
-      : appendExerciseLine(current, line);
+      ? insertLineUnderHeading(current, heading, line)
+      : appendLine(current, line);
     form.setValue("description", next, { shouldDirty: true });
   }
 
@@ -220,20 +220,22 @@ export function PlanDialog({
             )}
           </div>
 
-          {kind === "workout" && (
-            <WorkoutDayBuilder onInsertLine={handleInsertExerciseLine} />
+          {kind === "workout" ? (
+            <WorkoutDayBuilder onInsertLine={handleInsertLine} />
+          ) : (
+            <NutritionDayBuilder onInsertLine={handleInsertLine} />
           )}
 
           <div className="space-y-2">
             <Label htmlFor={`${kind}-description`}>توضیحات (اختیاری)</Label>
             <textarea
               id={`${kind}-description`}
-              rows={kind === "workout" ? 5 : 3}
-              placeholder="توضیحات آزاد برای شرح حرکات، ست و تکرار یا وعده‌های غذایی..."
+              rows={5}
+              placeholder={PLAN_DESCRIPTION_PLACEHOLDER[kind]}
               className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
               {...form.register("description")}
             />
-            {kind === "workout" && <PlanFormatHint />}
+            {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">

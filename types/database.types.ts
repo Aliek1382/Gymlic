@@ -391,6 +391,41 @@ export interface Database {
           last_used_at?: string;
         }
       >;
+      foods: TableOf<
+        {
+          id: string;
+          name: string;
+          name_en: string | null;
+          description: string | null;
+          category: string;
+          default_unit: string;
+          created_by: string | null;
+          created_at: string;
+        },
+        {
+          name: string;
+          category: string;
+          default_unit: string;
+          name_en?: string | null;
+          description?: string | null;
+          created_by?: string | null;
+        }
+      >;
+      food_usage: TableOf<
+        {
+          id: string;
+          trainer_id: string;
+          food_id: string;
+          use_count: number;
+          last_used_at: string;
+        },
+        {
+          trainer_id: string;
+          food_id: string;
+          use_count?: number;
+          last_used_at?: string;
+        }
+      >;
       notifications: TableOf<
         {
           id: string;
