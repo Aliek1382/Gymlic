@@ -500,9 +500,14 @@ export interface Database {
           first_name: string | null;
           last_name: string | null;
           club_name: string | null;
+          invited_role: InvitationRole;
         }[];
       };
       accept_athlete_invitation: {
+        Args: { p_code: string };
+        Returns: undefined;
+      };
+      accept_club_invitation: {
         Args: { p_code: string };
         Returns: undefined;
       };

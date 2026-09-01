@@ -10,19 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatPersianDate, toPersianDigits } from "@/lib/persian";
-import { PLAN_TIER_LABEL } from "../constants/members";
-import { useRevokeMemberInvite } from "../hooks/use-revoke-member-invite";
-import type { PendingMemberInvite } from "../types/member-types";
+import { useRevokeTrainerInvite } from "../hooks/use-revoke-trainer-invite";
+import type { PendingTrainerInvite } from "../types/trainer-types";
 
-function InviteRow({
-  invite,
-  trainerName,
-}: {
-  invite: PendingMemberInvite;
-  trainerName: string | null;
-}) {
+function InviteRow({ invite }: { invite: PendingTrainerInvite }) {
   const [revokeOpen, setRevokeOpen] = useState(false);
-  const revokeInvite = useRevokeMemberInvite();
+  const revokeInvite = useRevokeTrainerInvite();
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -35,9 +28,6 @@ function InviteRow({
         <div>
           <p className="text-sm font-medium text-foreground">{invite.name}</p>
           <p className="text-xs text-muted-foreground">
-            طرح {PLAN_TIER_LABEL[invite.planTier]}
-            {trainerName ? ` · مربی: ${trainerName}` : ""}
-            {" · "}
             اعتبار تا {formatPersianDate(new Date(invite.expiresAt))}
           </p>
           {invite.phone && (
@@ -60,7 +50,7 @@ function InviteRow({
             await navigator.clipboard.writeText(
               `${window.location.origin}/join/${invite.code}`
             );
-            toast.success("لینک عضویت کپی شد.");
+            toast.success("لینک دعوت کپی شد.");
           }}
         >
           <Copy />
@@ -90,12 +80,10 @@ function InviteRow({
   );
 }
 
-export function PendingInvitesCard({
+export function PendingTrainerInvitesCard({
   invites,
-  trainerNameById,
 }: {
-  invites: PendingMemberInvite[];
-  trainerNameById: Map<string, string>;
+  invites: PendingTrainerInvite[];
 }) {
   return (
     <Card className="gap-4 py-5">
@@ -106,15 +94,7 @@ export function PendingInvitesCard({
       </div>
       <div className="space-y-2 px-6">
         {invites.map((invite) => (
-          <InviteRow
-            key={invite.id}
-            invite={invite}
-            trainerName={
-              invite.trainerId
-                ? (trainerNameById.get(invite.trainerId) ?? null)
-                : null
-            }
-          />
+          <InviteRow key={invite.id} invite={invite} />
         ))}
       </div>
     </Card>
