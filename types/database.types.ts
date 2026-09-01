@@ -134,6 +134,7 @@ export interface Database {
           last_name: string | null;
           height_cm: number | null;
           weight_kg: number | null;
+          plan_tier: MembershipPlanTier | null;
           status: InvitationStatus;
           created_by: string;
           created_at: string;
@@ -152,6 +153,7 @@ export interface Database {
           last_name?: string | null;
           height_cm?: number | null;
           weight_kg?: number | null;
+          plan_tier?: MembershipPlanTier | null;
           status?: InvitationStatus;
           expires_at?: string;
         },
@@ -494,7 +496,11 @@ export interface Database {
     Functions: {
       get_invitation_preview: {
         Args: { p_code: string };
-        Returns: { first_name: string | null; last_name: string | null }[];
+        Returns: {
+          first_name: string | null;
+          last_name: string | null;
+          club_name: string | null;
+        }[];
       };
       accept_athlete_invitation: {
         Args: { p_code: string };

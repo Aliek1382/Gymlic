@@ -32,6 +32,7 @@
 - `app/` — مسیرهای Next.js App Router؛ گروه `(auth)` صفحات ورود/OTP/انتخاب نقش و گروه `(dashboard)` پنل اصلی را در بر می‌گیرد.
 - `features/authentication/` — فلوی کامل احراز هویت (OTP، انتخاب نقش، ساخت باشگاه، تایید دعوت) طبق ساختار Component → Hook → Service → Supabase.
 - `features/dashboard/` — سه نوع داشبورد (باشگاه، مربی، ورزشکار)، هرکدام Widget-Based با Loading / Empty / Error State مستقل.
+- `features/members/` — مدیریت اعضای باشگاه (دعوت عضو جدید، ویرایش طرح و وضعیت، تعلیق، حذف، جستجو و فیلتر).
 - `components/layout/` — Header و Sidebar پویا بر اساس نقش کاربر (اعضای مشترک بین تمام صفحات پنل).
 - `components/ui/` — کامپوننت‌های پایه به سبک shadcn/ui.
 - `lib/supabase/` — کلاینت‌های Supabase برای مرورگر، Server Component و Middleware.
