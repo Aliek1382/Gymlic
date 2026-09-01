@@ -14,7 +14,12 @@ export default async function DashboardPage() {
 
   switch (context!.accountType) {
     case "club":
-      return <ClubDashboard ownerName={name} />;
+      return (
+        <ClubDashboard
+          ownerName={name}
+          clubId={context!.activeMembership!.clubId}
+        />
+      );
     case "trainer":
       return <TrainerDashboard trainerName={name} />;
     case "athlete":

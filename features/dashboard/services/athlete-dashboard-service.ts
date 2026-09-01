@@ -1,18 +1,16 @@
 import { createClient } from "@/lib/supabase/client";
 import type { AthleteDashboardData } from "../types/dashboard-types";
 
-export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
+export async function getAthleteDashboard(
+  athleteId: string
+): Promise<AthleteDashboardData> {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("نشست کاربر معتبر نیست.");
 
   const [workout, nutrition] = await Promise.all([
     supabase
       .from("workout_assignments")
       .select("id, title, description, assigned_at")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .eq("status", "active")
       .order("assigned_at", { ascending: false })
       .limit(1)
@@ -20,7 +18,7 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
     supabase
       .from("nutrition_assignments")
       .select("id, title, description, assigned_at")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .eq("status", "active")
       .order("assigned_at", { ascending: false })
       .limit(1)

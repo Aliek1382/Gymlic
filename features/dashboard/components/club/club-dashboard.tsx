@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { Banknote, CalendarCheck2, Dumbbell, Settings, UserPlus, Users } from "lucide-react";
 
 import { formatToman, toPersianDigits } from "@/lib/persian";
-import { useDashboard } from "../../hooks/use-dashboard";
 import { useDashboardStatistics } from "../../hooks/use-dashboard-statistics";
 import { useMemberDistribution } from "../../hooks/use-member-distribution";
 import { useRevenueSeries } from "../../hooks/use-revenue-series";
@@ -16,7 +15,6 @@ import { StatisticsGrid } from "../shared/statistics-grid";
 import { StatisticCard } from "../shared/statistic-card";
 import {
   ChartCardSkeleton,
-  DashboardSkeleton,
   StatisticCardSkeleton,
   TableCardSkeleton,
 } from "../shared/dashboard-skeleton";
@@ -48,22 +46,19 @@ const QUICK_ACTIONS: QuickAction[] = [
   { label: "تنظیمات باشگاه", href: "/settings", icon: Settings },
 ];
 
-export function ClubDashboard({ ownerName }: { ownerName: string }) {
+export function ClubDashboard({
+  ownerName,
+  clubId,
+}: {
+  ownerName: string;
+  clubId: string;
+}) {
   const [revenueRange, setRevenueRange] = useState("6");
-  const dashboard = useDashboard();
-  const statistics = useDashboardStatistics(dashboard.clubId);
-  const memberDistribution = useMemberDistribution(dashboard.clubId);
-  const revenueSeries = useRevenueSeries(dashboard.clubId, Number(revenueRange));
-  const recentActivities = useRecentActivities(dashboard.clubId);
-  const subscription = useSubscription(dashboard.clubId);
-
-  if (dashboard.isLoading) {
-    return <DashboardSkeleton />;
-  }
-
-  if (dashboard.isError) {
-    return <ErrorState message="بارگذاری اطلاعات باشگاه با خطا مواجه شد." />;
-  }
+  const statistics = useDashboardStatistics(clubId);
+  const memberDistribution = useMemberDistribution(clubId);
+  const revenueSeries = useRevenueSeries(clubId, Number(revenueRange));
+  const recentActivities = useRecentActivities(clubId);
+  const subscription = useSubscription(clubId);
 
   return (
     <div className="space-y-6">
