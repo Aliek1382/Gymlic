@@ -6,6 +6,7 @@ import type {
   PlanKind,
   PlanTarget,
   PlanTemplate,
+  TrainerClub,
 } from "../types/athlete-types";
 
 async function getCurrentUserId(): Promise<string> {
@@ -167,6 +168,32 @@ export async function revokeAthleteInvite(invitationId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * The club the current trainer works at, if any. A trainer can use Gymlic
+ * without a club, but when they do belong to one, the athletes they invite
+ * become members of that club too — otherwise the club's own member list,
+ * plan distribution and "member joined" notification never see them.
+ */
+export async function getTrainerClub(): Promise<TrainerClub | null> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("club_id, clubs(name)")
+    .eq("user_id", trainerId)
+    .eq("role", "trainer")
+    .eq("status", "active")
+    .order("joined_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+    .returns<{ club_id: string; clubs: { name: string } | null } | null>();
+  if (error) throw error;
+  if (!data) return null;
+
+  return { id: data.club_id, name: data.clubs?.name ?? "" };
+}
+
 export async function createAthleteInvite(input: {
   firstName: string;
   lastName: string;
@@ -175,6 +202,10 @@ export async function createAthleteInvite(input: {
 }): Promise<{ code: string }> {
   const supabase = createClient();
   const trainerId = await getCurrentUserId();
+  // Carried on the invitation so accept_athlete_invitation can create the
+  // club membership alongside the trainer/athlete link. Null for a trainer
+  // who works independently, which is the pre-existing behaviour.
+  const club = await getTrainerClub();
 
   const code = crypto.randomUUID();
   const expiresAt = new Date();
@@ -183,6 +214,7 @@ export async function createAthleteInvite(input: {
   const { error } = await supabase.from("invitations").insert({
     code,
     trainer_id: trainerId,
+    club_id: club?.id ?? null,
     invited_role: "athlete",
     created_by: trainerId,
     first_name: input.firstName,
