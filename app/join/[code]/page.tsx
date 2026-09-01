@@ -18,7 +18,7 @@ export default async function JoinPage({
     return (
       <AuthShell
         title="لینک نامعتبر است"
-        description="این لینک دعوت منقضی شده یا قبلاً استفاده شده است. برای دریافت لینک جدید با مربی خود تماس بگیرید."
+        description="این لینک دعوت منقضی شده یا قبلاً استفاده شده است. برای دریافت لینک جدید با باشگاه یا مربی خود تماس بگیرید."
       >
         <div className="flex justify-center py-4 text-muted-foreground">
           <Frown className="size-10" />
@@ -34,7 +34,11 @@ export default async function JoinPage({
   return (
     <AuthShell
       title={name ? `خوش آمدید، ${name}` : "خوش آمدید"}
-      description="مربی شما را به جیم‌لیک دعوت کرده است. برای تکمیل ثبت‌نام، ایمیل و رمز عبور دلخواه خود را وارد کنید."
+      description={`${
+        invitation.clubName
+          ? `باشگاه «${invitation.clubName}»`
+          : "مربی شما"
+      } شما را به جیم‌لیک دعوت کرده است. برای تکمیل ثبت‌نام، ایمیل و رمز عبور دلخواه خود را وارد کنید.`}
     >
       <JoinForm code={code} />
     </AuthShell>

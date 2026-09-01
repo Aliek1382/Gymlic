@@ -206,9 +206,10 @@ export async function acceptInvitation(code: string) {
 }
 
 /**
- * Completes a trainer-generated athlete invite: the athlete only ever
- * provides an email + password here — role, trainer link, name and
- * measurements all come from the invitation the trainer already filled in.
+ * Completes an athlete invite — created either by a trainer or by a club:
+ * the athlete only ever provides an email + password here, while role, club
+ * membership, trainer link, name and measurements all come from the
+ * invitation whoever invited them already filled in.
  */
 export async function joinViaInvitation(
   code: string,
