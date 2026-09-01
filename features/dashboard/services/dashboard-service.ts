@@ -23,25 +23,6 @@ const PLAN_TIER_COLOR: Record<string, string> = {
   daily: "var(--border)",
 };
 
-/** Finds the club the current user manages/works at (their first active membership). */
-export async function getActiveClubId(): Promise<string | null> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("memberships")
-    .select("club_id")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.club_id ?? null;
-}
-
 export async function getClubName(clubId: string): Promise<string> {
   const supabase = createClient();
   const { data, error } = await supabase

@@ -19,7 +19,7 @@ export function AthleteDashboard({
   athleteName: string;
   trainerName: string | null;
 }) {
-  const dashboard = useAthleteDashboard();
+  const dashboard = useAthleteDashboard(athleteId);
 
   if (dashboard.isLoading) {
     return <DashboardSkeleton />;
