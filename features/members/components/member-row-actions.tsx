@@ -5,6 +5,7 @@ import { MoreVertical, Pause, Pencil, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +16,6 @@ import {
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useRemoveMember } from "../hooks/use-remove-member";
 import { useUpdateMembership } from "../hooks/use-update-membership";
-import { ConfirmDialog } from "./confirm-dialog";
 import { EditMemberDialog } from "./edit-member-dialog";
 import type { ClubMember } from "../types/member-types";
 

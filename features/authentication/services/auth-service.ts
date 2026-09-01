@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { AccountType } from "@/types/database.types";
+import type { AccountType, InvitationRole } from "@/types/database.types";
 
 import type { Profile } from "../types/auth-types";
 
@@ -206,11 +206,34 @@ export async function acceptInvitation(code: string) {
 }
 
 /**
- * Completes an athlete invite — created either by a trainer or by a club:
- * the athlete only ever provides an email + password here, while role, club
- * membership, trainer link, name and measurements all come from the
- * invitation whoever invited them already filled in.
+ * Completes an invite for a brand-new account — an athlete invited by a
+ * trainer or a club, or a trainer invited by a club. The invitee only ever
+ * provides an email + password here; role, club membership, trainer link,
+ * name and measurements all come from the invitation whoever invited them
+ * already filled in.
  */
+/**
+ * Completes the invitation for the signed-in user. Both functions run as
+ * SECURITY DEFINER so the whole hand-off commits atomically instead of
+ * depending on several separate RLS-gated calls: role, club membership,
+ * trainer link, measurements and any plans pre-assigned to the invitation
+ * for an athlete; role, membership and the trainer's existing athletes for a
+ * trainer joining a club.
+ */
+export async function acceptInvitationForCurrentUser(
+  code: string,
+  invitedRole: InvitationRole
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc(
+    invitedRole === "athlete"
+      ? "accept_athlete_invitation"
+      : "accept_club_invitation",
+    { p_code: code.trim() }
+  );
+  if (error) throw error;
+}
+
 export async function joinViaInvitation(
   code: string,
   email: string,
@@ -234,14 +257,7 @@ export async function joinViaInvitation(
   if (error) throw error;
   if (!data.session) return { hasSession: false };
 
-  // Runs as a SECURITY DEFINER function so the whole hand-off (role, trainer
-  // link, measurements, any plans pre-assigned to this invitation) commits
-  // atomically instead of depending on several separate RLS-gated calls.
-  const { error: acceptError } = await supabase.rpc(
-    "accept_athlete_invitation",
-    { p_code: trimmedCode }
-  );
-  if (acceptError) throw acceptError;
+  await acceptInvitationForCurrentUser(trimmedCode, preview[0].invited_role);
 
   return { hasSession: true };
 }

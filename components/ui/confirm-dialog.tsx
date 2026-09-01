@@ -16,9 +16,9 @@ import {
 import { getErrorMessage } from "@/lib/get-error-message";
 
 /**
- * Confirmation step shared by the destructive member actions (remove a
- * member, revoke a pending invite). The trigger is rendered by the caller so
- * it can live inside a dropdown menu or stand on its own.
+ * Confirmation step for a destructive action (removing a member or trainer,
+ * revoking a pending invite). The trigger is rendered by the caller so it can
+ * live inside a dropdown menu or stand on its own.
  */
 export function ConfirmDialog({
   open,
