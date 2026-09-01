@@ -29,6 +29,15 @@ export function toAsciiDigits(value: string): string {
     .replace(/[٠-٩]/g, (digit) => String(ARABIC_INDIC_DIGITS.indexOf(digit)));
 }
 
+/**
+ * Amounts get typed on a Persian keyboard and are often grouped with a
+ * separator ("۲٬۵۰۰٬۰۰۰"), so normalize both before validating or parsing —
+ * an amount field then accepts what the user naturally types.
+ */
+export function normalizeAmount(value: string): string {
+  return toAsciiDigits(value).replace(/[,٬\s]/g, "");
+}
+
 export function formatNumber(value: number): string {
   return toPersianDigits(new Intl.NumberFormat("en-US").format(Math.round(value)));
 }

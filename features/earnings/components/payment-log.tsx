@@ -5,7 +5,7 @@ import { Wallet } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { formatNumber, formatPersianDate } from "@/lib/persian";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
-import { parseIsoDate } from "../utils/iso-date";
+import { parseIsoDate } from "@/lib/iso-date";
 import type { TrainerPayment } from "../types/earnings-types";
 import { PaymentFormDialog } from "./payment-form-dialog";
 import { DeletePaymentButton } from "./delete-payment-button";

@@ -16,6 +16,7 @@ export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type WorkoutStatus = "active" | "completed" | "cancelled" | "draft";
 export type MembershipPlanTier = "elite" | "basic" | "daily";
 export type PaymentRequestStatus = "pending" | "approved" | "rejected";
+export type RevenueCategory = "membership" | "session" | "product" | "other";
 // Not a DB enum on purpose — `notifications.type` is plain text so new
 // kinds can be introduced later without a migration. This union only
 // covers the kinds the current triggers actually emit.
@@ -334,14 +335,23 @@ export interface Database {
         {
           id: string;
           club_id: string;
+          member_id: string | null;
           amount: number;
+          category: RevenueCategory;
           occurred_at: string;
+          note: string | null;
+          recorded_by: string | null;
           created_at: string;
+          updated_at: string;
         },
         {
           club_id: string;
           amount: number;
+          member_id?: string | null;
+          category?: RevenueCategory;
           occurred_at?: string;
+          note?: string | null;
+          recorded_by?: string | null;
         }
       >;
       // A trainer's own income ledger — one row per fee received from one of

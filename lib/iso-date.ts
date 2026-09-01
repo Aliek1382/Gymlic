@@ -1,9 +1,9 @@
 /**
- * `trainer_payments.paid_at` is a `date` column, so it travels as a bare
- * "YYYY-MM-DD" with no time or zone attached. These helpers keep it that
- * way in the viewer's own calendar: going through Date#toISOString() would
- * shift the day for anyone east or west of UTC and land a payment in the
- * wrong month.
+ * A `date` column (trainer_payments.paid_at, and the day a club's revenue
+ * entry is filed under) travels as a bare "YYYY-MM-DD" with no time or zone
+ * attached. These helpers keep it that way in the viewer's own calendar:
+ * going through Date#toISOString() would shift the day for anyone east or
+ * west of UTC and land a payment in the wrong month.
  */
 
 export function toIsoDate(date: Date): string {
