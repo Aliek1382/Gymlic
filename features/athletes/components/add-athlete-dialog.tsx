@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useCreateAthleteInvite } from "../hooks/use-create-athlete-invite";
+import { useTrainerClub } from "../hooks/use-trainer-club";
 import {
   addAthleteSchema,
   type AddAthleteFormValues,
@@ -28,6 +29,7 @@ export function AddAthleteDialog() {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const createInvite = useCreateAthleteInvite();
+  const trainerClub = useTrainerClub();
 
   const form = useForm<AddAthleteFormValues>({
     resolver: zodResolver(addAthleteSchema),
@@ -99,6 +101,9 @@ export function AddAthleteDialog() {
               <DialogTitle>افزودن ورزشکار جدید</DialogTitle>
               <DialogDescription>
                 مشخصات اولیه ورزشکار را وارد کنید. قد و وزن اختیاری هستند.
+                {trainerClub.data
+                  ? ` این ورزشکار به‌عنوان عضو باشگاه «${trainerClub.data.name}» هم ثبت می‌شود.`
+                  : ""}
               </DialogDescription>
             </DialogHeader>
 

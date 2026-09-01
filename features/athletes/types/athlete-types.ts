@@ -53,3 +53,10 @@ export interface PlanComment {
   body: string;
   createdAt: string;
 }
+
+// The club a trainer works at, when they belong to one — athletes they
+// invite are registered as members of it as well.
+export interface TrainerClub {
+  id: string;
+  name: string;
+}
