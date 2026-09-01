@@ -16,19 +16,21 @@ import {
   jalaliToGregorian,
   toPersianDigits,
 } from "@/lib/persian";
-import { parseIsoDate } from "../utils/iso-date";
+import { parseIsoDate } from "@/lib/iso-date";
 
-// A payment is recorded when it happens, or shortly after — the settings
-// BirthDatePicker's 90-year list would be the wrong tool here, so this
-// offers the current Jalali year and the two before it.
+// A payment or a revenue entry is recorded when it happens, or shortly
+// after — the settings BirthDatePicker's 90-year list would be the wrong
+// tool here, so this offers the current Jalali year and the two before it.
 const SELECTABLE_YEARS = 3;
 
 export function JalaliDateField({
   id,
+  label,
   value,
   onChange,
 }: {
   id: string;
+  label: string;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -60,7 +62,7 @@ export function JalaliDateField({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>تاریخ پرداخت</Label>
+      <Label htmlFor={id}>{label}</Label>
       <div className="grid grid-cols-3 gap-2">
         <Select
           value={String(jd)}

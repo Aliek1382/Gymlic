@@ -34,6 +34,7 @@
 - `features/dashboard/` — سه نوع داشبورد (باشگاه، مربی، ورزشکار)، هرکدام Widget-Based با Loading / Empty / Error State مستقل.
 - `features/members/` — مدیریت اعضای باشگاه (دعوت عضو جدید، ویرایش طرح و وضعیت، تعلیق، حذف، جستجو و فیلتر).
 - `features/trainers/` — مدیریت مربیان باشگاه (دعوت مربی، تعلیق، حذف، شمارش شاگردان هر مربی).
+- `features/revenue/` — دفتر درآمد باشگاه (ثبت شهریه و دریافتی‌ها، ویرایش و حذف، خلاصه و نمودار ماهانه).
 - `components/layout/` — Header و Sidebar پویا بر اساس نقش کاربر (اعضای مشترک بین تمام صفحات پنل).
 - `components/ui/` — کامپوننت‌های پایه به سبک shadcn/ui.
 - `lib/supabase/` — کلاینت‌های Supabase برای مرورگر، Server Component و Middleware.

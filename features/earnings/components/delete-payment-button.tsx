@@ -16,7 +16,7 @@ import {
 import { formatNumber, formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useDeleteTrainerPayment } from "../hooks/use-delete-trainer-payment";
-import { parseIsoDate } from "../utils/iso-date";
+import { parseIsoDate } from "@/lib/iso-date";
 import type { TrainerPayment } from "../types/earnings-types";
 
 export function DeletePaymentButton({ payment }: { payment: TrainerPayment }) {

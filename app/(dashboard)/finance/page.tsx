@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -15,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServerAuthContext } from "@/features/authentication/services/auth-server";
 import { SubscriptionCard } from "@/features/dashboard/components/shared/subscription-card";
 import { SubmitPaymentRequestDialog } from "@/features/finance/components/submit-payment-request-dialog";
+import { ClubRevenueSection } from "@/features/revenue";
 import type { PaymentRequestStatus, SubscriptionStatus } from "@/types/database.types";
 
 export const metadata = { title: "امور مالی | جیم‌لیک" };
@@ -93,64 +95,81 @@ export default async function FinancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">امور مالی باشگاه</h1>
-          <p className="text-sm text-muted-foreground">
-            وضعیت اشتراک پلتفرم و درخواست‌های پرداخت شما.
-          </p>
-        </div>
-        <SubmitPaymentRequestDialog plans={availablePlans} />
+      <div>
+        <h1 className="text-xl font-bold text-foreground">امور مالی باشگاه</h1>
+        <p className="text-sm text-muted-foreground">
+          درآمد و شهریه‌های دریافتی باشگاه، و وضعیت اشتراک شما در پلتفرم.
+        </p>
       </div>
 
-      <SubscriptionCard subscription={subscription} />
+      <Tabs defaultValue="revenue" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="revenue">درآمد باشگاه</TabsTrigger>
+          <TabsTrigger value="subscription">اشتراک پلتفرم</TabsTrigger>
+        </TabsList>
 
-      <Card className="gap-4 py-5">
-        <div className="px-6">
-          <CardTitle className="text-base">تاریخچه درخواست‌های پرداخت</CardTitle>
-        </div>
+        <TabsContent value="revenue">
+          <ClubRevenueSection clubId={clubId} />
+        </TabsContent>
 
-        {requestRows.length === 0 ? (
-          <p className="px-6 text-sm text-muted-foreground">
-            هنوز درخواست پرداختی ثبت نکرده‌اید.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>پلن</TableHead>
-                <TableHead>مبلغ</TableHead>
-                <TableHead>وضعیت</TableHead>
-                <TableHead>یادداشت مدیریت</TableHead>
-                <TableHead>تاریخ ثبت</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {requestRows.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell className="text-foreground">
-                    {request.plans?.name ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatToman(request.amount_toman)} تومان
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>
-                      {REQUEST_STATUS_LABEL[request.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {request.admin_note ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatPersianDate(new Date(request.created_at))}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+        <TabsContent value="subscription" className="space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              اشتراک باشگاه شما در جیم‌لیک و تاریخچه‌ی درخواست‌های پرداخت آن.
+            </p>
+            <SubmitPaymentRequestDialog plans={availablePlans} />
+          </div>
+
+          <SubscriptionCard subscription={subscription} />
+
+          <Card className="gap-4 py-5">
+            <div className="px-6">
+              <CardTitle className="text-base">تاریخچه درخواست‌های پرداخت</CardTitle>
+            </div>
+
+            {requestRows.length === 0 ? (
+              <p className="px-6 text-sm text-muted-foreground">
+                هنوز درخواست پرداختی ثبت نکرده‌اید.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>پلن</TableHead>
+                    <TableHead>مبلغ</TableHead>
+                    <TableHead>وضعیت</TableHead>
+                    <TableHead>یادداشت مدیریت</TableHead>
+                    <TableHead>تاریخ ثبت</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requestRows.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="text-foreground">
+                        {request.plans?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatToman(request.amount_toman)} تومان
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>
+                          {REQUEST_STATUS_LABEL[request.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {request.admin_note ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatPersianDate(new Date(request.created_at))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

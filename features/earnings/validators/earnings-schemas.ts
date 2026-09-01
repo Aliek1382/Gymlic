@@ -1,15 +1,6 @@
 import { z } from "zod";
 
-import { toAsciiDigits } from "@/lib/persian";
-
-/**
- * Amounts get typed on a Persian keyboard and are often grouped with a
- * separator ("۲٬۵۰۰٬۰۰۰"), so normalize both before validating or parsing —
- * the field accepts what the trainer naturally types.
- */
-export function normalizeAmount(value: string): string {
-  return toAsciiDigits(value).replace(/[,٬\s]/g, "");
-}
+import { normalizeAmount } from "@/lib/persian";
 
 export const trainerPaymentFormSchema = z.object({
   athleteId: z.string().min(1, "شاگرد را انتخاب کنید."),

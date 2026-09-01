@@ -23,19 +23,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatNumber } from "@/lib/persian";
+import { JalaliDateField } from "@/components/ui/jalali-date-field";
+import { todayIso } from "@/lib/iso-date";
+import { formatNumber, normalizeAmount } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useAthletes } from "@/features/athletes";
 import { useAddTrainerPayment } from "../hooks/use-add-trainer-payment";
 import { useUpdateTrainerPayment } from "../hooks/use-update-trainer-payment";
 import type { TrainerPayment, TrainerPaymentInput } from "../types/earnings-types";
 import {
-  normalizeAmount,
   trainerPaymentFormSchema,
   type TrainerPaymentFormValues,
 } from "../validators/earnings-schemas";
-import { todayIso } from "../utils/iso-date";
-import { JalaliDateField } from "./jalali-date-field";
 
 function toInput(values: TrainerPaymentFormValues): TrainerPaymentInput {
   return {
@@ -211,6 +210,7 @@ export function PaymentFormDialog({ payment }: { payment?: TrainerPayment }) {
             render={({ field }) => (
               <JalaliDateField
                 id="payment-paid-at"
+                label="تاریخ پرداخت"
                 value={field.value}
                 onChange={field.onChange}
               />

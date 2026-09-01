@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getPersianMonthLabel } from "@/lib/persian";
 import { trendFromChange } from "@/features/dashboard/utils/trend";
-import { parseIsoDate, toIsoDate } from "../utils/iso-date";
+import { parseIsoDate, toIsoDate } from "@/lib/iso-date";
 import type {
   EarningsPoint,
   TrainerEarningsSummary,
