@@ -19,7 +19,13 @@ import { useUpdateMembership } from "../hooks/use-update-membership";
 import { EditMemberDialog } from "./edit-member-dialog";
 import type { ClubMember } from "../types/member-types";
 
-export function MemberRowActions({ member }: { member: ClubMember }) {
+export function MemberRowActions({
+  clubId,
+  member,
+}: {
+  clubId: string;
+  member: ClubMember;
+}) {
   const [editOpen, setEditOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const updateMembership = useUpdateMembership();
@@ -71,6 +77,7 @@ export function MemberRowActions({ member }: { member: ClubMember }) {
       </DropdownMenu>
 
       <EditMemberDialog
+        clubId={clubId}
         member={member}
         open={editOpen}
         onOpenChange={setEditOpen}

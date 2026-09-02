@@ -1,4 +1,4 @@
-import type { MembershipPlanTier, MembershipStatus } from "@/types/database.types";
+import type { MembershipStatus } from "@/types/database.types";
 
 export interface ClubMember {
   membershipId: string;
@@ -6,7 +6,8 @@ export interface ClubMember {
   name: string;
   phone: string | null;
   avatarUrl: string | null;
-  planTier: MembershipPlanTier;
+  planId: string | null;
+  planName: string | null;
   status: MembershipStatus;
   joinedAt: string;
 }
@@ -16,7 +17,8 @@ export interface PendingMemberInvite {
   code: string;
   name: string;
   phone: string | null;
-  planTier: MembershipPlanTier;
+  planId: string | null;
+  planName: string | null;
   trainerId: string | null;
   createdAt: string;
   expiresAt: string;
@@ -38,13 +40,13 @@ export interface CreateMemberInviteInput {
   firstName: string;
   lastName: string;
   phone: string | null;
-  planTier: MembershipPlanTier;
+  planId: string | null;
   /** Optional: one of the club's own trainers, linked on accept. */
   trainerId: string | null;
 }
 
 export interface UpdateMembershipInput {
   membershipId: string;
-  planTier?: MembershipPlanTier;
+  planId?: string | null;
   status?: MembershipStatus;
 }

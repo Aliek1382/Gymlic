@@ -78,6 +78,9 @@ export interface Database {
           owner_id: string;
           status: ClubStatus;
           member_capacity: number | null;
+          address: string | null;
+          phone: string | null;
+          working_hours: string | null;
           created_at: string;
           updated_at: string;
         },
@@ -87,6 +90,34 @@ export interface Database {
           logo_url?: string | null;
           status?: ClubStatus;
           member_capacity?: number | null;
+          address?: string | null;
+          phone?: string | null;
+          working_hours?: string | null;
+        }
+      >;
+      // The plans a club sells, in its own words — replaces the fixed
+      // membership_plan_tier enum as what a membership actually points at.
+      club_membership_plans: TableOf<
+        {
+          id: string;
+          club_id: string;
+          name: string;
+          price_toman: number;
+          duration_days: number;
+          description: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          club_id: string;
+          name: string;
+          price_toman?: number;
+          duration_days?: number;
+          description?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
         }
       >;
       memberships: TableOf<
@@ -97,6 +128,7 @@ export interface Database {
           role: MembershipRole;
           status: MembershipStatus;
           plan_tier: MembershipPlanTier;
+          plan_id: string | null;
           joined_at: string;
         },
         {
@@ -105,6 +137,7 @@ export interface Database {
           role: MembershipRole;
           status?: MembershipStatus;
           plan_tier?: MembershipPlanTier;
+          plan_id?: string | null;
         }
       >;
       trainer_athletes: TableOf<
@@ -136,6 +169,7 @@ export interface Database {
           height_cm: number | null;
           weight_kg: number | null;
           plan_tier: MembershipPlanTier | null;
+          plan_id: string | null;
           status: InvitationStatus;
           created_by: string;
           created_at: string;
@@ -155,6 +189,7 @@ export interface Database {
           height_cm?: number | null;
           weight_kg?: number | null;
           plan_tier?: MembershipPlanTier | null;
+          plan_id?: string | null;
           status?: InvitationStatus;
           expires_at?: string;
         },

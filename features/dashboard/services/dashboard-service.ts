@@ -11,17 +11,18 @@ import type {
   SubscriptionInfo,
 } from "../types/dashboard-types";
 
-const PLAN_TIER_LABEL: Record<string, string> = {
-  elite: "ویژه (Elite)",
-  basic: "پایه",
-  daily: "روزانه",
-};
+const NO_PLAN_LABEL = "بدون طرح";
 
-const PLAN_TIER_COLOR: Record<string, string> = {
-  elite: "var(--chart-1)",
-  basic: "var(--chart-2)",
-  daily: "var(--border)",
-};
+// Cycled through in plan order; the last one is the muted slot the
+// "no plan" segment always takes.
+const PLAN_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-2)",
+];
+const NO_PLAN_COLOR = "var(--border)";
 
 export async function getClubName(clubId: string): Promise<string> {
   const supabase = createClient();
@@ -190,24 +191,54 @@ export async function getMemberDistribution(
   clubId: string
 ): Promise<MemberDistribution> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("memberships")
-    .select("plan_tier")
-    .eq("club_id", clubId)
-    .eq("role", "athlete")
-    .eq("status", "active");
-  if (error) throw error;
 
-  const rows = data ?? [];
+  // Every plan the club has, so a plan nobody is on still shows as 0% —
+  // and so the chart reads in the same order as the settings page.
+  const [membershipsResult, plansResult] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select("plan_id")
+      .eq("club_id", clubId)
+      .eq("role", "athlete")
+      .eq("status", "active"),
+    supabase
+      .from("club_membership_plans")
+      .select("id, name")
+      .eq("club_id", clubId)
+      .order("sort_order", { ascending: true }),
+  ]);
+  if (membershipsResult.error) throw membershipsResult.error;
+  if (plansResult.error) throw plansResult.error;
+
+  const rows = membershipsResult.data ?? [];
   const total = rows.length;
-  const counts: Record<string, number> = { elite: 0, basic: 0, daily: 0 };
-  for (const row of rows) counts[row.plan_tier] = (counts[row.plan_tier] ?? 0) + 1;
 
-  const segments = (["elite", "basic", "daily"] as const).map((tier) => ({
-    label: PLAN_TIER_LABEL[tier],
-    percent: total > 0 ? Math.round((counts[tier] / total) * 100) : 0,
-    color: PLAN_TIER_COLOR[tier],
+  const counts = new Map<string, number>();
+  let withoutPlan = 0;
+  for (const row of rows) {
+    if (!row.plan_id) {
+      withoutPlan += 1;
+      continue;
+    }
+    counts.set(row.plan_id, (counts.get(row.plan_id) ?? 0) + 1);
+  }
+
+  const percent = (count: number) =>
+    total > 0 ? Math.round((count / total) * 100) : 0;
+
+  const segments = (plansResult.data ?? []).map((plan, index) => ({
+    label: plan.name,
+    percent: percent(counts.get(plan.id) ?? 0),
+    color: PLAN_COLORS[index % PLAN_COLORS.length],
   }));
+
+  if (withoutPlan > 0) {
+    segments.push({
+      label: NO_PLAN_LABEL,
+      percent: percent(withoutPlan),
+      color: NO_PLAN_COLOR,
+    });
+  }
 
   return { totalActive: total, segments };
 }
@@ -252,7 +283,7 @@ export async function getRecentActivities(
   const { data, error } = await supabase
     .from("memberships")
     .select(
-      "id, plan_tier, status, joined_at, profiles(first_name, last_name, phone)"
+      "id, status, joined_at, profiles(first_name, last_name, phone), club_membership_plans(name)"
     )
     .eq("club_id", clubId)
     .eq("role", "athlete")
@@ -261,7 +292,6 @@ export async function getRecentActivities(
     .returns<
       {
         id: string;
-        plan_tier: string;
         status: string;
         joined_at: string;
         profiles: {
@@ -269,6 +299,7 @@ export async function getRecentActivities(
           last_name: string | null;
           phone: string | null;
         } | null;
+        club_membership_plans: { name: string } | null;
       }[]
     >();
   if (error) throw error;
@@ -281,7 +312,7 @@ export async function getRecentActivities(
       memberName: name || "بدون نام",
       memberEmail: profile?.phone ?? "",
       memberInitials: (name || "کا").trim().slice(0, 2),
-      planName: PLAN_TIER_LABEL[row.plan_tier] ?? row.plan_tier,
+      planName: row.club_membership_plans?.name ?? NO_PLAN_LABEL,
       status:
         row.status === "active"
           ? "active"
