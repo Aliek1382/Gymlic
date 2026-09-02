@@ -6,6 +6,7 @@ import type {
   ClubMember,
   ClubTrainerOption,
   CreateMemberInviteInput,
+  MemberProfile,
   PendingMemberInvite,
   UpdateMembershipInput,
 } from "../types/member-types";
@@ -33,7 +34,7 @@ export async function listClubMembers(clubId: string): Promise<ClubMember[]> {
   const { data, error } = await supabase
     .from("memberships")
     .select(
-      "id, user_id, plan_id, status, joined_at, profiles(first_name, last_name, phone, avatar_url), club_membership_plans(name)"
+      "id, user_id, plan_id, status, joined_at, expires_at, profiles(first_name, last_name, phone, avatar_url), club_membership_plans(name)"
     )
     .eq("club_id", clubId)
     .eq("role", "athlete")
@@ -45,6 +46,7 @@ export async function listClubMembers(clubId: string): Promise<ClubMember[]> {
         plan_id: string | null;
         status: MembershipStatus;
         joined_at: string;
+        expires_at: string | null;
         profiles: {
           first_name: string | null;
           last_name: string | null;
@@ -66,6 +68,7 @@ export async function listClubMembers(clubId: string): Promise<ClubMember[]> {
     planName: row.club_membership_plans?.name ?? null,
     status: row.status,
     joinedAt: row.joined_at,
+    expiresAt: row.expires_at,
   }));
 }
 
@@ -216,12 +219,18 @@ export async function updateMembership({
   membershipId,
   planId,
   status,
+  expiresAt,
 }: UpdateMembershipInput): Promise<void> {
   const supabase = createClient();
-  const patch: { plan_id?: string | null; status?: MembershipStatus } = {};
-  // undefined means "leave it alone"; null means "no plan".
+  const patch: {
+    plan_id?: string | null;
+    status?: MembershipStatus;
+    expires_at?: string | null;
+  } = {};
+  // undefined means "leave it alone"; null means "no plan" / "no end date".
   if (planId !== undefined) patch.plan_id = planId;
   if (status) patch.status = status;
+  if (expiresAt !== undefined) patch.expires_at = expiresAt;
   if (Object.keys(patch).length === 0) return;
 
   const { error } = await supabase
@@ -238,4 +247,168 @@ export async function removeMember(membershipId: string): Promise<void> {
     .delete()
     .eq("id", membershipId);
   if (error) throw error;
+}
+
+/**
+ * One member's whole file, as the club may see it: their membership, who
+ * trains them, what they have paid this club, the plans assigned to them,
+ * their recorded measurements and their class attendance.
+ *
+ * Each part is scoped to the club and gated by its own RLS policy, so a
+ * section coming back empty means "nothing recorded", not "hidden".
+ */
+export async function getMemberProfile(
+  clubId: string,
+  membershipId: string
+): Promise<MemberProfile | null> {
+  const supabase = createClient();
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("memberships")
+    .select(
+      "id, user_id, plan_id, status, joined_at, expires_at, profiles(first_name, last_name, phone, avatar_url), club_membership_plans(name)"
+    )
+    .eq("id", membershipId)
+    .eq("club_id", clubId)
+    .maybeSingle()
+    .returns<{
+      id: string;
+      user_id: string;
+      plan_id: string | null;
+      status: MembershipStatus;
+      joined_at: string;
+      expires_at: string | null;
+      profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        phone: string | null;
+        avatar_url: string | null;
+      } | null;
+      club_membership_plans: { name: string } | null;
+    } | null>();
+  if (membershipError) throw membershipError;
+  if (!membership) return null;
+
+  const athleteId = membership.user_id;
+
+  const [trainers, payments, workouts, nutrition, measurements, attendance] =
+    await Promise.all([
+      supabase
+        .from("trainer_athletes")
+        .select("trainer_id, profiles!trainer_id(first_name, last_name)")
+        .eq("athlete_id", athleteId)
+        .eq("club_id", clubId)
+        .eq("status", "active")
+        .returns<
+          {
+            trainer_id: string;
+            profiles: { first_name: string | null; last_name: string | null } | null;
+          }[]
+        >(),
+      supabase
+        .from("revenue_entries")
+        .select("id, amount, category, occurred_at, note")
+        .eq("club_id", clubId)
+        .eq("member_id", athleteId)
+        .order("occurred_at", { ascending: false }),
+      supabase
+        .from("workout_assignments")
+        .select("id, title, status, updated_at")
+        .eq("athlete_id", athleteId)
+        .eq("is_template", false)
+        .neq("status", "draft")
+        .order("updated_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("nutrition_assignments")
+        .select("id, title, status, updated_at")
+        .eq("athlete_id", athleteId)
+        .eq("is_template", false)
+        .neq("status", "draft")
+        .order("updated_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("measurements")
+        .select("id, weight_kg, height_cm, body_fat_percent, recorded_at")
+        .eq("athlete_id", athleteId)
+        .order("recorded_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("class_attendance_logs")
+        .select("id, attended, class_date")
+        .eq("club_id", clubId)
+        .eq("member_id", athleteId)
+        .order("class_date", { ascending: false })
+        .limit(20),
+    ]);
+  if (trainers.error) throw trainers.error;
+  if (payments.error) throw payments.error;
+  if (workouts.error) throw workouts.error;
+  if (nutrition.error) throw nutrition.error;
+  if (measurements.error) throw measurements.error;
+  if (attendance.error) throw attendance.error;
+
+  const paymentRows = (payments.data ?? []).map((row) => ({
+    id: row.id,
+    amount: Number(row.amount),
+    category: row.category,
+    occurredOn: new Date(row.occurred_at).toISOString().slice(0, 10),
+    note: row.note,
+  }));
+
+  const attendanceRows = attendance.data ?? [];
+  const attended = attendanceRows.filter((row) => row.attended).length;
+
+  return {
+    member: {
+      membershipId: membership.id,
+      userId: membership.user_id,
+      name: fullName(membership.profiles),
+      phone: membership.profiles?.phone ?? null,
+      avatarUrl: membership.profiles?.avatar_url ?? null,
+      planId: membership.plan_id,
+      planName: membership.club_membership_plans?.name ?? null,
+      status: membership.status,
+      joinedAt: membership.joined_at,
+      expiresAt: membership.expires_at,
+    },
+    trainers: (trainers.data ?? []).map((row) => ({
+      id: row.trainer_id,
+      name: fullName(row.profiles),
+    })),
+    payments: paymentRows,
+    totalPaid: paymentRows.reduce((sum, row) => sum + row.amount, 0),
+    plans: [
+      ...(workouts.data ?? []).map((row) => ({
+        id: row.id,
+        kind: "workout" as const,
+        title: row.title,
+        status: row.status,
+        updatedAt: row.updated_at,
+      })),
+      ...(nutrition.data ?? []).map((row) => ({
+        id: row.id,
+        kind: "nutrition" as const,
+        title: row.title,
+        status: row.status,
+        updatedAt: row.updated_at,
+      })),
+    ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    measurements: (measurements.data ?? []).map((row) => ({
+      id: row.id,
+      weightKg: row.weight_kg,
+      heightCm: row.height_cm,
+      bodyFatPercent: row.body_fat_percent,
+      recordedAt: row.recorded_at,
+    })),
+    attendance: attendanceRows.map((row) => ({
+      id: row.id,
+      attended: row.attended,
+      classDate: row.class_date,
+    })),
+    attendanceRate:
+      attendanceRows.length > 0
+        ? Math.round((attended / attendanceRows.length) * 100)
+        : null,
+  };
 }

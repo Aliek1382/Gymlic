@@ -21,16 +21,20 @@ import type { MembershipStatus } from "@/types/database.types";
 import { useMembershipPlans } from "@/features/club";
 import {
   ALL_FILTER_VALUE,
+  EXPIRY_FILTER_LABEL,
   MEMBER_SORT_LABEL,
   MEMBER_STATUS_LABEL,
   MEMBER_STATUS_VALUES,
+  type ExpiryFilter,
   type MemberSortOrder,
 } from "../constants/members";
+import { expiryState } from "../utils/membership-expiry";
 import { useClubCapacity } from "../hooks/use-club-capacity";
 import { useClubMembers } from "../hooks/use-club-members";
 import { useClubTrainers } from "../hooks/use-club-trainers";
 import { usePendingMemberInvites } from "../hooks/use-pending-member-invites";
 import { AddMemberDialog } from "./add-member-dialog";
+import { ExpiryAlert } from "./expiry-alert";
 import { MemberTable } from "./member-table";
 import { PendingInvitesCard } from "./pending-invites-card";
 
@@ -62,6 +66,7 @@ export function MemberManagement({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(ALL_FILTER_VALUE);
   const [planFilter, setPlanFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [expiryFilter, setExpiryFilter] = useState<ExpiryFilter>("all");
   const [sortOrder, setSortOrder] = useState<MemberSortOrder>("newest");
 
   // Drop ?new=1 once it has done its job, so a refresh doesn't reopen the
@@ -84,8 +89,18 @@ export function MemberManagement({
       pending: 0,
       suspended: 0,
     };
-    for (const member of rows) byStatus[member.status] += 1;
-    return byStatus;
+    let expiring = 0;
+    let expired = 0;
+    for (const member of rows) {
+      byStatus[member.status] += 1;
+      // A suspended membership is already off the floor; its end date is
+      // not what the club needs to chase.
+      if (member.status === "suspended") continue;
+      const state = expiryState(member.expiresAt);
+      if (state === "expiring") expiring += 1;
+      if (state === "expired") expired += 1;
+    }
+    return { byStatus, expiring, expired };
   }, [rows]);
 
   const filteredMembers = useMemo(() => {
@@ -99,7 +114,13 @@ export function MemberManagement({
         statusFilter === ALL_FILTER_VALUE || member.status === statusFilter;
       const matchesPlan =
         planFilter === ALL_FILTER_VALUE || member.planId === planFilter;
-      return matchesQuery && matchesStatus && matchesPlan;
+      const state = expiryState(member.expiresAt);
+      const matchesExpiry =
+        expiryFilter === "all" ||
+        (expiryFilter === "no-date" && state === "none") ||
+        (expiryFilter === "expiring" && state === "expiring") ||
+        (expiryFilter === "expired" && state === "expired");
+      return matchesQuery && matchesStatus && matchesPlan && matchesExpiry;
     });
 
     return [...list].sort((a, b) => {
@@ -108,7 +129,7 @@ export function MemberManagement({
         ? b.joinedAt.localeCompare(a.joinedAt)
         : a.joinedAt.localeCompare(b.joinedAt);
     });
-  }, [rows, search, statusFilter, planFilter, sortOrder]);
+  }, [rows, search, statusFilter, planFilter, expiryFilter, sortOrder]);
 
   const filteredInvites = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -123,9 +144,11 @@ export function MemberManagement({
       // the list under "همه" or the "در انتظار" status filter.
       const matchesStatus =
         statusFilter === ALL_FILTER_VALUE || statusFilter === "pending";
-      return matchesQuery && matchesPlan && matchesStatus;
+      // An invite has no membership yet, so no end date to filter on.
+      const matchesExpiry = expiryFilter === "all";
+      return matchesQuery && matchesPlan && matchesStatus && matchesExpiry;
     });
-  }, [inviteRows, search, planFilter, statusFilter]);
+  }, [inviteRows, search, planFilter, statusFilter, expiryFilter]);
 
   const capacityLabel = capacity.data
     ? capacity.data.capacity === null
@@ -140,12 +163,18 @@ export function MemberManagement({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <SummaryChip label="ظرفیت پلن" value={capacityLabel} />
-          <SummaryChip label="فعال" value={toPersianDigits(counts.active)} />
+          <SummaryChip
+            label="فعال"
+            value={toPersianDigits(counts.byStatus.active)}
+          />
           <SummaryChip
             label="در انتظار"
-            value={toPersianDigits(counts.pending + inviteRows.length)}
+            value={toPersianDigits(counts.byStatus.pending + inviteRows.length)}
           />
-          <SummaryChip label="معلق" value={toPersianDigits(counts.suspended)} />
+          <SummaryChip
+            label="رو به انقضا"
+            value={toPersianDigits(counts.expiring)}
+          />
         </div>
 
         <AddMemberDialog
@@ -154,6 +183,12 @@ export function MemberManagement({
           onOpenChange={setAddOpen}
         />
       </div>
+
+      <ExpiryAlert
+        expiringCount={counts.expiring}
+        expiredCount={counts.expired}
+        onFilter={setExpiryFilter}
+      />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative flex-1">
@@ -189,6 +224,22 @@ export function MemberManagement({
             {(plans.data ?? []).map((plan) => (
               <SelectItem key={plan.id} value={plan.id}>
                 {plan.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={expiryFilter}
+          onValueChange={(value) => setExpiryFilter(value as ExpiryFilter)}
+        >
+          <SelectTrigger className="lg:w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(EXPIRY_FILTER_LABEL) as ExpiryFilter[]).map((value) => (
+              <SelectItem key={value} value={value}>
+                {EXPIRY_FILTER_LABEL[value]}
               </SelectItem>
             ))}
           </SelectContent>

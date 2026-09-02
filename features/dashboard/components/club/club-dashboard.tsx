@@ -25,6 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { RecentActivitiesTable } from "./recent-activities-table";
 import { SubscriptionCard } from "../shared/subscription-card";
 import { QuickActions } from "../shared/quick-actions";
+import { ExpiringMembershipsCard } from "@/features/members";
 import type { QuickAction } from "../../types/dashboard-types";
 
 // Code-split out of the main dashboard bundle: recharts is heavy, the data
@@ -189,8 +190,9 @@ export function ClubDashboard({
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="space-y-4 lg:col-span-2">
           <QuickActions actions={QUICK_ACTIONS} />
+          <ExpiringMembershipsCard clubId={clubId} />
         </div>
         {subscription.isLoading ? (
           <ChartCardSkeleton />

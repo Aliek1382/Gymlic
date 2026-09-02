@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { JalaliDateField } from "@/components/ui/jalali-date-field";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -24,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { todayIso } from "@/lib/iso-date";
+import { Switch } from "@/components/ui/switch";
 import { useMembershipPlans } from "@/features/club";
 import {
   MEMBER_STATUS_LABEL,
@@ -56,17 +59,26 @@ export function EditMemberDialog({
     defaultValues: {
       planId: member.planId ?? NO_PLAN_VALUE,
       status: member.status,
+      hasEndDate: member.expiresAt !== null,
+      expiresAt: member.expiresAt ?? todayIso(),
     },
   });
+
+  const hasEndDate = form.watch("hasEndDate");
 
   const { reset } = form;
   // The row's values can change under an open dialog (another tab, a
   // refetch), and the same dialog instance is reused across rows.
   useEffect(() => {
     if (open) {
-      reset({ planId: member.planId ?? NO_PLAN_VALUE, status: member.status });
+      reset({
+        planId: member.planId ?? NO_PLAN_VALUE,
+        status: member.status,
+        hasEndDate: member.expiresAt !== null,
+        expiresAt: member.expiresAt ?? todayIso(),
+      });
     }
-  }, [open, member.planId, member.status, reset]);
+  }, [open, member.planId, member.status, member.expiresAt, reset]);
 
   async function onSubmit(values: EditMemberFormValues) {
     try {
@@ -77,6 +89,7 @@ export function EditMemberDialog({
             ? values.planId
             : null,
         status: values.status,
+        expiresAt: values.hasEndDate ? values.expiresAt : null,
       });
       toast.success("عضویت به‌روزرسانی شد.");
       onOpenChange(false);
@@ -154,6 +167,44 @@ export function EditMemberDialog({
                 </Select>
               )}
             />
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-border p-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="edit-member-has-end-date">تاریخ پایان عضویت</Label>
+                <p className="text-xs text-muted-foreground">
+                  بدون تاریخ پایان، عضویت باز می‌ماند و در فهرست «رو به
+                  انقضا» دیده نمی‌شود.
+                </p>
+              </div>
+              <Controller
+                control={form.control}
+                name="hasEndDate"
+                render={({ field }) => (
+                  <Switch
+                    id="edit-member-has-end-date"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+
+            {hasEndDate && (
+              <Controller
+                control={form.control}
+                name="expiresAt"
+                render={({ field }) => (
+                  <JalaliDateField
+                    id="edit-member-expires-at"
+                    label="پایان عضویت"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            )}
           </div>
 
           <DialogFooter>

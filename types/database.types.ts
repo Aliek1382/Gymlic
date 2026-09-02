@@ -129,6 +129,7 @@ export interface Database {
           status: MembershipStatus;
           plan_tier: MembershipPlanTier;
           plan_id: string | null;
+          expires_at: string | null;
           joined_at: string;
         },
         {
@@ -138,6 +139,7 @@ export interface Database {
           status?: MembershipStatus;
           plan_tier?: MembershipPlanTier;
           plan_id?: string | null;
+          expires_at?: string | null;
         }
       >;
       trainer_athletes: TableOf<
