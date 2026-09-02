@@ -1,15 +1,13 @@
-import type { MembershipPlanTier, MembershipStatus } from "@/types/database.types";
+import type { MembershipStatus } from "@/types/database.types";
 
 export const MEMBER_INVITE_EXPIRES_DAYS = 30;
 
-export const PLAN_TIER_LABEL: Record<MembershipPlanTier, string> = {
-  elite: "ویژه (Elite)",
-  basic: "پایه",
-  daily: "روزانه",
-};
+/** Shown wherever a membership has no plan attached (a deleted plan, or an
+ *  older membership from before the club defined its own plans). */
+export const NO_PLAN_LABEL = "بدون طرح";
 
-export const PLAN_TIER_VALUES = ["elite", "basic", "daily"] as const satisfies
-  readonly MembershipPlanTier[];
+/** Radix Select has no empty value, so "no plan" needs one of its own. */
+export const NO_PLAN_VALUE = "none";
 
 export const MEMBER_STATUS_LABEL: Record<MembershipStatus, string> = {
   active: "فعال",

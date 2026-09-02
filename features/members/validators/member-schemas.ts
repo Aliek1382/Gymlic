@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-import { PLAN_TIER_VALUES, MEMBER_STATUS_VALUES } from "../constants/members";
-
-const planTierSchema = z.enum(PLAN_TIER_VALUES, "طرح عضویت را انتخاب کنید.");
+import { MEMBER_STATUS_VALUES } from "../constants/members";
 
 const statusSchema = z.enum(MEMBER_STATUS_VALUES, "وضعیت عضویت را انتخاب کنید.");
 
@@ -16,7 +14,8 @@ export const addMemberSchema = z.object({
     .refine((value) => !value || /^09\d{9}$/.test(value), {
       message: "شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود.",
     }),
-  planTier: planTierSchema,
+  // NO_PLAN_VALUE when the club has no plan for this member yet.
+  planId: z.string().optional(),
   // "" = no trainer picked; Radix Select cannot hold an empty value, so the
   // form uses NO_TRAINER_VALUE and maps it back to null on submit.
   trainerId: z.string().optional(),
@@ -25,7 +24,7 @@ export const addMemberSchema = z.object({
 export type AddMemberFormValues = z.infer<typeof addMemberSchema>;
 
 export const editMemberSchema = z.object({
-  planTier: planTierSchema,
+  planId: z.string().optional(),
   status: statusSchema,
 });
 

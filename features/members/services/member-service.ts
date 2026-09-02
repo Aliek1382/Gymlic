@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { MembershipPlanTier, MembershipStatus } from "@/types/database.types";
+import type { MembershipStatus } from "@/types/database.types";
 import { MEMBER_INVITE_EXPIRES_DAYS } from "../constants/members";
 import type {
   ClubCapacity,
@@ -33,7 +33,7 @@ export async function listClubMembers(clubId: string): Promise<ClubMember[]> {
   const { data, error } = await supabase
     .from("memberships")
     .select(
-      "id, user_id, plan_tier, status, joined_at, profiles(first_name, last_name, phone, avatar_url)"
+      "id, user_id, plan_id, status, joined_at, profiles(first_name, last_name, phone, avatar_url), club_membership_plans(name)"
     )
     .eq("club_id", clubId)
     .eq("role", "athlete")
@@ -42,7 +42,7 @@ export async function listClubMembers(clubId: string): Promise<ClubMember[]> {
       {
         id: string;
         user_id: string;
-        plan_tier: MembershipPlanTier;
+        plan_id: string | null;
         status: MembershipStatus;
         joined_at: string;
         profiles: {
@@ -51,6 +51,7 @@ export async function listClubMembers(clubId: string): Promise<ClubMember[]> {
           phone: string | null;
           avatar_url: string | null;
         } | null;
+        club_membership_plans: { name: string } | null;
       }[]
     >();
   if (error) throw error;
@@ -61,7 +62,8 @@ export async function listClubMembers(clubId: string): Promise<ClubMember[]> {
     name: fullName(row.profiles),
     phone: row.profiles?.phone ?? null,
     avatarUrl: row.profiles?.avatar_url ?? null,
-    planTier: row.plan_tier,
+    planId: row.plan_id,
+    planName: row.club_membership_plans?.name ?? null,
     status: row.status,
     joinedAt: row.joined_at,
   }));
@@ -74,7 +76,7 @@ export async function listPendingMemberInvites(
   const { data, error } = await supabase
     .from("invitations")
     .select(
-      "id, code, first_name, last_name, phone, plan_tier, trainer_id, created_at, expires_at"
+      "id, code, first_name, last_name, phone, plan_id, trainer_id, created_at, expires_at, club_membership_plans(name)"
     )
     .eq("club_id", clubId)
     .eq("invited_role", "athlete")
@@ -88,10 +90,11 @@ export async function listPendingMemberInvites(
         first_name: string | null;
         last_name: string | null;
         phone: string | null;
-        plan_tier: MembershipPlanTier | null;
+        plan_id: string | null;
         trainer_id: string | null;
         created_at: string;
         expires_at: string;
+        club_membership_plans: { name: string } | null;
       }[]
     >();
   if (error) throw error;
@@ -101,7 +104,8 @@ export async function listPendingMemberInvites(
     code: row.code,
     name: fullName(row),
     phone: row.phone,
-    planTier: row.plan_tier ?? "basic",
+    planId: row.plan_id,
+    planName: row.club_membership_plans?.name ?? null,
     trainerId: row.trainer_id,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
@@ -191,7 +195,7 @@ export async function createMemberInvite(
     first_name: input.firstName,
     last_name: input.lastName,
     phone: input.phone,
-    plan_tier: input.planTier,
+    plan_id: input.planId,
     expires_at: expiresAt.toISOString(),
   });
   if (error) throw error;
@@ -210,12 +214,13 @@ export async function revokeMemberInvite(invitationId: string): Promise<void> {
 
 export async function updateMembership({
   membershipId,
-  planTier,
+  planId,
   status,
 }: UpdateMembershipInput): Promise<void> {
   const supabase = createClient();
-  const patch: { plan_tier?: MembershipPlanTier; status?: MembershipStatus } = {};
-  if (planTier) patch.plan_tier = planTier;
+  const patch: { plan_id?: string | null; status?: MembershipStatus } = {};
+  // undefined means "leave it alone"; null means "no plan".
+  if (planId !== undefined) patch.plan_id = planId;
   if (status) patch.status = status;
   if (Object.keys(patch).length === 0) return;
 

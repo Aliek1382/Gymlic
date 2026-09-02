@@ -24,7 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { PLAN_TIER_LABEL, PLAN_TIER_VALUES } from "../constants/members";
+import { useMembershipPlans } from "@/features/club";
+import { NO_PLAN_VALUE } from "../constants/members";
 import { useClubTrainers } from "../hooks/use-club-trainers";
 import { useCreateMemberInvite } from "../hooks/use-create-member-invite";
 import {
@@ -48,6 +49,7 @@ export function AddMemberDialog({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const trainers = useClubTrainers(clubId);
+  const plans = useMembershipPlans(clubId, { activeOnly: true });
   const createInvite = useCreateMemberInvite();
 
   const form = useForm<AddMemberFormValues>({
@@ -56,7 +58,7 @@ export function AddMemberDialog({
       firstName: "",
       lastName: "",
       phone: "",
-      planTier: "basic",
+      planId: NO_PLAN_VALUE,
       trainerId: NO_TRAINER_VALUE,
     },
   });
@@ -68,7 +70,10 @@ export function AddMemberDialog({
         firstName: values.firstName,
         lastName: values.lastName,
         phone: values.phone ? values.phone : null,
-        planTier: values.planTier,
+        planId:
+          values.planId && values.planId !== NO_PLAN_VALUE
+            ? values.planId
+            : null,
         trainerId:
           values.trainerId && values.trainerId !== NO_TRAINER_VALUE
             ? values.trainerId
@@ -97,6 +102,7 @@ export function AddMemberDialog({
   }
 
   const trainerOptions = trainers.data ?? [];
+  const planOptions = plans.data ?? [];
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -189,22 +195,37 @@ export function AddMemberDialog({
                 <Label htmlFor="member-plan">طرح عضویت</Label>
                 <Controller
                   control={form.control}
-                  name="planTier"
+                  name="planId"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={plans.isLoading}
+                    >
                       <SelectTrigger id="member-plan" className="w-full">
-                        <SelectValue />
+                        <SelectValue
+                          placeholder={
+                            plans.isLoading ? "در حال بارگذاری…" : "بدون طرح"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {PLAN_TIER_VALUES.map((tier) => (
-                          <SelectItem key={tier} value={tier}>
-                            {PLAN_TIER_LABEL[tier]}
+                        <SelectItem value={NO_PLAN_VALUE}>بدون طرح</SelectItem>
+                        {planOptions.map((plan) => (
+                          <SelectItem key={plan.id} value={plan.id}>
+                            {plan.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
                 />
+                {!plans.isLoading && planOptions.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    هنوز طرح عضویتی تعریف نکرده‌اید. از تنظیمات ← طرح‌های
+                    عضویت می‌توانید طرح‌های باشگاه خود را بسازید.
+                  </p>
+                )}
               </div>
 
               {trainerOptions.length > 0 && (

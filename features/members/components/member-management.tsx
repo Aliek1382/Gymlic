@@ -18,13 +18,12 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import type { MembershipStatus } from "@/types/database.types";
+import { useMembershipPlans } from "@/features/club";
 import {
   ALL_FILTER_VALUE,
   MEMBER_SORT_LABEL,
   MEMBER_STATUS_LABEL,
   MEMBER_STATUS_VALUES,
-  PLAN_TIER_LABEL,
-  PLAN_TIER_VALUES,
   type MemberSortOrder,
 } from "../constants/members";
 import { useClubCapacity } from "../hooks/use-club-capacity";
@@ -57,6 +56,7 @@ export function MemberManagement({
   const invites = usePendingMemberInvites(clubId);
   const trainers = useClubTrainers(clubId);
   const capacity = useClubCapacity(clubId);
+  const plans = useMembershipPlans(clubId);
 
   const [addOpen, setAddOpen] = useState(openAddOnMount);
   const [search, setSearch] = useState("");
@@ -98,7 +98,7 @@ export function MemberManagement({
       const matchesStatus =
         statusFilter === ALL_FILTER_VALUE || member.status === statusFilter;
       const matchesPlan =
-        planFilter === ALL_FILTER_VALUE || member.planTier === planFilter;
+        planFilter === ALL_FILTER_VALUE || member.planId === planFilter;
       return matchesQuery && matchesStatus && matchesPlan;
     });
 
@@ -118,7 +118,7 @@ export function MemberManagement({
         invite.name.toLowerCase().includes(query) ||
         (invite.phone ?? "").includes(query);
       const matchesPlan =
-        planFilter === ALL_FILTER_VALUE || invite.planTier === planFilter;
+        planFilter === ALL_FILTER_VALUE || invite.planId === planFilter;
       // A pending invite has no membership row yet, so it only belongs in
       // the list under "همه" or the "در انتظار" status filter.
       const matchesStatus =
@@ -186,9 +186,9 @@ export function MemberManagement({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_FILTER_VALUE}>همه طرح‌ها</SelectItem>
-            {PLAN_TIER_VALUES.map((tier) => (
-              <SelectItem key={tier} value={tier}>
-                {PLAN_TIER_LABEL[tier]}
+            {(plans.data ?? []).map((plan) => (
+              <SelectItem key={plan.id} value={plan.id}>
+                {plan.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -244,7 +244,7 @@ export function MemberManagement({
             />
           )}
           {filteredMembers.length > 0 && (
-            <MemberTable members={filteredMembers} />
+            <MemberTable clubId={clubId} members={filteredMembers} />
           )}
         </div>
       )}

@@ -15,12 +15,18 @@ import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import {
   MEMBER_STATUS_LABEL,
   MEMBER_STATUS_VARIANT,
-  PLAN_TIER_LABEL,
+  NO_PLAN_LABEL,
 } from "../constants/members";
 import { MemberRowActions } from "./member-row-actions";
 import type { ClubMember } from "../types/member-types";
 
-export function MemberTable({ members }: { members: ClubMember[] }) {
+export function MemberTable({
+  clubId,
+  members,
+}: {
+  clubId: string;
+  members: ClubMember[];
+}) {
   return (
     <Card className="gap-4 py-5">
       <div className="px-6">
@@ -64,7 +70,7 @@ export function MemberTable({ members }: { members: ClubMember[] }) {
                   </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {PLAN_TIER_LABEL[member.planTier]}
+                  {member.planName ?? NO_PLAN_LABEL}
                 </TableCell>
                 <TableCell>
                   <Badge variant={MEMBER_STATUS_VARIANT[member.status]}>
@@ -75,7 +81,7 @@ export function MemberTable({ members }: { members: ClubMember[] }) {
                   {formatPersianDate(new Date(member.joinedAt))}
                 </TableCell>
                 <TableCell>
-                  <MemberRowActions member={member} />
+                  <MemberRowActions clubId={clubId} member={member} />
                 </TableCell>
               </TableRow>
             ))}

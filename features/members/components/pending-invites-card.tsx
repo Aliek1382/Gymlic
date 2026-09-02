@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatPersianDate, toPersianDigits } from "@/lib/persian";
-import { PLAN_TIER_LABEL } from "../constants/members";
+import { NO_PLAN_LABEL } from "../constants/members";
 import { useRevokeMemberInvite } from "../hooks/use-revoke-member-invite";
 import type { PendingMemberInvite } from "../types/member-types";
 
@@ -35,7 +35,7 @@ function InviteRow({
         <div>
           <p className="text-sm font-medium text-foreground">{invite.name}</p>
           <p className="text-xs text-muted-foreground">
-            طرح {PLAN_TIER_LABEL[invite.planTier]}
+            طرح {invite.planName ?? NO_PLAN_LABEL}
             {trainerName ? ` · مربی: ${trainerName}` : ""}
             {" · "}
             اعتبار تا {formatPersianDate(new Date(invite.expiresAt))}
