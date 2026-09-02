@@ -40,3 +40,12 @@ export const MEMBER_SORT_LABEL: Record<MemberSortOrder, string> = {
 
 /** Value used by the status/plan dropdowns for "no filter" — Radix Select has no empty value. */
 export const ALL_FILTER_VALUE = "all";
+
+export type ExpiryFilter = "all" | "expiring" | "expired" | "no-date";
+
+export const EXPIRY_FILTER_LABEL: Record<ExpiryFilter, string> = {
+  all: "همه‌ی تاریخ‌های پایان",
+  expiring: "رو به انقضا",
+  expired: "منقضی‌شده",
+  "no-date": "بدون تاریخ پایان",
+};

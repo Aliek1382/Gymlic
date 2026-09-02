@@ -1,4 +1,4 @@
-import type { MembershipStatus } from "@/types/database.types";
+import type { MembershipStatus, RevenueCategory } from "@/types/database.types";
 
 export interface ClubMember {
   membershipId: string;
@@ -10,6 +10,8 @@ export interface ClubMember {
   planName: string | null;
   status: MembershipStatus;
   joinedAt: string;
+  /** "YYYY-MM-DD", or null for an open-ended membership. */
+  expiresAt: string | null;
 }
 
 export interface PendingMemberInvite {
@@ -49,4 +51,40 @@ export interface UpdateMembershipInput {
   membershipId: string;
   planId?: string | null;
   status?: MembershipStatus;
+  /** null clears the end date; undefined leaves it as it is. */
+  expiresAt?: string | null;
+}
+
+/** Everything the club sees on one member's profile page. */
+export interface MemberProfile {
+  member: ClubMember;
+  trainers: { id: string; name: string }[];
+  payments: {
+    id: string;
+    amount: number;
+    category: RevenueCategory;
+    occurredOn: string;
+    note: string | null;
+  }[];
+  totalPaid: number;
+  plans: {
+    id: string;
+    kind: "workout" | "nutrition";
+    title: string;
+    status: string;
+    updatedAt: string;
+  }[];
+  measurements: {
+    id: string;
+    weightKg: number | null;
+    heightCm: number | null;
+    bodyFatPercent: number | null;
+    recordedAt: string;
+  }[];
+  attendance: {
+    id: string;
+    attended: boolean;
+    classDate: string;
+  }[];
+  attendanceRate: number | null;
 }

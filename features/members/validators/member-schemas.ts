@@ -26,6 +26,8 @@ export type AddMemberFormValues = z.infer<typeof addMemberSchema>;
 export const editMemberSchema = z.object({
   planId: z.string().optional(),
   status: statusSchema,
+  hasEndDate: z.boolean(),
+  expiresAt: z.string(),
 });
 
 export type EditMemberFormValues = z.infer<typeof editMemberSchema>;
