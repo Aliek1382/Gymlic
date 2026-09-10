@@ -9,6 +9,7 @@ import { WelcomeSection } from "../shared/welcome-section";
 import { DashboardSkeleton } from "../shared/dashboard-skeleton";
 import { ErrorState } from "../shared/error-state";
 import { PlanSummaryCard } from "./plan-summary-card";
+import { StreakCard } from "./streak-card";
 
 export function AthleteDashboard({
   athleteId,
@@ -35,6 +36,11 @@ export function AthleteDashboard({
         name={athleteName}
         subtitle="برنامه امروز و پیشرفت خودت را اینجا ببین."
         trainerName={trainerName}
+      />
+
+      <StreakCard
+        athleteId={athleteId}
+        todaysWorkout={dashboard.data.todaysWorkout}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
