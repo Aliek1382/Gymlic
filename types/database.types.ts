@@ -587,6 +587,24 @@ export interface Database {
         Args: { p_request_id: string; p_admin_note?: string | null };
         Returns: undefined;
       };
+      // One row per person the caller shares an assigned plan with — the
+      // inbox list, aggregated from plan_comments and notifications.
+      list_message_threads: {
+        Args: Record<string, never>;
+        Returns: {
+          counterpart_id: string;
+          counterpart_role: "trainer" | "athlete";
+          first_name: string | null;
+          last_name: string | null;
+          avatar_url: string | null;
+          plan_count: number;
+          message_count: number;
+          unread_count: number;
+          last_message_body: string | null;
+          last_message_author_id: string | null;
+          last_message_at: string | null;
+        }[];
+      };
       admin_set_club_status: {
         Args: { p_club_id: string; p_status: ClubStatus };
         Returns: undefined;

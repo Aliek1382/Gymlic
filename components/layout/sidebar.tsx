@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
+import { MessagesNavBadge } from "@/features/messages/components/messages-nav-badge";
 import { SIDEBAR_NAV } from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
 
@@ -43,6 +44,7 @@ export function SidebarContent({
             const isActive =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
+            const badge = item.href === "/messages" ? <MessagesNavBadge /> : null;
             const linkClassName = cn(
               "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
               isActive
@@ -60,6 +62,7 @@ export function SidebarContent({
                 >
                   <Icon className="size-[18px]" />
                   {item.label}
+                  {badge}
                 </Link>
               );
             }
@@ -70,6 +73,7 @@ export function SidebarContent({
                   <Link href={item.href} onClick={onNavigate} className={linkClassName}>
                     <Icon className="size-[18px]" />
                     {item.label}
+                    {badge}
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="max-w-56 text-center">

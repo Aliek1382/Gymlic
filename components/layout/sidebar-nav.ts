@@ -7,6 +7,7 @@ import {
   Dumbbell,
   LayoutGrid,
   LineChart,
+  MessageCircle,
   Ruler,
   Salad,
   Settings,
@@ -41,6 +42,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "برنامه‌های تمرینی", href: "/workout-programs", icon: Dumbbell },
     { label: "برنامه‌های غذایی", href: "/nutrition-programs", icon: Apple },
     {
+      label: "پیام‌ها",
+      href: "/messages",
+      icon: MessageCircle,
+      description:
+        "گفتگوی مستقیم با هر ورزشکار درباره برنامه‌هایی که برایش نوشته‌اید.",
+    },
+    {
       label: "قالب‌ها",
       href: "/templates",
       icon: Bookmark,
@@ -70,6 +78,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "داشبورد", href: "/dashboard", icon: LayoutGrid },
     { label: "برنامه تمرینی", href: "/workout", icon: Dumbbell },
     { label: "برنامه غذایی", href: "/nutrition", icon: Apple },
+    { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },
     { label: "پروفایل", href: "/profile", icon: UserCircle },
   ],
