@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +17,10 @@ export function planCommentsQueryKey(kind: PlanKind, assignmentId: string) {
 export function usePlanComments(kind: PlanKind, assignmentId: string, enabled = true) {
   const queryClient = useQueryClient();
   const queryKey = planCommentsQueryKey(kind, assignmentId);
+  // Unique per subscriber: the same plan's thread can be on screen twice
+  // (a list row and the plan dialog), and a shared channel instance would be
+  // torn down for one by the other's unmount.
+  const channelId = useId();
 
   const query = useQuery({
     queryKey,
@@ -29,7 +33,7 @@ export function usePlanComments(kind: PlanKind, assignmentId: string, enabled = 
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`plan-comments:${kind}:${assignmentId}`)
+      .channel(`plan-comments:${kind}:${assignmentId}:${channelId}`)
       .on(
         "postgres_changes",
         {
@@ -47,7 +51,7 @@ export function usePlanComments(kind: PlanKind, assignmentId: string, enabled = 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [enabled, kind, assignmentId, queryClient, queryKey]);
+  }, [enabled, kind, assignmentId, channelId, queryClient, queryKey]);
 
   return query;
 }

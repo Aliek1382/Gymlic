@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +18,12 @@ export function messageThreadsQueryKey() {
  */
 export function useMessageThreads() {
   const queryClient = useQueryClient();
+  // supabase.channel() hands back the *existing* channel when the topic is
+  // already taken, so a fixed name would give every subscriber the same
+  // instance — and the first one to unmount would tear it down for the rest
+  // (the sidebar badge and the inbox are both on screen at /messages). A
+  // per-subscriber topic keeps them independent.
+  const channelId = useId();
 
   const query = useQuery({
     queryKey: messageThreadsQueryKey(),
@@ -31,7 +37,7 @@ export function useMessageThreads() {
     };
 
     const channel = supabase
-      .channel("message-threads")
+      .channel(`message-threads:${channelId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "messages" },
@@ -42,7 +48,7 @@ export function useMessageThreads() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [channelId, queryClient]);
 
   return query;
 }
