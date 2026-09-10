@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,11 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { useRevokeTrainerInvite } from "../hooks/use-revoke-trainer-invite";
 import type { PendingTrainerInvite } from "../types/trainer-types";
 
-function InviteRow({ invite }: { invite: PendingTrainerInvite }) {
+function InviteRow({
+  invite,
+  origin,
+}: {
+  invite: PendingTrainerInvite;
+  origin: string;
+}) {
   const [revokeOpen, setRevokeOpen] = useState(false);
   const revokeInvite = useRevokeTrainerInvite();
 
@@ -56,6 +63,12 @@ function InviteRow({ invite }: { invite: PendingTrainerInvite }) {
           <Copy />
           کپی لینک
         </Button>
+        {origin && (
+          <InviteShareButtons
+            link={`${origin}/join/${invite.code}`}
+            phone={invite.phone}
+          />
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -85,6 +98,12 @@ export function PendingTrainerInvitesCard({
 }: {
   invites: PendingTrainerInvite[];
 }) {
+  // Read only after mount so the server-rendered markup (which has no
+  // `window`) matches the client's first render, then the share buttons pick
+  // up the real origin.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+
   return (
     <Card className="gap-4 py-5">
       <div className="px-6">
@@ -94,7 +113,7 @@ export function PendingTrainerInvitesCard({
       </div>
       <div className="space-y-2 px-6">
         {invites.map((invite) => (
-          <InviteRow key={invite.id} invite={invite} />
+          <InviteRow key={invite.id} invite={invite} origin={origin} />
         ))}
       </div>
     </Card>

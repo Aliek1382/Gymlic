@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useCreateTrainerInvite } from "../hooks/use-create-trainer-invite";
@@ -33,6 +34,7 @@ export function AddTrainerDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [invitedPhone, setInvitedPhone] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const createInvite = useCreateTrainerInvite();
 
@@ -50,6 +52,7 @@ export function AddTrainerDialog({
         phone: values.phone ? values.phone : null,
       });
       setInviteLink(`${window.location.origin}/join/${code}`);
+      setInvitedPhone(values.phone ? values.phone : null);
     } catch (error) {
       toast.error(getErrorMessage(error, "دعوت مربی با خطا مواجه شد."));
     }
@@ -66,6 +69,7 @@ export function AddTrainerDialog({
     onOpenChange(next);
     if (!next) {
       setInviteLink(null);
+      setInvitedPhone(null);
       setCopied(false);
       form.reset();
     }
@@ -97,6 +101,8 @@ export function AddTrainerDialog({
                 {copied ? <Check className="text-success" /> : <Copy />}
               </Button>
             </div>
+
+            <InviteShareButtons link={inviteLink} phone={invitedPhone} fullWidth />
 
             <Button className="w-full" onClick={() => handleOpenChange(false)}>
               بستن

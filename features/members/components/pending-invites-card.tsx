@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { NO_PLAN_LABEL } from "../constants/members";
 import { useRevokeMemberInvite } from "../hooks/use-revoke-member-invite";
@@ -17,9 +18,11 @@ import type { PendingMemberInvite } from "../types/member-types";
 function InviteRow({
   invite,
   trainerName,
+  origin,
 }: {
   invite: PendingMemberInvite;
   trainerName: string | null;
+  origin: string;
 }) {
   const [revokeOpen, setRevokeOpen] = useState(false);
   const revokeInvite = useRevokeMemberInvite();
@@ -66,6 +69,12 @@ function InviteRow({
           <Copy />
           کپی لینک
         </Button>
+        {origin && (
+          <InviteShareButtons
+            link={`${origin}/join/${invite.code}`}
+            phone={invite.phone}
+          />
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -97,6 +106,12 @@ export function PendingInvitesCard({
   invites: PendingMemberInvite[];
   trainerNameById: Map<string, string>;
 }) {
+  // Read only after mount so the server-rendered markup (which has no
+  // `window`) matches the client's first render, then the share buttons pick
+  // up the real origin.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+
   return (
     <Card className="gap-4 py-5">
       <div className="px-6">
@@ -109,6 +124,7 @@ export function PendingInvitesCard({
           <InviteRow
             key={invite.id}
             invite={invite}
+            origin={origin}
             trainerName={
               invite.trainerId
                 ? (trainerNameById.get(invite.trainerId) ?? null)

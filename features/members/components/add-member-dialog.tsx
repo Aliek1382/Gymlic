@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -47,6 +48,7 @@ export function AddMemberDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [invitedPhone, setInvitedPhone] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const trainers = useClubTrainers(clubId);
   const plans = useMembershipPlans(clubId, { activeOnly: true });
@@ -80,6 +82,7 @@ export function AddMemberDialog({
             : null,
       });
       setInviteLink(`${window.location.origin}/join/${code}`);
+      setInvitedPhone(values.phone ? values.phone : null);
     } catch (error) {
       toast.error(getErrorMessage(error, "افزودن عضو با خطا مواجه شد."));
     }
@@ -96,6 +99,7 @@ export function AddMemberDialog({
     onOpenChange(next);
     if (!next) {
       setInviteLink(null);
+      setInvitedPhone(null);
       setCopied(false);
       form.reset();
     }
@@ -128,6 +132,8 @@ export function AddMemberDialog({
                 {copied ? <Check className="text-success" /> : <Copy />}
               </Button>
             </div>
+
+            <InviteShareButtons link={inviteLink} phone={invitedPhone} fullWidth />
 
             <Button className="w-full" onClick={() => handleOpenChange(false)}>
               بستن
