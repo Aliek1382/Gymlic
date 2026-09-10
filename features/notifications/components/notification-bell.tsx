@@ -84,6 +84,14 @@ export function NotificationBell({ userId }: NotificationBellProps) {
             </ul>
           )}
         </ScrollArea>
+
+        <div className="h-px bg-border" />
+        <Link
+          href="/notifications"
+          className="block px-3 py-2.5 text-center text-xs text-primary hover:underline"
+        >
+          مشاهده همه اعلان‌ها
+        </Link>
       </DropdownMenuContent>
     </DropdownMenu>
   );
