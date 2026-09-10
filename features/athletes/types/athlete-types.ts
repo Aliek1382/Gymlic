@@ -9,6 +9,16 @@ export interface AthleteSummary {
   nutritionPlanCount: number;
 }
 
+export interface AthleteProfile {
+  id: string;
+  name: string;
+  birthDate: string | null;
+  avatarUrl: string | null;
+  phone: string | null;
+  joinedAt: string;
+  note: string | null;
+}
+
 export interface PendingAthleteInvite {
   id: string;
   code: string;

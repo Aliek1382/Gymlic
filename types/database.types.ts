@@ -112,6 +112,7 @@ export interface Database {
           athlete_id: string;
           club_id: string | null;
           status: MembershipStatus;
+          note: string | null;
           created_at: string;
         },
         {
@@ -119,6 +120,7 @@ export interface Database {
           athlete_id: string;
           club_id?: string | null;
           status?: MembershipStatus;
+          note?: string | null;
         }
       >;
       invitations: TableOf<
