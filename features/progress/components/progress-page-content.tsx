@@ -3,7 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/features/authentication";
-import { TrainingCalendar } from "@/features/athletes";
+import { TrainingCalendar } from "@/features/athletes/components/training-calendar";
 import { useMeasurements } from "../hooks/use-measurements";
 import { getLatestKnownHeight } from "../utils/bmi";
 import { MeasurementFormDialog } from "./measurement-form-dialog";

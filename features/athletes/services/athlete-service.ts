@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { INVITE_EXPIRES_DAYS } from "../constants/athletes";
 import type {
+  AthleteProfile,
   AthleteSummary,
   PendingAthleteInvite,
   PlanKind,
@@ -92,6 +93,64 @@ export async function listAthletes(): Promise<AthleteSummary[]> {
     workoutPlanCount: workoutCounts.get(row.athlete_id) ?? 0,
     nutritionPlanCount: nutritionCounts.get(row.athlete_id) ?? 0,
   }));
+}
+
+export async function getAthleteProfile(
+  athleteId: string
+): Promise<AthleteProfile | null> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { data, error } = await supabase
+    .from("trainer_athletes")
+    .select(
+      "created_at, note, profiles!athlete_id(first_name, last_name, birth_date, avatar_url, phone)"
+    )
+    .eq("trainer_id", trainerId)
+    .eq("athlete_id", athleteId)
+    .eq("status", "active")
+    .maybeSingle()
+    .returns<{
+      created_at: string;
+      note: string | null;
+      profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        birth_date: string | null;
+        avatar_url: string | null;
+        phone: string | null;
+      } | null;
+    } | null>();
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    id: athleteId,
+    name:
+      [data.profiles?.first_name, data.profiles?.last_name]
+        .filter(Boolean)
+        .join(" ") || "بدون نام",
+    birthDate: data.profiles?.birth_date ?? null,
+    avatarUrl: data.profiles?.avatar_url ?? null,
+    phone: data.profiles?.phone ?? null,
+    joinedAt: data.created_at,
+    note: data.note,
+  };
+}
+
+export async function updateAthleteNote(
+  athleteId: string,
+  note: string | null
+): Promise<void> {
+  const supabase = createClient();
+  const trainerId = await getCurrentUserId();
+
+  const { error } = await supabase
+    .from("trainer_athletes")
+    .update({ note })
+    .eq("trainer_id", trainerId)
+    .eq("athlete_id", athleteId);
+  if (error) throw error;
 }
 
 export async function listPendingAthleteInvites(): Promise<

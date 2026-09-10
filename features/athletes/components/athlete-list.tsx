@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Clock, Copy, Flame, Search, Users } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, Clock, Copy, Flame, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -277,15 +278,18 @@ export function AthleteList() {
                 key={athlete.id}
                 className="flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-center gap-3">
+                <Link
+                  href={`/athletes/${athlete.id}`}
+                  className="group flex min-w-0 items-center gap-3 rounded-lg -m-1 p-1 transition-colors hover:bg-muted/50"
+                >
                   <Avatar className="size-9">
                     <AvatarFallback className="text-xs">
                       {athlete.name.slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="text-sm font-medium text-foreground group-hover:text-primary">
                         {athlete.name}
                       </p>
                       <StreakBadge weeks={streakByAthlete.get(athlete.id) ?? 0} />
@@ -296,7 +300,8 @@ export function AthleteList() {
                       {toPersianDigits(athlete.nutritionPlanCount)} برنامه غذایی
                     </p>
                   </div>
-                </div>
+                  <ChevronLeft className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                </Link>
                 <div className="flex flex-wrap items-center gap-2">
                   <PlanDialog
                     kind="workout"

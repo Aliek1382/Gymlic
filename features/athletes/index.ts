@@ -1,5 +1,7 @@
 export * from "./components/add-athlete-dialog";
 export * from "./components/athlete-list";
+export * from "./components/athlete-profile-content";
+export * from "./components/athlete-profile-note";
 export * from "./components/plan-dialog";
 export * from "./components/my-plan-list";
 export * from "./components/remove-athlete-button";
@@ -18,6 +20,8 @@ export * from "./components/plan-comments";
 export * from "./components/training-calendar";
 
 export * from "./hooks/use-athletes";
+export * from "./hooks/use-athlete-profile";
+export * from "./hooks/use-update-athlete-note";
 export * from "./hooks/use-pending-athlete-invites";
 export * from "./hooks/use-create-athlete-invite";
 export * from "./hooks/use-trainer-club";
