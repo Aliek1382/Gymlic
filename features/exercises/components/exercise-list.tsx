@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useExercises } from "../hooks/use-exercises";
+import { getMuscleGroupBadgeVariant } from "../utils/muscle-group-color";
 import type { ExerciseSummary } from "../types/exercise-types";
 
 function groupByMuscle(exercises: ExerciseSummary[]) {
@@ -116,7 +117,9 @@ export function ExerciseList() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="secondary">{exercise.muscleGroup}</Badge>
+                    <Badge variant={getMuscleGroupBadgeVariant(exercise.muscleGroup)}>
+                      {exercise.muscleGroup}
+                    </Badge>
                     {exercise.isCustom && (
                       <Badge variant="info">حرکت شما</Badge>
                     )}
