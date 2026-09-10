@@ -82,7 +82,19 @@ export function getPersianMonthLabel(date: Date): string {
   return formatter.format(date);
 }
 
+// Intl throws a RangeError on an unparseable date, and a date formatted in
+// the middle of a list is deep enough in the tree that the throw takes the
+// whole page down with it ("a client-side exception has occurred"). One bad
+// timestamp should cost its own label, nothing more.
+const UNKNOWN_DATE = "—";
+
+function isValidDate(date: Date): boolean {
+  return !Number.isNaN(date.getTime());
+}
+
 export function formatPersianDate(date: Date): string {
+  if (!isValidDate(date)) return UNKNOWN_DATE;
+
   return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
     year: "numeric",
     month: "long",
@@ -92,6 +104,8 @@ export function formatPersianDate(date: Date): string {
 
 // Short "day month" label (no year) for chart axes — e.g. "۱۶ مرداد".
 export function formatShortPersianDate(date: Date): string {
+  if (!isValidDate(date)) return UNKNOWN_DATE;
+
   return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
     month: "short",
     day: "numeric",
@@ -120,6 +134,8 @@ export function formatAge(birthDate: string | null | undefined): string | null {
 // Short relative label for timestamps like notifications — "همین الان",
 // "۵ دقیقه پیش", "۳ روز پیش" — falling back to the full date past a week.
 export function formatRelativeTime(date: Date): string {
+  if (!isValidDate(date)) return UNKNOWN_DATE;
+
   const diffSeconds = Math.round((Date.now() - date.getTime()) / 1000);
   if (diffSeconds < 60) return "همین الان";
 

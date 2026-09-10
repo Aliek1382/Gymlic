@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { createClient } from "@/lib/supabase/client";
@@ -12,6 +12,8 @@ export function conversationQueryKey(counterpartId: string | null) {
 
 export function useConversation(counterpartId: string | null) {
   const queryClient = useQueryClient();
+  // Unique per subscriber — see the note in useMessageThreads.
+  const channelId = useId();
 
   const query = useQuery({
     queryKey: conversationQueryKey(counterpartId),
@@ -27,7 +29,7 @@ export function useConversation(counterpartId: string | null) {
     // "either direction between these two" — so this listens to the user's
     // visible messages and lets getConversation decide what belongs here.
     const channel = supabase
-      .channel(`conversation:${counterpartId}`)
+      .channel(`conversation:${counterpartId}:${channelId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "messages" },
@@ -40,7 +42,7 @@ export function useConversation(counterpartId: string | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [counterpartId, queryClient]);
+  }, [channelId, counterpartId, queryClient]);
 
   return query;
 }
