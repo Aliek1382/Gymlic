@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { formatPersianDate } from "@/lib/persian";
 import { PlanSections } from "@/features/athletes";
+import type { PlanKind } from "@/features/athletes";
 import { EmptyState } from "../shared/empty-state";
 import type { AthletePlanSummary } from "../../types/dashboard-types";
 
@@ -12,18 +13,18 @@ export function PlanSummaryCard({
   plan,
   emptyTitle,
   emptyDescription,
-  // Renders the description as the same day cards /workout uses, with the
-  // same day-tick, instead of one plain paragraph. Off by default because
-  // it only makes sense for a workout plan — workout_day_logs has no
-  // equivalent for nutrition_assignments.
-  dayLogging = false,
+  // Picks which layout the description is parsed into — day cards for a
+  // workout plan, meal blocks for a nutrition one. Day ticking rides on the
+  // workout kind alone; workout_day_logs has no equivalent for
+  // nutrition_assignments.
+  planKind,
 }: {
   title: string;
   icon: LucideIcon;
   plan: AthletePlanSummary | null;
   emptyTitle: string;
   emptyDescription: string;
-  dayLogging?: boolean;
+  planKind: PlanKind;
 }) {
   return (
     <Card className="gap-4 py-5">
@@ -46,20 +47,13 @@ export function PlanSummaryCard({
                 </p>
               </div>
             </div>
-            {dayLogging ? (
-              <PlanSections
-                planId={plan.id}
-                description={plan.description}
-                isActivePlan
-                dayLogging
-              />
-            ) : (
-              plan.description && (
-                <p className="whitespace-pre-line rounded-xl bg-muted/50 p-3 text-sm text-muted-foreground">
-                  {plan.description}
-                </p>
-              )
-            )}
+            <PlanSections
+              planId={plan.id}
+              description={plan.description}
+              kind={planKind}
+              isActivePlan
+              dayLogging={planKind === "workout"}
+            />
           </div>
         )}
       </div>

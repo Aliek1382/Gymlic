@@ -25,6 +25,7 @@ export default async function WorkoutProgramsPage() {
 
       <PlanBrowser
         kind="workout"
+        currentUserId={context.userId}
         trainerName={trainerName}
         trainerAvatarUrl={context.avatarUrl}
       />

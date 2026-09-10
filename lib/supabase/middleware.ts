@@ -5,6 +5,12 @@ import type { Database } from "@/types/database.types";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/join"];
 
+// Public paths a signed-in visitor is allowed to stay on. An invite link is
+// the one case where being signed in is not a mistake: a trainer who already
+// uses Gymlic accepts a club's invite with the account they are holding, so
+// bouncing them to the dashboard would make the link unusable for them.
+const SIGNED_IN_ALLOWED_PATHS = ["/join"];
+
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
@@ -68,7 +74,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Session exists but user is still on an auth page -> send to Dashboard
-  if (isPublicPath) {
+  if (
+    isPublicPath &&
+    !SIGNED_IN_ALLOWED_PATHS.some((path) => pathname.startsWith(path))
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

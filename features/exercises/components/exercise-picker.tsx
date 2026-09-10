@@ -3,20 +3,45 @@
 import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useExercisesForPicker } from "../hooks/use-exercises-for-picker";
 import { useRecordExerciseUsage } from "../hooks/use-record-exercise-usage";
+import { getMuscleGroupBadgeVariant } from "../utils/muscle-group-color";
 import type { ExercisePickerItem } from "../types/exercise-types";
+
+// Groups stay in the picker's existing most-used-first order (by whichever
+// exercise in the group ranks highest), so switching to muscle-group
+// clusters doesn't bury a trainer's frequently-used exercises.
+function groupByMuscle(
+  exercises: ExercisePickerItem[]
+): { muscleGroup: string; items: ExercisePickerItem[] }[] {
+  const order: string[] = [];
+  const groups = new Map<string, ExercisePickerItem[]>();
+  for (const exercise of exercises) {
+    if (!groups.has(exercise.muscleGroup)) {
+      order.push(exercise.muscleGroup);
+      groups.set(exercise.muscleGroup, []);
+    }
+    groups.get(exercise.muscleGroup)!.push(exercise);
+  }
+  return order.map((muscleGroup) => ({
+    muscleGroup,
+    items: groups.get(muscleGroup)!,
+  }));
+}
 
 type Technique = "normal" | "superset" | "triset" | "dropset";
 
@@ -88,17 +113,34 @@ function ExerciseSelect({
   onChange: (value: string) => void;
   placeholder: string;
 }) {
+  const groups = groupByMuscle(exercises ?? []);
+
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-full justify-start">
         <SelectValue placeholder={placeholder} className="min-w-0 truncate" />
       </SelectTrigger>
       <SelectContent>
-        {exercises?.map((exercise) => (
-          <SelectItem key={exercise.id} value={exercise.id}>
-            {exercise.name}
-            {exercise.nameEn ? ` / ${exercise.nameEn}` : ""}
-          </SelectItem>
+        {groups.map(({ muscleGroup, items }) => (
+          <SelectGroup key={muscleGroup}>
+            <SelectLabel>{muscleGroup}</SelectLabel>
+            {items.map((exercise) => (
+              <SelectItem key={exercise.id} value={exercise.id}>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">
+                    {exercise.name}
+                    {exercise.nameEn ? ` / ${exercise.nameEn}` : ""}
+                  </span>
+                  <Badge
+                    variant={getMuscleGroupBadgeVariant(exercise.muscleGroup)}
+                    className="shrink-0"
+                  >
+                    {exercise.muscleGroup}
+                  </Badge>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectGroup>
         ))}
       </SelectContent>
     </Select>

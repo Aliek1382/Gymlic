@@ -2,12 +2,15 @@ import type { LucideIcon } from "lucide-react";
 import {
   Apple,
   BarChart3,
+  Bell,
   Bookmark,
   Calendar,
   Dumbbell,
   LayoutGrid,
   LineChart,
+  MessageCircle,
   Ruler,
+  Salad,
   Settings,
   User,
   UserCircle,
@@ -32,6 +35,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "مربیان", href: "/trainers", icon: Dumbbell },
     { label: "کلاس‌ها", href: "/classes", icon: Calendar },
     { label: "امور مالی", href: "/finance", icon: Wallet },
+    { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "تنظیمات", href: "/settings", icon: Settings },
   ],
   trainer: [
@@ -40,6 +44,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "برنامه‌های تمرینی", href: "/workout-programs", icon: Dumbbell },
     { label: "برنامه‌های غذایی", href: "/nutrition-programs", icon: Apple },
     {
+      label: "پیام‌ها",
+      href: "/messages",
+      icon: MessageCircle,
+      description:
+        "گفتگوی مستقیم با هر ورزشکار درباره برنامه‌هایی که برایش نوشته‌اید.",
+    },
+    {
       label: "قالب‌ها",
       href: "/templates",
       icon: Bookmark,
@@ -47,6 +58,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
         "قالب‌های آماده برای برنامه تمرینی و غذایی بسازید تا هنگام نوشتن برنامه برای ورزشکاران سریع‌تر شروع کنید.",
     },
     { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
+    { label: "کتابخانه غذاها", href: "/foods", icon: Salad },
     {
       label: "پیشرفت ورزشکاران",
       href: "/progress",
@@ -54,14 +66,24 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
       description:
         "نمودار روند وزن، BMI، درصد چربی بدن، دور کمر و دور سینه‌ی هر ورزشکار را ببینید.",
     },
+    {
+      label: "درآمد من",
+      href: "/earnings",
+      icon: Wallet,
+      description:
+        "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
+    },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
+    { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "تنظیمات", href: "/settings", icon: Settings },
   ],
   athlete: [
     { label: "داشبورد", href: "/dashboard", icon: LayoutGrid },
     { label: "برنامه تمرینی", href: "/workout", icon: Dumbbell },
     { label: "برنامه غذایی", href: "/nutrition", icon: Apple },
+    { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },
+    { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "پروفایل", href: "/profile", icon: UserCircle },
   ],
 };

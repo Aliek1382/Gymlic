@@ -15,9 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useCreateAthleteInvite } from "../hooks/use-create-athlete-invite";
+import { useTrainerClub } from "../hooks/use-trainer-club";
 import {
   addAthleteSchema,
   type AddAthleteFormValues,
@@ -26,12 +28,20 @@ import {
 export function AddAthleteDialog() {
   const [open, setOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [invitedPhone, setInvitedPhone] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const createInvite = useCreateAthleteInvite();
+  const trainerClub = useTrainerClub();
 
   const form = useForm<AddAthleteFormValues>({
     resolver: zodResolver(addAthleteSchema),
-    defaultValues: { firstName: "", lastName: "", heightCm: "", weightKg: "" },
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      heightCm: "",
+      weightKg: "",
+    },
   });
 
   async function onSubmit(values: AddAthleteFormValues) {
@@ -39,10 +49,12 @@ export function AddAthleteDialog() {
       const { code } = await createInvite.mutateAsync({
         firstName: values.firstName,
         lastName: values.lastName,
+        phone: values.phone ? values.phone : null,
         heightCm: values.heightCm ? Number(values.heightCm) : null,
         weightKg: values.weightKg ? Number(values.weightKg) : null,
       });
       setInviteLink(`${window.location.origin}/join/${code}`);
+      setInvitedPhone(values.phone ? values.phone : null);
     } catch (error) {
       toast.error(getErrorMessage(error, "افزودن ورزشکار با خطا مواجه شد."));
     }
@@ -59,6 +71,7 @@ export function AddAthleteDialog() {
     setOpen(next);
     if (!next) {
       setInviteLink(null);
+      setInvitedPhone(null);
       setCopied(false);
       form.reset();
     }
@@ -89,6 +102,8 @@ export function AddAthleteDialog() {
               </Button>
             </div>
 
+            <InviteShareButtons link={inviteLink} phone={invitedPhone} fullWidth />
+
             <Button className="w-full" onClick={() => handleOpenChange(false)}>
               بستن
             </Button>
@@ -99,6 +114,9 @@ export function AddAthleteDialog() {
               <DialogTitle>افزودن ورزشکار جدید</DialogTitle>
               <DialogDescription>
                 مشخصات اولیه ورزشکار را وارد کنید. قد و وزن اختیاری هستند.
+                {trainerClub.data
+                  ? ` این ورزشکار به‌عنوان عضو باشگاه «${trainerClub.data.name}» هم ثبت می‌شود.`
+                  : ""}
               </DialogDescription>
             </DialogHeader>
 
@@ -133,6 +151,23 @@ export function AddAthleteDialog() {
                     </p>
                   )}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="athlete-phone">شماره موبایل (اختیاری)</Label>
+                <Input
+                  id="athlete-phone"
+                  dir="ltr"
+                  inputMode="numeric"
+                  placeholder="09xxxxxxxxx"
+                  className="text-center"
+                  {...form.register("phone")}
+                />
+                {form.formState.errors.phone && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.phone.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

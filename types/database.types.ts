@@ -16,6 +16,7 @@ export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type WorkoutStatus = "active" | "completed" | "cancelled" | "draft";
 export type MembershipPlanTier = "elite" | "basic" | "daily";
 export type PaymentRequestStatus = "pending" | "approved" | "rejected";
+export type RevenueCategory = "membership" | "session" | "product" | "other";
 // Not a DB enum on purpose — `notifications.type` is plain text so new
 // kinds can be introduced later without a migration. This union only
 // covers the kinds the current triggers actually emit.
@@ -28,7 +29,11 @@ export type NotificationType =
   | "measurement_recorded"
   | "member_joined"
   | "complete_profile"
-  | "broadcast";
+  | "broadcast"
+  // Written by plan_comments' trigger until 0036; kept so historical rows
+  // still render with an icon.
+  | "plan_comment"
+  | "message";
 
 type TableOf<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
@@ -76,6 +81,9 @@ export interface Database {
           owner_id: string;
           status: ClubStatus;
           member_capacity: number | null;
+          address: string | null;
+          phone: string | null;
+          working_hours: string | null;
           created_at: string;
           updated_at: string;
         },
@@ -85,6 +93,34 @@ export interface Database {
           logo_url?: string | null;
           status?: ClubStatus;
           member_capacity?: number | null;
+          address?: string | null;
+          phone?: string | null;
+          working_hours?: string | null;
+        }
+      >;
+      // The plans a club sells, in its own words — replaces the fixed
+      // membership_plan_tier enum as what a membership actually points at.
+      club_membership_plans: TableOf<
+        {
+          id: string;
+          club_id: string;
+          name: string;
+          price_toman: number;
+          duration_days: number;
+          description: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          club_id: string;
+          name: string;
+          price_toman?: number;
+          duration_days?: number;
+          description?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
         }
       >;
       memberships: TableOf<
@@ -95,6 +131,8 @@ export interface Database {
           role: MembershipRole;
           status: MembershipStatus;
           plan_tier: MembershipPlanTier;
+          plan_id: string | null;
+          expires_at: string | null;
           joined_at: string;
         },
         {
@@ -103,6 +141,8 @@ export interface Database {
           role: MembershipRole;
           status?: MembershipStatus;
           plan_tier?: MembershipPlanTier;
+          plan_id?: string | null;
+          expires_at?: string | null;
         }
       >;
       trainer_athletes: TableOf<
@@ -135,6 +175,8 @@ export interface Database {
           last_name: string | null;
           height_cm: number | null;
           weight_kg: number | null;
+          plan_tier: MembershipPlanTier | null;
+          plan_id: string | null;
           status: InvitationStatus;
           created_by: string;
           created_at: string;
@@ -153,6 +195,8 @@ export interface Database {
           last_name?: string | null;
           height_cm?: number | null;
           weight_kg?: number | null;
+          plan_tier?: MembershipPlanTier | null;
+          plan_id?: string | null;
           status?: InvitationStatus;
           expires_at?: string;
         },
@@ -333,14 +377,45 @@ export interface Database {
         {
           id: string;
           club_id: string;
+          member_id: string | null;
           amount: number;
+          category: RevenueCategory;
           occurred_at: string;
+          note: string | null;
+          recorded_by: string | null;
           created_at: string;
+          updated_at: string;
         },
         {
           club_id: string;
           amount: number;
+          member_id?: string | null;
+          category?: RevenueCategory;
           occurred_at?: string;
+          note?: string | null;
+          recorded_by?: string | null;
+        }
+      >;
+      // A trainer's own income ledger — one row per fee received from one of
+      // their athletes. Unrelated to revenue_entries (club-level income) and
+      // to payment_requests (a club paying the platform).
+      trainer_payments: TableOf<
+        {
+          id: string;
+          trainer_id: string;
+          athlete_id: string | null;
+          amount_toman: number;
+          paid_at: string;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          trainer_id: string;
+          athlete_id: string;
+          amount_toman: number;
+          paid_at?: string;
+          note?: string | null;
         }
       >;
       class_attendance_logs: TableOf<
@@ -392,6 +467,41 @@ export interface Database {
           last_used_at?: string;
         }
       >;
+      foods: TableOf<
+        {
+          id: string;
+          name: string;
+          name_en: string | null;
+          description: string | null;
+          category: string;
+          default_unit: string;
+          created_by: string | null;
+          created_at: string;
+        },
+        {
+          name: string;
+          category: string;
+          default_unit: string;
+          name_en?: string | null;
+          description?: string | null;
+          created_by?: string | null;
+        }
+      >;
+      food_usage: TableOf<
+        {
+          id: string;
+          trainer_id: string;
+          food_id: string;
+          use_count: number;
+          last_used_at: string;
+        },
+        {
+          trainer_id: string;
+          food_id: string;
+          use_count?: number;
+          last_used_at?: string;
+        }
+      >;
       notifications: TableOf<
         {
           id: string;
@@ -417,14 +527,65 @@ export interface Database {
         },
         { read_at: string | null }
       >;
+      messages: TableOf<
+        {
+          id: string;
+          sender_id: string;
+          recipient_id: string;
+          body: string;
+          // Null on a plain direct message; set when the message was written
+          // about one of the pair's plans.
+          plan_kind: "workout" | "nutrition" | null;
+          plan_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        },
+        {
+          sender_id: string;
+          recipient_id: string;
+          body: string;
+          plan_kind?: "workout" | "nutrition" | null;
+          plan_id?: string | null;
+        },
+        // Only the recipient's read state may change; a trigger rejects any
+        // other edit.
+        { read_at: string | null }
+      >;
+      // Read-only archive since 0036: rows were copied into `messages` and
+      // the insert policy was dropped.
+      plan_comments: TableOf<
+        {
+          id: string;
+          kind: "workout" | "nutrition";
+          assignment_id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+        },
+        {
+          kind: "workout" | "nutrition";
+          assignment_id: string;
+          author_id: string;
+          body: string;
+        }
+      >;
     };
     Views: Record<string, never>;
     Functions: {
       get_invitation_preview: {
         Args: { p_code: string };
-        Returns: { first_name: string | null; last_name: string | null }[];
+        Returns: {
+          first_name: string | null;
+          last_name: string | null;
+          club_name: string | null;
+          invited_role: InvitationRole;
+        }[];
       };
       accept_athlete_invitation: {
+        Args: { p_code: string };
+        Returns: undefined;
+      };
+      accept_club_invitation: {
         Args: { p_code: string };
         Returns: undefined;
       };
@@ -456,6 +617,24 @@ export interface Database {
       reject_payment_request: {
         Args: { p_request_id: string; p_admin_note?: string | null };
         Returns: undefined;
+      };
+      // One row per person the caller may message — everyone they are linked
+      // to, plus anyone they have exchanged messages with.
+      list_message_threads: {
+        Args: Record<string, never>;
+        Returns: {
+          counterpart_id: string;
+          counterpart_role: "trainer" | "athlete";
+          first_name: string | null;
+          last_name: string | null;
+          avatar_url: string | null;
+          plan_count: number;
+          message_count: number;
+          unread_count: number;
+          last_message_body: string | null;
+          last_message_author_id: string | null;
+          last_message_at: string | null;
+        }[];
       };
       admin_set_club_status: {
         Args: { p_club_id: string; p_status: ClubStatus };

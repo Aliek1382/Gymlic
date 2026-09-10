@@ -11,6 +11,7 @@ import { toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
 import { useToggleWorkoutDay } from "../hooks/use-toggle-workout-day";
 import { useWorkoutDayLogs } from "../hooks/use-workout-day-logs";
+import { NutritionPlanSections } from "./nutrition-plan-sections";
 import {
   hasExerciseRows,
   parsePlanDescription,
@@ -22,6 +23,7 @@ import {
 } from "../utils/workout-plan-parse";
 import { getTodayWeekday, headingWeekday } from "../utils/workout-plan-weekday";
 import type { Weekday } from "../utils/workout-plan-text";
+import type { PlanKind } from "../types/athlete-types";
 
 // The printable sheet already lays the plan out as day blocks and exercise
 // rows; this renders the same parse on screen, so an athlete doesn't have
@@ -230,20 +232,16 @@ function PlanSection({
   );
 }
 
-export function PlanSections({
+function WorkoutPlanSections({
   planId,
   description,
-  isActivePlan = false,
-  dayLogging = false,
+  isActivePlan,
+  dayLogging,
 }: {
   planId: string;
   description: string | null;
-  // Only the plan actually in effect marks a day as "today" or offers a
-  // tick — pointing at today's block on a finished plan would suggest it's
-  // still due, and logging a session against it would be meaningless.
-  isActivePlan?: boolean;
-  // Ticking is workout-only; workout_day_logs references workout_assignments.
-  dayLogging?: boolean;
+  isActivePlan: boolean;
+  dayLogging: boolean;
 }) {
   const sections = parsePlanDescription(description);
   // A plan grouped by muscle group has no day to match against, so "today"
@@ -321,5 +319,40 @@ export function PlanSections({
         />
       ))}
     </div>
+  );
+}
+
+// A nutrition plan parses to meal blocks rather than day blocks, and has no
+// day tick to offer, so the two kinds render through separate components.
+// Dispatching here (rather than at each call site) keeps "render this plan's
+// description" a single entry point.
+export function PlanSections({
+  planId,
+  description,
+  kind = "workout",
+  isActivePlan = false,
+  dayLogging = false,
+}: {
+  planId: string;
+  description: string | null;
+  kind?: PlanKind;
+  // Only the plan actually in effect marks a day as "today" or offers a
+  // tick — pointing at today's block on a finished plan would suggest it's
+  // still due, and logging a session against it would be meaningless.
+  isActivePlan?: boolean;
+  // Ticking is workout-only; workout_day_logs references workout_assignments.
+  dayLogging?: boolean;
+}) {
+  if (kind === "nutrition") {
+    return <NutritionPlanSections description={description} />;
+  }
+
+  return (
+    <WorkoutPlanSections
+      planId={planId}
+      description={description}
+      isActivePlan={isActivePlan}
+      dayLogging={dayLogging}
+    />
   );
 }

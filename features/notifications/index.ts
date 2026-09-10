@@ -1,7 +1,9 @@
 export * from "./components/notification-bell";
+export * from "./components/notification-archive-list";
 export * from "./components/broadcast-notification-form";
 
 export * from "./hooks/use-notifications";
+export * from "./hooks/use-notifications-archive";
 export * from "./hooks/use-notification-actions";
 export * from "./hooks/use-send-broadcast-notification";
 

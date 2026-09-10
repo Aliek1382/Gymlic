@@ -61,8 +61,14 @@ export default async function DashboardLayout({
     redirect("/create-club");
   }
 
-  // An Athlete must belong to at least one Trainer before reaching the panel.
-  if (context.accountType === "athlete" && !context.hasTrainer) {
+  // An Athlete reaches the panel through a Trainer, or — since clubs can
+  // invite members directly — through an active club membership. With
+  // neither, there is nothing to show them yet.
+  if (
+    context.accountType === "athlete" &&
+    !context.hasTrainer &&
+    !context.activeMembership
+  ) {
     redirect("/invitation");
   }
 

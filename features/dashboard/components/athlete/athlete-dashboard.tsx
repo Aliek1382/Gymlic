@@ -2,13 +2,14 @@
 
 import { Apple, Dumbbell } from "lucide-react";
 
+import { CoachMessageCard } from "@/features/messages";
 import { ProgressDashboardWidget } from "@/features/progress";
 import { useAthleteDashboard } from "../../hooks/use-athlete-dashboard";
 import { WelcomeSection } from "../shared/welcome-section";
 import { DashboardSkeleton } from "../shared/dashboard-skeleton";
 import { ErrorState } from "../shared/error-state";
 import { PlanSummaryCard } from "./plan-summary-card";
-import { CoachMessageCard } from "./coach-message-card";
+import { StreakCard } from "./streak-card";
 
 export function AthleteDashboard({
   athleteId,
@@ -19,7 +20,7 @@ export function AthleteDashboard({
   athleteName: string;
   trainerName: string | null;
 }) {
-  const dashboard = useAthleteDashboard();
+  const dashboard = useAthleteDashboard(athleteId);
 
   if (dashboard.isLoading) {
     return <DashboardSkeleton />;
@@ -37,6 +38,11 @@ export function AthleteDashboard({
         trainerName={trainerName}
       />
 
+      <StreakCard
+        athleteId={athleteId}
+        todaysWorkout={dashboard.data.todaysWorkout}
+      />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PlanSummaryCard
           title="برنامه تمرینی امروز"
@@ -44,7 +50,7 @@ export function AthleteDashboard({
           plan={dashboard.data.todaysWorkout}
           emptyTitle="برنامه تمرینی فعالی ندارید."
           emptyDescription="مربی شما به‌زودی یک برنامه تمرینی برایتان تنظیم می‌کند."
-          dayLogging
+          planKind="workout"
         />
         <PlanSummaryCard
           title="برنامه غذایی"
@@ -52,12 +58,13 @@ export function AthleteDashboard({
           plan={dashboard.data.nutritionPlan}
           emptyTitle="برنامه غذایی فعالی ندارید."
           emptyDescription="مربی شما به‌زودی یک برنامه غذایی برایتان تنظیم می‌کند."
+          planKind="nutrition"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ProgressDashboardWidget athleteId={athleteId} />
-        <CoachMessageCard />
+        <CoachMessageCard currentUserId={athleteId} />
       </div>
     </div>
   );

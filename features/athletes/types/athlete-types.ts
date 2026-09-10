@@ -23,6 +23,7 @@ export interface PendingAthleteInvite {
   id: string;
   code: string;
   name: string;
+  phone: string | null;
   heightCm: number | null;
   weightKg: number | null;
   createdAt: string;
@@ -50,4 +51,23 @@ export interface PlanTemplate {
   title: string;
   description: string | null;
   createdAt: string;
+}
+
+// One message in the back-and-forth on an assigned plan — a trainer and
+// athlete telling each other things like "برنامه این هفته خیلی سخته" or
+// "این حرکت برام درد داشت".
+export interface PlanComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  body: string;
+  createdAt: string;
+}
+
+// The club a trainer works at, when they belong to one — athletes they
+// invite are registered as members of it as well.
+export interface TrainerClub {
+  id: string;
+  name: string;
 }

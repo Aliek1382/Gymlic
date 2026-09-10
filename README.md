@@ -5,7 +5,7 @@
 ## راه‌اندازی
 
 1. یک پروژه در [Supabase](https://supabase.com) بسازید.
-2. فایل‌های SQL داخل `supabase/migrations` را به ترتیب (`0001_init.sql` سپس `0002_dashboard_metrics.sql`) در SQL Editor پروژه اجرا کنید.
+2. فایل‌های SQL داخل `supabase/migrations` را به ترتیب (از `0001_init.sql` تا آخرین فایل) در SQL Editor پروژه اجرا کنید.
 3. در تنظیمات Authentication پروژه، ورود با شماره موبایل (Phone / OTP) را فعال کنید و یک SMS Provider متصل کنید.
 4. فایل `.env.example` را کپی کرده و به `.env.local` تغییر نام دهید، سپس مقادیر را از Project Settings → API پر کنید:
 
@@ -32,6 +32,11 @@
 - `app/` — مسیرهای Next.js App Router؛ گروه `(auth)` صفحات ورود/OTP/انتخاب نقش و گروه `(dashboard)` پنل اصلی را در بر می‌گیرد.
 - `features/authentication/` — فلوی کامل احراز هویت (OTP، انتخاب نقش، ساخت باشگاه، تایید دعوت) طبق ساختار Component → Hook → Service → Supabase.
 - `features/dashboard/` — سه نوع داشبورد (باشگاه، مربی، ورزشکار)، هرکدام Widget-Based با Loading / Empty / Error State مستقل.
+- `features/members/` — مدیریت اعضای باشگاه (دعوت عضو جدید، ویرایش طرح و وضعیت، تعلیق، حذف، جستجو و فیلتر).
+- `features/trainers/` — مدیریت مربیان باشگاه (دعوت مربی، تعلیق، حذف، شمارش شاگردان هر مربی).
+- `features/messages/` — اینباکس گفتگوی مربی و ورزشکار روی جدول `messages`؛ پیام می‌تواند مستقل باشد یا به یکی از برنامه‌های مشترک گره بخورد (همان پیام‌ها زیر خود برنامه هم دیده می‌شوند).
+- `features/revenue/` — دفتر درآمد باشگاه (ثبت شهریه و دریافتی‌ها، ویرایش و حذف، خلاصه و نمودار ماهانه).
+- `features/club/` — تنظیمات باشگاه (نام، لوگو، آدرس، تلفن، ساعات کاری) و طرح‌های عضویت اختصاصی هر باشگاه.
 - `components/layout/` — Header و Sidebar پویا بر اساس نقش کاربر (اعضای مشترک بین تمام صفحات پنل).
 - `components/ui/` — کامپوننت‌های پایه به سبک shadcn/ui.
 - `lib/supabase/` — کلاینت‌های Supabase برای مرورگر، Server Component و Middleware.

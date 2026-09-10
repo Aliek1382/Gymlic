@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Clock, Copy, Flame, Search, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import {
   Select,
   SelectContent,
@@ -76,6 +77,10 @@ export function AthleteList() {
   const revokeInvite = useRevokeAthleteInvite();
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<AthleteSortOrder>("newest");
+  // Read only after mount so the server-rendered markup (which has no
+  // `window`) matches the client's first render.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
 
   const hasAthletes = (athletes.data?.length ?? 0) > 0;
   const hasPendingInvites = (pendingInvites.data?.length ?? 0) > 0;
@@ -209,6 +214,11 @@ export function AthleteList() {
                         {toPersianDigits(invite.nutritionPlanCount)} برنامه غذایی
                       </p>
                     )}
+                    {invite.phone && (
+                      <p className="text-xs text-muted-foreground" dir="ltr">
+                        {invite.phone}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -239,6 +249,12 @@ export function AthleteList() {
                     <Copy />
                     کپی لینک
                   </Button>
+                  {origin && (
+                    <InviteShareButtons
+                      link={`${origin}/join/${invite.code}`}
+                      phone={invite.phone}
+                    />
+                  )}
                   <RemoveAthleteButton
                     athleteName={invite.name}
                     description="این دعوت لغو می‌شود و لینک آن دیگر کار نخواهد کرد."

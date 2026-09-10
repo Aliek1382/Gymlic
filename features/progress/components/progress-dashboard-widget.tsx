@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ChevronLeft, Ruler } from "lucide-react";
 
 import { Card, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,14 @@ import { calculateBmi, getLatestKnownHeight } from "../utils/bmi";
 import { buildPoints, seriesFor } from "../utils/build-points";
 import { deltaFor } from "../utils/deltas";
 import { MeasurementFormDialog } from "./measurement-form-dialog";
-import { MetricChart } from "./metric-chart";
+import { QuickWeightEntry } from "./quick-weight-entry";
+
+// Code-split out of the main bundle: recharts is heavy and this widget
+// isn't needed until measurements have already loaded.
+const MetricChart = dynamic(
+  () => import("./metric-chart").then((m) => m.MetricChart),
+  { ssr: false, loading: () => <Skeleton className="h-40 w-full rounded-xl" /> }
+);
 
 export function ProgressDashboardWidget({ athleteId }: { athleteId: string }) {
   const measurements = useMeasurements(athleteId);
@@ -106,10 +114,13 @@ export function ProgressDashboardWidget({ athleteId }: { athleteId: string }) {
           </>
         )}
 
-        <MeasurementFormDialog
-          athleteId={athleteId}
-          latestKnownHeight={latestKnownHeight}
-        />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <QuickWeightEntry athleteId={athleteId} />
+          <MeasurementFormDialog
+            athleteId={athleteId}
+            latestKnownHeight={latestKnownHeight}
+          />
+        </div>
       </div>
     </Card>
   );

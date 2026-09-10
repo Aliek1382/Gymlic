@@ -2,7 +2,12 @@ import "server-only";
 import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
-import type { AccountType, ClubStatus, MembershipRole } from "@/types/database.types";
+import type {
+  AccountType,
+  ClubStatus,
+  InvitationRole,
+  MembershipRole,
+} from "@/types/database.types";
 
 export interface ServerAuthContext {
   userId: string;
@@ -124,6 +129,9 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
 export interface InvitationPreview {
   firstName: string | null;
   lastName: string | null;
+  /** Set when the invite was created by a club rather than a lone trainer. */
+  clubName: string | null;
+  invitedRole: InvitationRole;
 }
 
 /**
@@ -144,5 +152,10 @@ export async function getInvitationPreview(
   const row = data?.[0];
   if (!row) return null;
 
-  return { firstName: row.first_name, lastName: row.last_name };
+  return {
+    firstName: row.first_name,
+    lastName: row.last_name,
+    clubName: row.club_name,
+    invitedRole: row.invited_role,
+  };
 }

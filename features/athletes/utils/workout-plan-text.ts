@@ -1,8 +1,9 @@
-// Workout plan descriptions stay free text (a trainer can always type
-// directly), but the builder groups picked exercises under a "برچسب:"
-// heading line within that same text instead of a separate structured
-// field. The heading can be a day of week or a muscle group — both are
-// just labels as far as this module is concerned.
+// Plan descriptions stay free text (a trainer can always type directly),
+// but the builder groups picked lines under a "برچسب:" heading line within
+// that same text instead of a separate structured field. The heading can be
+// a day of week, a muscle group or a meal — all just labels as far as this
+// module is concerned, so both the workout and the nutrition builder write
+// through here.
 export const WEEKDAYS = [
   "شنبه",
   "یکشنبه",
@@ -20,9 +21,9 @@ function heading(label: string): string {
 }
 
 // A heading line is any standalone "چیزی:" line — not just a weekday —
-// since headings can now also be muscle-group labels sourced from the
-// exercise library. Exported so the printable sheet splits the text into
-// day blocks on exactly the same rule the builder writes them with.
+// since headings can now also be muscle-group or meal labels. Exported so
+// the printable sheet splits the text into blocks on exactly the same rule
+// the builder writes them with.
 export function isHeadingLine(line: string): boolean {
   const trimmed = line.trim();
   return trimmed.length > 1 && trimmed.endsWith(":");
@@ -31,7 +32,7 @@ export function isHeadingLine(line: string): boolean {
 // Inserts `line` at the end of `label`'s block if that heading already
 // exists in `currentText`, otherwise appends a new "برچسب:" section at
 // the end.
-export function insertExerciseLineUnderHeading(
+export function insertLineUnderHeading(
   currentText: string,
   label: string,
   line: string
@@ -70,8 +71,8 @@ export function insertExerciseLineUnderHeading(
 }
 
 // Appends `line` with no heading at all — for a trainer who doesn't want
-// to group exercises by day or muscle group for this entry.
-export function appendExerciseLine(currentText: string, line: string): string {
+// to group this entry under a day, muscle group or meal.
+export function appendLine(currentText: string, line: string): string {
   if (!currentText.trim()) return line;
   const prefix = currentText.replace(/\n+$/, "");
   return `${prefix}\n${line}`;
