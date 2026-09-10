@@ -1,8 +1,10 @@
 import type { PlanKind } from "@/features/athletes/types/athlete-types";
 
-// A conversation is derived, not stored: two people share one as soon as a
-// plan has been assigned between them, and its messages are the
-// plan_comments rows on every plan they share (see list_message_threads).
+// A conversation is derived, not stored: it exists between any two people
+// the trainer/athlete relationship (or a shared plan) links, and its
+// messages are the `messages` rows between them — see list_message_threads.
+// Someone you have never written to still gets a thread, which is how a
+// first message is sent.
 export interface MessageThread {
   counterpartId: string;
   // The other side's role relative to the viewer — an athlete's threads are
@@ -19,7 +21,7 @@ export interface MessageThread {
 }
 
 // One plan the two of them share — both a thing to talk about and, for the
-// composer, the row a new message gets attached to.
+// composer, what an outgoing message can optionally be attached to.
 export interface ConversationPlan {
   id: string;
   kind: PlanKind;
@@ -29,9 +31,10 @@ export interface ConversationPlan {
 
 export interface ConversationMessage {
   id: string;
-  kind: PlanKind;
-  assignmentId: string;
-  planTitle: string;
+  // Null on a plain direct message; set when it was written about a plan.
+  planKind: PlanKind | null;
+  planId: string | null;
+  planTitle: string | null;
   authorId: string;
   authorName: string;
   authorAvatarUrl: string | null;

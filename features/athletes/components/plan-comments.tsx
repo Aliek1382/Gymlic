@@ -14,20 +14,26 @@ import { useAddPlanComment } from "../hooks/use-add-plan-comment";
 import { usePlanComments } from "../hooks/use-plan-comments";
 import type { PlanKind } from "../types/athlete-types";
 
-const MAX_COMMENT_LENGTH = 500;
+// Matches the messages.body check in 0036.
+const MAX_COMMENT_LENGTH = 1000;
 
 // A small back-and-forth thread on one assigned plan — the athlete can flag
 // something ("این حرکت برام سخت بود") and the trainer can reply, right
-// where the plan itself is shown. Each new comment also fires a
-// notification to whoever didn't write it (see notify_plan_comment).
+// where the plan itself is shown. These are the same messages the inbox
+// shows, filtered to this plan, and each one notifies the other side.
+//
+// A draft has no other side yet: the athlete has never been shown it, so
+// there is nobody to write to until it is sent.
 export function PlanComments({
   kind,
   assignmentId,
   currentUserId,
+  isDraft = false,
 }: {
   kind: PlanKind;
   assignmentId: string;
   currentUserId: string;
+  isDraft?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const comments = usePlanComments(kind, assignmentId);
@@ -40,7 +46,7 @@ export function PlanComments({
       await addComment.mutateAsync(body);
       setDraft("");
     } catch (error) {
-      toast.error(getErrorMessage(error, "ثبت نظر با خطا مواجه شد."));
+      toast.error(getErrorMessage(error, "ارسال پیام با خطا مواجه شد."));
     }
   }
 
@@ -53,7 +59,9 @@ export function PlanComments({
         </div>
       ) : !comments.data || comments.data.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          هنوز نظری ثبت نشده — اگر نکته‌ای درباره این برنامه هست، اینجا بنویسید.
+          {isDraft
+            ? "این برنامه هنوز پیش‌نویس است و ورزشکار آن را ندیده."
+            : "هنوز پیامی ثبت نشده — اگر نکته‌ای درباره این برنامه هست، اینجا بنویسید."}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -93,30 +101,36 @@ export function PlanComments({
         </ul>
       )}
 
-      <div className="flex items-end gap-2">
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          rows={2}
-          placeholder="نظرتون رو درباره این برنامه بنویسید..."
-          className="flex-1 resize-none rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
-        />
-        <Button
-          type="button"
-          size="icon"
-          disabled={addComment.isPending || !draft.trim()}
-          onClick={handleSubmit}
-          aria-label="ارسال نظر"
-        >
-          {addComment.isPending ? <Loader2 className="animate-spin" /> : <Send />}
-        </Button>
-      </div>
+      {isDraft ? (
+        <p className="text-xs text-muted-foreground">
+          پس از ثبت نهایی برنامه می‌توانید درباره‌اش با ورزشکار گفتگو کنید.
+        </p>
+      ) : (
+        <div className="flex items-end gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            rows={2}
+            placeholder="پیامتان درباره این برنامه را بنویسید..."
+            className="flex-1 resize-none rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+          />
+          <Button
+            type="button"
+            size="icon"
+            disabled={addComment.isPending || !draft.trim()}
+            onClick={handleSubmit}
+            aria-label="ارسال پیام"
+          >
+            {addComment.isPending ? <Loader2 className="animate-spin" /> : <Send />}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

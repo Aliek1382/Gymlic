@@ -23,15 +23,14 @@ export function useConversation(counterpartId: string | null) {
     if (!counterpartId) return;
 
     const supabase = createClient();
-    // The thread spans every plan these two share, so it can't be narrowed
-    // to one assignment_id the way the per-plan thread in usePlanComments
-    // is — any comment this user is allowed to see may belong here, and
-    // getConversation decides which ones actually do.
+    // Postgres changes filters take one column, and a conversation is
+    // "either direction between these two" — so this listens to the user's
+    // visible messages and lets getConversation decide what belongs here.
     const channel = supabase
       .channel(`conversation:${counterpartId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "plan_comments" },
+        { event: "*", schema: "public", table: "messages" },
         () => {
           queryClient.invalidateQueries({ queryKey: conversationQueryKey(counterpartId) });
         }

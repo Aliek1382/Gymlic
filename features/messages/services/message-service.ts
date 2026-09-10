@@ -67,13 +67,13 @@ interface AssignmentRow {
   assigned_at: string;
 }
 
-interface ConversationCommentRow {
+interface ConversationMessageRow {
   id: string;
-  kind: PlanKind;
-  assignment_id: string;
-  author_id: string;
+  sender_id: string;
   body: string;
   created_at: string;
+  plan_kind: PlanKind | null;
+  plan_id: string | null;
   profiles: {
     first_name: string | null;
     last_name: string | null;
@@ -112,77 +112,110 @@ async function listSharedPlans(
 }
 
 /**
- * The whole back-and-forth with one person: every comment on every plan
- * they share, merged into a single timeline. Each message keeps the plan it
- * was written on, so the thread can still say what a line is about.
+ * The whole back-and-forth with one person, in one timeline: direct messages
+ * and anything written about a plan alike. The shared plans come back with
+ * it — they are what the composer can attach a message to, and what names
+ * the plan a message was written on.
  */
 export async function getConversation(counterpartId: string): Promise<Conversation> {
   const supabase = createClient();
   const userId = await getCurrentUserId();
 
-  const [workoutPlans, nutritionPlans] = await Promise.all([
+  const [workoutPlans, nutritionPlans, conversation] = await Promise.all([
     listSharedPlans("workout", userId, counterpartId),
     listSharedPlans("nutrition", userId, counterpartId),
+    supabase
+      .from("messages")
+      .select(
+        "id, sender_id, body, created_at, plan_kind, plan_id, profiles!sender_id(first_name, last_name, avatar_url)"
+      )
+      // Both directions of the pair. RLS already limits this to the caller's
+      // own messages, so this only has to pick the counterpart.
+      .or(
+        `and(sender_id.eq.${userId},recipient_id.eq.${counterpartId}),` +
+          `and(sender_id.eq.${counterpartId},recipient_id.eq.${userId})`
+      )
+      .order("created_at", { ascending: true })
+      .returns<ConversationMessageRow[]>(),
   ]);
+  if (conversation.error) throw conversation.error;
 
   const plans = [...workoutPlans, ...nutritionPlans].sort((a, b) =>
     b.assignedAt.localeCompare(a.assignedAt)
   );
-  if (plans.length === 0) return { plans, messages: [] };
 
-  const { data, error } = await supabase
-    .from("plan_comments")
-    .select(
-      "id, kind, assignment_id, author_id, body, created_at, profiles!author_id(first_name, last_name, avatar_url)"
-    )
-    .in(
-      "assignment_id",
-      plans.map((plan) => plan.id)
-    )
-    .order("created_at", { ascending: true })
-    .returns<ConversationCommentRow[]>();
-  if (error) throw error;
-
-  // assignment_id has no single FK (workout and nutrition plans live in
-  // separate tables), so the id filter above can't tell the two apart on
-  // its own — the kind has to match the plan the id was taken from.
+  // plan_id has no single FK (workout and nutrition plans live in separate
+  // tables), so a title is looked up by kind and id together.
   const planByKey = new Map(plans.map((plan) => [`${plan.kind}:${plan.id}`, plan]));
 
-  const messages: ConversationMessage[] = [];
-  for (const row of data ?? []) {
-    const plan = planByKey.get(`${row.kind}:${row.assignment_id}`);
-    if (!plan) continue;
-    messages.push({
-      id: row.id,
-      kind: row.kind,
-      assignmentId: row.assignment_id,
-      planTitle: plan.title,
-      authorId: row.author_id,
-      authorName: fullName(row.profiles?.first_name ?? null, row.profiles?.last_name ?? null),
-      authorAvatarUrl: row.profiles?.avatar_url ?? null,
-      body: row.body,
-      createdAt: row.created_at,
-    });
-  }
+  const messages: ConversationMessage[] = (conversation.data ?? []).map((row) => ({
+    id: row.id,
+    planKind: row.plan_kind,
+    planId: row.plan_id,
+    planTitle:
+      row.plan_id && row.plan_kind
+        ? planByKey.get(`${row.plan_kind}:${row.plan_id}`)?.title ?? "برنامه"
+        : null,
+    authorId: row.sender_id,
+    authorName: fullName(row.profiles?.first_name ?? null, row.profiles?.last_name ?? null),
+    authorAvatarUrl: row.profiles?.avatar_url ?? null,
+    body: row.body,
+    createdAt: row.created_at,
+  }));
 
   return { plans, messages };
 }
 
 /**
- * Clears the unread badge for one conversation by marking the notifications
- * it produced as read — the same rows the bell reads, so opening a
- * conversation empties both at once.
+ * Sends one message. `plan` is optional: without it this is an ordinary
+ * direct message, which is what makes a conversation possible before any
+ * plan exists.
+ */
+export async function sendMessage(
+  recipientId: string,
+  body: string,
+  plan?: { kind: PlanKind; id: string } | null
+): Promise<void> {
+  const supabase = createClient();
+  const userId = await getCurrentUserId();
+
+  const { error } = await supabase.from("messages").insert({
+    sender_id: userId,
+    recipient_id: recipientId,
+    body,
+    plan_kind: plan?.kind ?? null,
+    plan_id: plan?.id ?? null,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Marks everything this person sent as read. The unread count comes from the
+ * messages themselves now, but the notifications they produced are cleared
+ * in the same breath so the bell doesn't keep announcing a conversation the
+ * user is looking at. 'plan_comment' is included for rows written before
+ * 0036 renamed the kind.
  */
 export async function markConversationRead(counterpartId: string): Promise<void> {
   const supabase = createClient();
   const userId = await getCurrentUserId();
+  const readAt = new Date().toISOString();
 
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("recipient_id", userId)
-    .eq("type", "plan_comment")
-    .eq("actor_id", counterpartId)
-    .is("read_at", null);
-  if (error) throw error;
+  const [messagesResult, notificationsResult] = await Promise.all([
+    supabase
+      .from("messages")
+      .update({ read_at: readAt })
+      .eq("recipient_id", userId)
+      .eq("sender_id", counterpartId)
+      .is("read_at", null),
+    supabase
+      .from("notifications")
+      .update({ read_at: readAt })
+      .eq("recipient_id", userId)
+      .in("type", ["message", "plan_comment"])
+      .eq("actor_id", counterpartId)
+      .is("read_at", null),
+  ]);
+  if (messagesResult.error) throw messagesResult.error;
+  if (notificationsResult.error) throw notificationsResult.error;
 }

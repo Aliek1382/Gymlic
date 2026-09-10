@@ -320,6 +320,7 @@ export function PlanBrowser({
                   kind={kind}
                   assignmentId={selectedPlan.id}
                   currentUserId={currentUserId}
+                  isDraft={selectedPlan.status === "draft"}
                 />
               </div>
             </DialogContent>

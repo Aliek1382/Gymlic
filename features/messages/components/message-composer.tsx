@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Apple, Dumbbell, Loader2, Send } from "lucide-react";
+import { Apple, Dumbbell, Loader2, MessageCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,12 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import type { PlanKind } from "@/features/athletes/types/athlete-types";
 import type { ConversationPlan } from "../types/message-types";
 
-// Same ceiling the plan_comments body check enforces in the database.
-const MAX_MESSAGE_LENGTH = 500;
+// Same ceiling the messages.body check enforces in the database.
+const MAX_MESSAGE_LENGTH = 1000;
+
+// A message doesn't have to be about anything in particular — that is the
+// default, and what makes the inbox usable before a plan exists.
+const NO_PLAN = "none";
 
 const PLAN_ICON = { workout: Dumbbell, nutrition: Apple } as const;
 
@@ -25,13 +29,6 @@ function planKey(plan: ConversationPlan) {
   return `${plan.kind}:${plan.id}`;
 }
 
-/**
- * Every message belongs to one of the plans the two share — that's what
- * plan_comments records — so the composer picks one. It defaults to the
- * most recently assigned plan, which is what a message is nearly always
- * about, and the picker is only shown when there's more than one to choose
- * from.
- */
 export function MessageComposer({
   plans,
   isPending,
@@ -39,19 +36,25 @@ export function MessageComposer({
 }: {
   plans: ConversationPlan[];
   isPending: boolean;
-  onSend: (input: { kind: PlanKind; assignmentId: string; body: string }) => Promise<void>;
+  onSend: (input: {
+    body: string;
+    plan?: { kind: PlanKind; id: string } | null;
+  }) => Promise<void>;
 }) {
   const [draft, setDraft] = useState("");
-  const [selectedKey, setSelectedKey] = useState(() => planKey(plans[0]));
+  const [selectedKey, setSelectedKey] = useState<string>(NO_PLAN);
 
-  const selectedPlan = plans.find((plan) => planKey(plan) === selectedKey) ?? plans[0];
+  const selectedPlan = plans.find((plan) => planKey(plan) === selectedKey) ?? null;
 
   async function handleSubmit() {
     const body = draft.trim();
     if (!body || isPending) return;
 
     try {
-      await onSend({ kind: selectedPlan.kind, assignmentId: selectedPlan.id, body });
+      await onSend({
+        body,
+        plan: selectedPlan ? { kind: selectedPlan.kind, id: selectedPlan.id } : null,
+      });
       setDraft("");
     } catch (error) {
       toast.error(getErrorMessage(error, "ارسال پیام با خطا مواجه شد."));
@@ -60,14 +63,21 @@ export function MessageComposer({
 
   return (
     <div className="space-y-2 border-t border-border p-3">
-      {plans.length > 1 && (
+      {plans.length > 0 && (
         <div className="flex items-center gap-2">
-          <span className="shrink-0 text-xs text-muted-foreground">درباره برنامه:</span>
-          <Select value={planKey(selectedPlan)} onValueChange={setSelectedKey}>
+          <span className="shrink-0 text-xs text-muted-foreground">درباره:</span>
+          <Select
+            value={selectedPlan ? planKey(selectedPlan) : NO_PLAN}
+            onValueChange={setSelectedKey}
+          >
             <SelectTrigger className="h-9 flex-1 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={NO_PLAN}>
+                <MessageCircle className="size-3.5" />
+                پیام عمومی
+              </SelectItem>
               {plans.map((plan) => {
                 const Icon = PLAN_ICON[plan.kind];
                 return (
