@@ -27,8 +27,8 @@ export default async function MessagesPage({
         <h1 className="text-xl font-bold text-foreground">پیام‌ها</h1>
         <p className="text-sm text-muted-foreground">
           {isAthlete
-            ? "درباره برنامه‌هایتان با مربی گفتگو کنید؛ پیام‌ها زیر همان برنامه ثبت می‌شوند."
-            : "گفتگو با ورزشکاران درباره برنامه‌هایی که برایشان نوشته‌اید."}
+            ? "با مربی خود گفتگو کنید — درباره برنامه‌ها یا هر سوال دیگری."
+            : "گفتگوی مستقیم با ورزشکاران، درباره برنامه‌ها یا هر موضوع دیگری."}
         </p>
       </div>
 

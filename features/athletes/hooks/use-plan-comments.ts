@@ -13,7 +13,7 @@ export function planCommentsQueryKey(kind: PlanKind, assignmentId: string) {
 
 // Keeps the thread live with a Realtime subscription, same shape as
 // useNotifications — whoever's on the other end sees a reply without a
-// refresh.
+// refresh. The rows are messages carrying this plan's reference (0036).
 export function usePlanComments(kind: PlanKind, assignmentId: string, enabled = true) {
   const queryClient = useQueryClient();
   const queryKey = planCommentsQueryKey(kind, assignmentId);
@@ -35,8 +35,8 @@ export function usePlanComments(kind: PlanKind, assignmentId: string, enabled = 
         {
           event: "INSERT",
           schema: "public",
-          table: "plan_comments",
-          filter: `assignment_id=eq.${assignmentId}`,
+          table: "messages",
+          filter: `plan_id=eq.${assignmentId}`,
         },
         () => {
           queryClient.invalidateQueries({ queryKey });

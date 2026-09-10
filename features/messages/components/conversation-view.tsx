@@ -65,8 +65,9 @@ export function ConversationView({
           <p className="truncate text-sm font-medium text-foreground">{thread.name}</p>
           <p className="text-xs text-muted-foreground">
             {ROLE_LABEL[thread.counterpartRole]}
-            {thread.planCount > 0 &&
-              ` · ${toPersianDigits(thread.planCount)} برنامه مشترک`}
+            {thread.planCount > 0
+              ? ` · ${toPersianDigits(thread.planCount)} برنامه مشترک`
+              : " · هنوز برنامه‌ای ثبت نشده"}
           </p>
         </div>
       </div>
@@ -84,25 +85,27 @@ export function ConversationView({
           <EmptyState
             icon={MessageCircle}
             title="هنوز پیامی رد و بدل نشده است."
-            description="اولین پیام را شما بنویسید — پیام‌ها زیر برنامه‌ای که انتخاب می‌کنید ثبت می‌شوند."
+            description="اولین پیام را شما بنویسید. اگر درباره یکی از برنامه‌هاست، می‌توانید آن را هم انتخاب کنید."
           />
         ) : (
           <ul className="space-y-3">
             {messages.map((message, index) => {
               const isOwn = message.authorId === currentUserId;
-              // Messages from different plans sit in one timeline, so the
-              // plan is named whenever it changes — a chip on every message
-              // would just be noise in a run about the same plan.
+              // Plan-attached messages and plain ones share one timeline, so
+              // the plan is named whenever it changes — a chip on every
+              // message would be noise in a run about the same plan, and a
+              // direct message has nothing to name.
               const showPlan =
-                index === 0 || messages[index - 1].assignmentId !== message.assignmentId;
-              const PlanIcon = PLAN_ICON[message.kind];
+                message.planId !== null &&
+                (index === 0 || messages[index - 1].planId !== message.planId);
+              const PlanIcon = message.planKind ? PLAN_ICON[message.planKind] : null;
 
               return (
                 <li key={message.id} className="space-y-2">
                   {showPlan && (
                     <div className="flex items-center justify-center">
                       <span className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-[11px] text-muted-foreground">
-                        <PlanIcon className="size-3" />
+                        {PlanIcon && <PlanIcon className="size-3" />}
                         {message.planTitle}
                       </span>
                     </div>
@@ -140,11 +143,7 @@ export function ConversationView({
         )}
       </div>
 
-      {conversation.isLoading ? null : plans.length === 0 ? (
-        <p className="border-t border-border p-4 text-center text-xs text-muted-foreground">
-          تا وقتی برنامه‌ای بین شما ثبت نشده باشد، امکان ارسال پیام وجود ندارد.
-        </p>
-      ) : (
+      {conversation.isLoading ? null : (
         <MessageComposer
           plans={plans}
           isPending={sendMessage.isPending}

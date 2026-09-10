@@ -46,7 +46,7 @@ export function CoachMessageCard({ currentUserId }: { currentUserId: string }) {
           <EmptyState
             icon={MessageCircle}
             title="هنوز گفتگویی با مربی ندارید."
-            description="به محض ثبت اولین برنامه، می‌توانید همین‌جا با مربی خود گفتگو کنید."
+            description="به محض وصل‌شدن به مربی، می‌توانید همین‌جا با او گفتگو کنید."
           />
         ) : (
           <ul className="space-y-1">

@@ -30,7 +30,10 @@ export type NotificationType =
   | "member_joined"
   | "complete_profile"
   | "broadcast"
-  | "plan_comment";
+  // Written by plan_comments' trigger until 0036; kept so historical rows
+  // still render with an icon.
+  | "plan_comment"
+  | "message";
 
 type TableOf<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
@@ -522,6 +525,32 @@ export interface Database {
         },
         { read_at: string | null }
       >;
+      messages: TableOf<
+        {
+          id: string;
+          sender_id: string;
+          recipient_id: string;
+          body: string;
+          // Null on a plain direct message; set when the message was written
+          // about one of the pair's plans.
+          plan_kind: "workout" | "nutrition" | null;
+          plan_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        },
+        {
+          sender_id: string;
+          recipient_id: string;
+          body: string;
+          plan_kind?: "workout" | "nutrition" | null;
+          plan_id?: string | null;
+        },
+        // Only the recipient's read state may change; a trigger rejects any
+        // other edit.
+        { read_at: string | null }
+      >;
+      // Read-only archive since 0036: rows were copied into `messages` and
+      // the insert policy was dropped.
       plan_comments: TableOf<
         {
           id: string;
@@ -587,8 +616,8 @@ export interface Database {
         Args: { p_request_id: string; p_admin_note?: string | null };
         Returns: undefined;
       };
-      // One row per person the caller shares an assigned plan with — the
-      // inbox list, aggregated from plan_comments and notifications.
+      // One row per person the caller may message — everyone they are linked
+      // to, plus anyone they have exchanged messages with.
       list_message_threads: {
         Args: Record<string, never>;
         Returns: {

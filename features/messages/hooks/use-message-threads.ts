@@ -11,10 +11,10 @@ export function messageThreadsQueryKey() {
 }
 
 /**
- * The inbox list, kept live the same way the notification bell is: a new
- * comment anywhere (or a notification of one being read) re-runs the
- * aggregate, so a reply shows up without a refresh. Realtime respects RLS,
- * so only rows this user may see ever arrive.
+ * The inbox list, kept live the same way the notification bell is: any
+ * message arriving or being marked read re-runs the aggregate, so a reply
+ * shows up without a refresh. Realtime respects RLS, so only rows this user
+ * may see ever arrive.
  */
 export function useMessageThreads() {
   const queryClient = useQueryClient();
@@ -34,12 +34,7 @@ export function useMessageThreads() {
       .channel("message-threads")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "plan_comments" },
-        invalidate
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
+        { event: "*", schema: "public", table: "messages" },
         invalidate
       )
       .subscribe();
