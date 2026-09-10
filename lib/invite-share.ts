@@ -20,3 +20,10 @@ export function buildWhatsAppShareUrl(message: string, phone?: string | null): s
 export function buildTelegramShareUrl(link: string, message: string): string {
   return `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(message)}`;
 }
+
+// Eitaa is a Telegram-client fork and mirrors its share/url widget the same
+// way — same caveat as Telegram: opens Eitaa's own contact picker, no way to
+// target a phone number directly.
+export function buildEitaaShareUrl(link: string, message: string): string {
+  return `https://eitaa.com/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(message)}`;
+}

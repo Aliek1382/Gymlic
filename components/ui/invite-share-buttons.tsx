@@ -1,15 +1,16 @@
-import { MessageCircle, Send } from "lucide-react";
+import { MessageCircle, MessageSquare, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
+  buildEitaaShareUrl,
   buildTelegramShareUrl,
   buildWhatsAppShareUrl,
 } from "@/lib/invite-share";
 
-// Opens WhatsApp/Telegram with the invite link pre-filled, so sending it
-// doesn't require leaving the panel to copy-paste into another app by hand.
-// WhatsApp can target the invitee's number directly; Telegram always opens
-// its own contact picker (see buildTelegramShareUrl).
+// Opens WhatsApp/Telegram/Eitaa with the invite link pre-filled, so sending
+// it doesn't require leaving the panel to copy-paste into another app by
+// hand. WhatsApp can target the invitee's number directly; Telegram and
+// Eitaa always open their own contact picker (see their build*ShareUrl).
 export function InviteShareButtons({
   link,
   phone,
@@ -24,7 +25,7 @@ export function InviteShareButtons({
   const text = message ?? `برای پذیرش دعوت روی این لینک بزنید:\n${link}`;
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button
         asChild
         variant="outline"
@@ -53,6 +54,21 @@ export function InviteShareButtons({
         >
           <Send />
           تلگرام
+        </a>
+      </Button>
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        className={fullWidth ? "flex-1" : undefined}
+      >
+        <a
+          href={buildEitaaShareUrl(link, text)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <MessageSquare />
+          ایتا
         </a>
       </Button>
     </div>
