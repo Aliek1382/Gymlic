@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Apple,
   BarChart3,
+  Bell,
   Bookmark,
   Calendar,
   Dumbbell,
@@ -34,6 +35,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "مربیان", href: "/trainers", icon: Dumbbell },
     { label: "کلاس‌ها", href: "/classes", icon: Calendar },
     { label: "امور مالی", href: "/finance", icon: Wallet },
+    { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "تنظیمات", href: "/settings", icon: Settings },
   ],
   trainer: [
@@ -72,6 +74,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
         "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
     },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
+    { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "تنظیمات", href: "/settings", icon: Settings },
   ],
   athlete: [
@@ -80,6 +83,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "برنامه غذایی", href: "/nutrition", icon: Apple },
     { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },
+    { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "پروفایل", href: "/profile", icon: UserCircle },
   ],
 };

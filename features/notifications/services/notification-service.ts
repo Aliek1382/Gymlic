@@ -44,6 +44,42 @@ export async function getNotifications(userId: string): Promise<NotificationItem
   return (data ?? []).map(toNotificationItem);
 }
 
+const ARCHIVE_PAGE_SIZE = 30;
+
+export interface NotificationsPage {
+  items: NotificationItem[];
+  // The oldest row's `created_at` in this page — pass back as `cursor` to
+  // fetch the next one. `null` once there's nothing older left.
+  nextCursor: string | null;
+}
+
+// Keyset pagination on `created_at` rather than `.range()` offsets — offsets
+// shift under a live-updating list (a new notification lands, or one's
+// marked read) and would duplicate or skip rows across pages.
+export async function getNotificationsPage(
+  userId: string,
+  cursor?: string | null
+): Promise<NotificationsPage> {
+  const supabase = createClient();
+  let query = supabase
+    .from("notifications")
+    .select("id, actor_id, type, title, body, link, metadata, read_at, created_at")
+    .eq("recipient_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(ARCHIVE_PAGE_SIZE);
+
+  if (cursor) query = query.lt("created_at", cursor);
+
+  const { data, error } = await query.returns<NotificationRow[]>();
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const nextCursor =
+    rows.length === ARCHIVE_PAGE_SIZE ? rows[rows.length - 1].created_at : null;
+
+  return { items: rows.map(toNotificationItem), nextCursor };
+}
+
 export async function markNotificationRead(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
