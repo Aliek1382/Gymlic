@@ -13,6 +13,7 @@ export interface PendingAthleteInvite {
   id: string;
   code: string;
   name: string;
+  phone: string | null;
   heightCm: number | null;
   weightKg: number | null;
   createdAt: string;

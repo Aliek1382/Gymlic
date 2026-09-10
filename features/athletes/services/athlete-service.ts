@@ -103,7 +103,7 @@ export async function listPendingAthleteInvites(): Promise<
   const [invitesResult, workouts, nutrition] = await Promise.all([
     supabase
       .from("invitations")
-      .select("id, code, first_name, last_name, height_cm, weight_kg, created_at, expires_at")
+      .select("id, code, first_name, last_name, phone, height_cm, weight_kg, created_at, expires_at")
       .eq("created_by", trainerId)
       .eq("invited_role", "athlete")
       .eq("status", "pending")
@@ -135,6 +135,7 @@ export async function listPendingAthleteInvites(): Promise<
     code: row.code,
     name:
       [row.first_name, row.last_name].filter(Boolean).join(" ") || "بدون نام",
+    phone: row.phone,
     heightCm: row.height_cm,
     weightKg: row.weight_kg,
     createdAt: row.created_at,
@@ -197,6 +198,7 @@ export async function getTrainerClub(): Promise<TrainerClub | null> {
 export async function createAthleteInvite(input: {
   firstName: string;
   lastName: string;
+  phone: string | null;
   heightCm: number | null;
   weightKg: number | null;
 }): Promise<{ code: string }> {
@@ -219,6 +221,7 @@ export async function createAthleteInvite(input: {
     created_by: trainerId,
     first_name: input.firstName,
     last_name: input.lastName,
+    phone: input.phone,
     height_cm: input.heightCm,
     weight_kg: input.weightKg,
     expires_at: expiresAt.toISOString(),
