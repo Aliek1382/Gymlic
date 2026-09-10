@@ -4,6 +4,7 @@ export * from "./components/metric-chart";
 export * from "./components/progress-charts";
 export * from "./components/progress-dashboard-widget";
 export * from "./components/progress-page-content";
+export * from "./components/quick-weight-entry";
 export * from "./components/trainer-progress-browser";
 
 export * from "./hooks/use-add-measurement";
