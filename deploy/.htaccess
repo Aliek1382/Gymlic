@@ -1,0 +1,76 @@
+# Gymlic — Apache/LiteSpeed config for the static export in out/.
+# Copied into out/ by `npm run build`; upload the whole folder to public_html.
+
+# ---------------------------------------------------------------------------
+# Routing
+# ---------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Anything that exists on disk is served as-is. This also covers /join/_/,
+  # so the rewrite below can never loop.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Invite links are handed out as /join/<code> and opened from outside the
+  # app, so the path has to keep working. Real codes only exist at runtime, so
+  # the route was exported once under a placeholder and every code is served
+  # from that one file — the page reads the code back off the URL, which this
+  # rewrite leaves untouched.
+  RewriteRule ^join/[^/]+/?$ /join/_/index.html [L]
+</IfModule>
+
+# Every other unknown path falls through to the exported 404 page.
+ErrorDocument 404 /404.html
+
+# ---------------------------------------------------------------------------
+# Caching
+# ---------------------------------------------------------------------------
+<IfModule mod_headers.c>
+  # Build assets carry a content hash in their filename, so a given URL never
+  # changes contents and can be cached indefinitely.
+  <FilesMatch "\.(js|css|woff|woff2|ttf|otf)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  <FilesMatch "\.(png|jpg|jpeg|gif|webp|svg|ico)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+
+  # HTML is the entry point to a new build, so it must always be revalidated —
+  # otherwise a cached page keeps pointing at deleted asset hashes.
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Listed after the .js rule above so it wins: a cached service worker would
+  # pin users to an old build.
+  <Files "sw.js">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </Files>
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Compression
+# ---------------------------------------------------------------------------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml \
+    application/javascript application/json application/manifest+json \
+    image/svg+xml
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# MIME types
+# ---------------------------------------------------------------------------
+AddType application/manifest+json .webmanifest
+AddType font/woff2 .woff2
+
+# ---------------------------------------------------------------------------
+# Force HTTPS — uncomment once the domain's SSL certificate is issued.
+# ---------------------------------------------------------------------------
+# <IfModule mod_rewrite.c>
+#   RewriteCond %{HTTPS} off
+#   RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+# </IfModule>

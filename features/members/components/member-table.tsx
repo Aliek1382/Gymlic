@@ -100,7 +100,7 @@ export function MemberTable({
                     </Avatar>
                     <div>
                       <Link
-                        href={`/members/${member.membershipId}`}
+                        href={`/members/profile?id=${member.membershipId}`}
                         className="font-medium text-foreground hover:underline"
                       >
                         {member.name}

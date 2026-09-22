@@ -59,7 +59,7 @@ export function ExpiringMembershipsCard({ clubId }: { clubId: string }) {
               return (
                 <Link
                   key={member.membershipId}
-                  href={`/members/${member.membershipId}`}
+                  href={`/members/profile?id=${member.membershipId}`}
                   className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 hover:bg-muted/50"
                 >
                   <div className="min-w-0">

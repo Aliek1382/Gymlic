@@ -1,33 +1,16 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { getServerAuthContext } from "@/features/authentication/services/auth-server";
-import { MemberManagement } from "@/features/members";
+import { RouteLoading } from "@/components/layout/route-loading";
+import { MembersPage } from "@/features/members";
 
 export const metadata = { title: "اعضا | جیم‌لیک" };
 
-export default async function MembersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ new?: string }>;
-}) {
-  const context = await getServerAuthContext();
-  if (!context) redirect("/login");
-  if (context.accountType !== "club") redirect("/dashboard");
-
-  const { new: openAdd } = await searchParams;
-  const clubId = context.activeMembership!.clubId;
-
+export default function Page() {
+  // MembersPage reads `?new=1` via useSearchParams, which has to sit behind a
+  // Suspense boundary for the page to be prerendered at build time.
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">اعضا</h1>
-        <p className="text-sm text-muted-foreground">
-          اعضای باشگاه را دعوت کنید، طرح و وضعیت عضویتشان را مدیریت کنید و
-          دعوت‌های در انتظار را پیگیری کنید.
-        </p>
-      </div>
-
-      <MemberManagement clubId={clubId} openAddOnMount={openAdd === "1"} />
-    </div>
+    <Suspense fallback={<RouteLoading />}>
+      <MembersPage />
+    </Suspense>
   );
 }

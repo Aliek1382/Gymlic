@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+"use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -12,55 +12,79 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatAge, formatNumber, formatPersianDate } from "@/lib/persian";
-import { createClient } from "@/lib/supabase/server";
-import { AdminProfileEditForm } from "@/features/admin/components/admin-profile-edit-form";
-import { SuspendToggle } from "@/features/admin/components/suspend-toggle";
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 
-export default async function AdminTrainerDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const supabase = await createClient();
+import { createClient } from "@/lib/supabase/client";
+import { NotFoundNotice } from "@/components/not-found-notice";
+import { RouteLoading } from "@/components/layout/route-loading";
+import { AdminProfileEditForm } from "./admin-profile-edit-form";
+import { SuspendToggle } from "./suspend-toggle";
 
-  const [{ data: trainer }, { data: club }, { data: students }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, first_name, last_name, phone, email, birth_date, avatar_url, is_suspended, account_type, created_at")
-      .eq("id", id)
-      .maybeSingle(),
-    supabase
-      .from("memberships")
-      .select("clubs(name)")
-      .eq("user_id", id)
-      .eq("role", "trainer")
-      .eq("status", "active")
-      .maybeSingle()
-      .returns<{ clubs: { name: string } | null } | null>(),
-    supabase
-      .from("trainer_athletes")
-      .select("status, created_at, profiles:athlete_id(first_name, last_name, phone)")
-      .eq("trainer_id", id)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .returns<
-        {
-          status: string;
-          created_at: string;
-          profiles: { first_name: string | null; last_name: string | null; phone: string | null } | null;
-        }[]
-      >(),
-  ]);
+export function AdminTrainerDetailPage() {
+  // Was /admin/trainers/[id] — see AdminClubDetailPage for why the id moved
+  // into the query string.
+  const id = useSearchParams().get("id") ?? "";
 
-  if (!trainer || trainer.account_type !== "trainer") notFound();
+  const { data, isPending } = useQuery({
+    queryKey: ["admin", "trainer", id],
+    enabled: id.length > 0,
+    queryFn: async () => {
+      const supabase = createClient();
+      const [{ data: trainer }, { data: club }, { data: students }] =
+        await Promise.all([
+          supabase
+            .from("profiles")
+            .select("id, first_name, last_name, phone, email, birth_date, avatar_url, is_suspended, account_type, created_at")
+            .eq("id", id)
+            .maybeSingle(),
+          supabase
+            .from("memberships")
+            .select("clubs(name)")
+            .eq("user_id", id)
+            .eq("role", "trainer")
+            .eq("status", "active")
+            .maybeSingle()
+            .returns<{ clubs: { name: string } | null } | null>(),
+          supabase
+            .from("trainer_athletes")
+            .select("status, created_at, profiles:athlete_id(first_name, last_name, phone)")
+            .eq("trainer_id", id)
+            .eq("status", "active")
+            .order("created_at", { ascending: false })
+            .returns<
+              {
+                status: string;
+                created_at: string;
+                profiles: { first_name: string | null; last_name: string | null; phone: string | null } | null;
+              }[]
+            >(),
+        ]);
 
+      return { trainer, club, students };
+    },
+  });
+
+  if (isPending) return <RouteLoading />;
+
+  const trainer = data?.trainer;
+  if (!trainer || trainer.account_type !== "trainer") {
+    return (
+      <NotFoundNotice
+        title="مربی پیدا نشد"
+        description="این مربی وجود ندارد یا حساب او حذف شده است."
+      />
+    );
+  }
+
+  const club = data?.club;
   const name =
     [trainer.first_name, trainer.last_name].filter(Boolean).join(" ") || "بدون نام";
   const age = formatAge(trainer.birth_date);
-  const studentRows = students ?? [];
+  const studentRows = data?.students ?? [];
 
   return (
+
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">

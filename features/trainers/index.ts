@@ -3,6 +3,7 @@ export * from "./components/pending-trainer-invites-card";
 export * from "./components/trainer-management";
 export * from "./components/trainer-row-actions";
 export * from "./components/trainer-table";
+export * from "./components/trainers-page";
 
 export * from "./hooks/use-club-trainer-list";
 export * from "./hooks/use-create-trainer-invite";

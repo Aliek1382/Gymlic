@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "eslint"
+    "build": "next build --turbopack && cp deploy/.htaccess out/.htaccess",
+    "lint": "eslint",
+    "preview": "npx --yes serve out"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

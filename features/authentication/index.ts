@@ -6,6 +6,8 @@ export * from "./components/create-club-form";
 export * from "./components/invitation-form";
 export * from "./components/join-form";
 export * from "./components/join-signed-in-form";
+export * from "./components/onboarding-pages";
+export * from "./components/join-page";
 
 export * from "./hooks/use-profile";
 export * from "./hooks/use-choose-role";

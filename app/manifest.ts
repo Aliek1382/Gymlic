@@ -1,5 +1,10 @@
 import type { MetadataRoute } from "next";
 
+// With `output: "export"` every route must be emitted at build time; a metadata
+// route is dynamic by default, so it has to opt in explicitly or the build
+// fails while collecting page data.
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     // `id` pins the app's identity independently of `start_url`, so changing

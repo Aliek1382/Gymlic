@@ -3,6 +3,7 @@ export * from "./components/conversation-view";
 export * from "./components/message-composer";
 export * from "./components/message-inbox";
 export * from "./components/thread-list";
+export * from "./components/messages-page";
 
 export * from "./hooks/use-conversation";
 export * from "./hooks/use-mark-conversation-read";

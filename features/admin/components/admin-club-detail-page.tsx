@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+"use client";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -11,8 +11,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
-import { createClient } from "@/lib/supabase/server";
-import { ClubStatusToggle } from "@/features/admin/components/club-status-toggle";
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
+
+import { createClient } from "@/lib/supabase/client";
+import { NotFoundNotice } from "@/components/not-found-notice";
+import { RouteLoading } from "@/components/layout/route-loading";
+import { ClubStatusToggle } from "./club-status-toggle";
 import type {
   ClubStatus,
   PaymentRequestStatus,
@@ -62,76 +67,93 @@ const REQUEST_STATUS_VARIANT: Record<PaymentRequestStatus, "warning" | "success"
   rejected: "destructive",
 };
 
-export default async function AdminClubDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const supabase = await createClient();
+export function AdminClubDetailPage() {
+  // Was /admin/clubs/[id]; a static export cannot emit a page per club, so
+  // the id travels in the query string and <Link> navigation stays client-side.
+  const id = useSearchParams().get("id") ?? "";
 
-  const [{ data: club }, { data: memberships }, { data: paymentRequests }] =
-    await Promise.all([
-      supabase
-        .from("clubs")
-        .select(
-          "id, name, status, member_capacity, created_at, owner:profiles!owner_id(first_name, last_name, phone, email), subscriptions(status, plan_name, started_at, expires_at)"
-        )
-        .eq("id", id)
-        .maybeSingle()
-        .returns<{
-          id: string;
-          name: string;
-          status: ClubStatus;
-          member_capacity: number | null;
-          created_at: string;
-          owner: { first_name: string | null; last_name: string | null; phone: string | null; email: string | null } | null;
-          subscriptions: { status: SubscriptionStatus; plan_name: string; started_at: string; expires_at: string }[];
-        } | null>(),
-      supabase
-        .from("memberships")
-        .select("role, joined_at, profiles(first_name, last_name, phone)")
-        .eq("club_id", id)
-        .eq("status", "active")
-        .order("joined_at", { ascending: false })
-        .returns<
-          {
-            role: string;
-            joined_at: string;
-            profiles: { first_name: string | null; last_name: string | null; phone: string | null } | null;
-          }[]
-        >(),
-      supabase
-        .from("payment_requests")
-        .select("id, amount_toman, reference_note, status, admin_note, created_at, reviewed_at, plans(name)")
-        .eq("club_id", id)
-        .order("created_at", { ascending: false })
-        .returns<
-          {
-            id: string;
-            amount_toman: number;
-            reference_note: string | null;
-            status: PaymentRequestStatus;
-            admin_note: string | null;
-            created_at: string;
-            reviewed_at: string | null;
-            plans: { name: string } | null;
-          }[]
-        >(),
-    ]);
+  const { data, isPending } = useQuery({
+    queryKey: ["admin", "club", id],
+    enabled: id.length > 0,
+    queryFn: async () => {
+      const supabase = createClient();
+      const [{ data: club }, { data: memberships }, { data: paymentRequests }] =
+        await Promise.all([
+          supabase
+            .from("clubs")
+            .select(
+              "id, name, status, member_capacity, created_at, owner:profiles!owner_id(first_name, last_name, phone, email), subscriptions(status, plan_name, started_at, expires_at)"
+            )
+            .eq("id", id)
+            .maybeSingle()
+            .returns<{
+              id: string;
+              name: string;
+              status: ClubStatus;
+              member_capacity: number | null;
+              created_at: string;
+              owner: { first_name: string | null; last_name: string | null; phone: string | null; email: string | null } | null;
+              subscriptions: { status: SubscriptionStatus; plan_name: string; started_at: string; expires_at: string }[];
+            } | null>(),
+          supabase
+            .from("memberships")
+            .select("role, joined_at, profiles(first_name, last_name, phone)")
+            .eq("club_id", id)
+            .eq("status", "active")
+            .order("joined_at", { ascending: false })
+            .returns<
+              {
+                role: string;
+                joined_at: string;
+                profiles: { first_name: string | null; last_name: string | null; phone: string | null } | null;
+              }[]
+            >(),
+          supabase
+            .from("payment_requests")
+            .select("id, amount_toman, reference_note, status, admin_note, created_at, reviewed_at, plans(name)")
+            .eq("club_id", id)
+            .order("created_at", { ascending: false })
+            .returns<
+              {
+                id: string;
+                amount_toman: number;
+                reference_note: string | null;
+                status: PaymentRequestStatus;
+                admin_note: string | null;
+                created_at: string;
+                reviewed_at: string | null;
+                plans: { name: string } | null;
+              }[]
+            >(),
+        ]);
 
-  if (!club) notFound();
+      return { club, memberships, paymentRequests };
+    },
+  });
+
+  if (isPending) return <RouteLoading />;
+
+  const club = data?.club;
+  if (!club) {
+    return (
+      <NotFoundNotice
+        title="باشگاه پیدا نشد"
+        description="این باشگاه وجود ندارد یا حذف شده است."
+      />
+    );
+  }
 
   const ownerName =
     [club.owner?.first_name, club.owner?.last_name].filter(Boolean).join(" ") ||
     "بدون نام";
   const subscription = club.subscriptions?.[0];
-  const memberRows = memberships ?? [];
+  const memberRows = data?.memberships ?? [];
   const athleteCount = memberRows.filter((m) => m.role === "athlete").length;
   const trainerCount = memberRows.filter((m) => m.role === "trainer").length;
-  const requests = paymentRequests ?? [];
+  const requests = data?.paymentRequests ?? [];
 
   return (
+
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>

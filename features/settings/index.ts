@@ -4,6 +4,7 @@ export * from "./components/password-form";
 export * from "./components/profile-info-form";
 export * from "./components/settings-view";
 export * from "./components/sign-out-section";
+export * from "./components/settings-page";
 
 export * from "./hooks/use-update-profile-info";
 export * from "./hooks/use-update-email";

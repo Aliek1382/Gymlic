@@ -1,7 +1,4 @@
-import "server-only";
-import { cache } from "react";
-
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import type {
   AccountType,
   ClubStatus,
@@ -9,7 +6,13 @@ import type {
   MembershipRole,
 } from "@/types/database.types";
 
-export interface ServerAuthContext {
+/**
+ * Browser-side twin of the old ServerAuthContext. The app ships as a static
+ * export, so there is no request to read cookies from on the server — every
+ * gate that used to run in a Server Component now resolves here instead and
+ * is cached for the session by React Query.
+ */
+export interface AuthContext {
   userId: string;
   phone: string | null;
   email: string | null;
@@ -32,14 +35,12 @@ export interface ServerAuthContext {
 }
 
 /**
- * Loads everything the Redirect Rules (Dashboard Pack #7) need to decide
- * where an authenticated user should land. Returns null when there is no
- * session — callers should redirect to /login in that case (middleware
- * already does this for protected routes, this is the belt-and-braces check
- * for Server Components that need the resolved data anyway).
+ * Loads everything the Redirect Rules need to decide where an authenticated
+ * user should land. Returns null when there is no session — callers send the
+ * visitor to /login in that case.
  */
-export const getServerAuthContext = cache(async function getServerAuthContext(): Promise<ServerAuthContext | null> {
-  const supabase = await createClient();
+export async function getAuthContext(): Promise<AuthContext | null> {
+  const supabase = createClient();
 
   const {
     data: { user },
@@ -124,7 +125,48 @@ export const getServerAuthContext = cache(async function getServerAuthContext():
     trainerName,
     trainerAvatarUrl,
   };
-});
+}
+
+export interface AdminContext {
+  userId: string;
+  fullName: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * Gate for the whole /admin route group. Returns null for anyone without
+ * profiles.is_platform_admin set — including a signed-out visitor.
+ *
+ * On a static host this check is a routing convenience, not the security
+ * boundary: /admin's HTML shell is served to anyone who asks for it. What
+ * actually protects the data is the admin_* RLS policies, which re-check
+ * is_platform_admin on every row the page tries to read or write.
+ */
+export async function getAdminContext(): Promise<AdminContext | null> {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name, avatar_url, is_platform_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.is_platform_admin) return null;
+
+  return {
+    userId: user.id,
+    fullName:
+      [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+      "مدیر کل",
+    avatarUrl: profile.avatar_url,
+  };
+}
 
 export interface InvitationPreview {
   firstName: string | null;
@@ -135,15 +177,14 @@ export interface InvitationPreview {
 }
 
 /**
- * Server-side lookup for the public /join/[code] page. Calls the
- * get_invitation_preview SECURITY DEFINER function, so it works with no
- * session at all — possession of the (unguessable) code is the
- * authorization model.
+ * Lookup for the public /join/[code] page. Calls the get_invitation_preview
+ * SECURITY DEFINER function, so it works with no session at all — possession
+ * of the (unguessable) code is the authorization model.
  */
 export async function getInvitationPreview(
   code: string
 ): Promise<InvitationPreview | null> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase.rpc("get_invitation_preview", {
     p_code: code,
   });

@@ -4,6 +4,8 @@ export * from "./components/athlete-profile-content";
 export * from "./components/athlete-profile-note";
 export * from "./components/plan-dialog";
 export * from "./components/my-plan-list";
+export * from "./components/plan-browser-page";
+export * from "./components/my-plan-page";
 export * from "./components/remove-athlete-button";
 export * from "./components/plan-browser";
 export * from "./components/workout-day-builder";
@@ -18,6 +20,7 @@ export * from "./components/plan-format-hint";
 export * from "./components/nutrition-format-hint";
 export * from "./components/plan-comments";
 export * from "./components/training-calendar";
+export * from "./components/athlete-profile-page";
 
 export * from "./hooks/use-athletes";
 export * from "./hooks/use-athlete-profile";
