@@ -1,5 +1,10 @@
 import type { MetadataRoute } from "next";
 
+// With `output: "export"` every route must be emitted at build time; a metadata
+// route is dynamic by default, so it has to opt in explicitly or the build
+// fails while collecting page data.
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     // `id` pins the app's identity independently of `start_url`, so changing
@@ -11,9 +16,9 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "پلتفرم مدیریت باشگاه، مربی و ورزشکار",
     lang: "fa",
     dir: "rtl",
-    // Middleware sends a signed-out visitor from here to /login, so the
-    // installed app opens on the panel for a returning user and on the login
-    // screen for everyone else.
+    // The (dashboard) layout sends a signed-out visitor from here to /login,
+    // so the installed app opens on the panel for a returning user and on the
+    // login screen for everyone else.
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

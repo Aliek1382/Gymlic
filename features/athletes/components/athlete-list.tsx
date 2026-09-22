@@ -279,7 +279,7 @@ export function AthleteList() {
                 className="flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <Link
-                  href={`/athletes/${athlete.id}`}
+                  href={`/athletes/profile?id=${athlete.id}`}
                   className="group flex min-w-0 items-center gap-3 rounded-lg -m-1 p-1 transition-colors hover:bg-muted/50"
                 >
                   <Avatar className="size-9">

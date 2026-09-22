@@ -1,7 +1,12 @@
-import { AuthSplitCard } from "@/features/authentication";
+import { AuthSplitCard, LoginRedirectGuard } from "@/features/authentication";
 
 export const metadata = { title: "ورود | جیم‌لیک" };
 
 export default function LoginPage() {
-  return <AuthSplitCard />;
+  return (
+    <>
+      <LoginRedirectGuard />
+      <AuthSplitCard />
+    </>
+  );
 }

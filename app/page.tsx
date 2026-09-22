@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { NavigateTo } from "@/components/navigate-to";
 
 export default function RootPage() {
-  redirect("/dashboard");
+  return <NavigateTo href="/dashboard" />;
 }

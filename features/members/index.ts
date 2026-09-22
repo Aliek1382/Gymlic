@@ -3,12 +3,14 @@ export * from "./components/edit-member-dialog";
 export * from "./components/expiry-alert";
 export * from "./components/expiring-memberships-card";
 export * from "./components/member-management";
+export * from "./components/members-page";
 export * from "./components/member-profile-view";
 export * from "./components/member-profile-actions";
 export * from "./components/member-profile-page";
 export * from "./components/member-row-actions";
 export * from "./components/member-table";
 export * from "./components/pending-invites-card";
+export * from "./components/member-profile-route";
 
 export * from "./hooks/use-club-capacity";
 export * from "./hooks/use-club-members";

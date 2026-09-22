@@ -1,22 +1,57 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Clock, ShieldAlert } from "lucide-react";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { RouteLoading } from "@/components/layout/route-loading";
 import { ROLE_LABEL } from "@/components/layout/sidebar-nav";
 import { AccessBlockedNotice } from "@/components/access-blocked-notice";
-import { getServerAuthContext } from "@/features/authentication/services/auth-server";
+import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const context = await getServerAuthContext();
+  const router = useRouter();
+  const { data: context, isPending } = useAuthContext();
 
-  // Rule 1: Dashboard (and every panel page) is only reachable with a
-  // valid session. Middleware already redirects unauthenticated requests,
-  // this is the defensive Server Component check.
-  if (!context) redirect("/login");
+  // The Redirect Rules used to run in a Server Component, before any HTML was
+  // sent. Under `output: "export"` the shell is already in the browser by the
+  // time the session is known, so each rule becomes a client-side replace()
+  // and the layout renders its loading state until one of them settles.
+  useEffect(() => {
+    if (isPending) return;
+
+    if (!context) {
+      router.replace("/login");
+      return;
+    }
+    // Rule 2 / Rule 7 — role must be chosen before anything else.
+    if (!context.accountType) {
+      router.replace("/choose-role");
+      return;
+    }
+    // Club role must own a club before reaching the panel.
+    if (context.accountType === "club" && !context.activeMembership) {
+      router.replace("/create-club");
+      return;
+    }
+    // An Athlete reaches the panel through a Trainer, or — since clubs can
+    // invite members directly — through an active club membership. With
+    // neither, there is nothing to show them yet.
+    if (
+      context.accountType === "athlete" &&
+      !context.hasTrainer &&
+      !context.activeMembership
+    ) {
+      router.replace("/invitation");
+    }
+  }, [context, isPending, router]);
+
+  if (isPending || !context) return <RouteLoading />;
 
   // A platform admin can suspend any account — block the panel entirely
   // rather than letting a suspended user reach a half-working dashboard.
@@ -35,17 +70,17 @@ export default async function DashboardLayout({
   // owner, trainer, or reception — until the admin flips it back to
   // 'active' in /admin/clubs.
   if (context.activeMembership && context.activeMembership.clubStatus !== "active") {
-    const isPending = context.activeMembership.clubStatus === "pending";
+    const isPendingClub = context.activeMembership.clubStatus === "pending";
     return (
       <AccessBlockedNotice
-        icon={isPending ? Clock : ShieldAlert}
+        icon={isPendingClub ? Clock : ShieldAlert}
         title={
-          isPending
+          isPendingClub
             ? "باشگاه در انتظار تایید مدیریت است"
             : "دسترسی این باشگاه موقتاً معلق شده است"
         }
         description={
-          isPending
+          isPendingClub
             ? `باشگاه «${context.activeMembership.clubName}» هنوز توسط مدیریت جیم‌لیک تایید نشده است. پس از تایید، دسترسی شما به‌طور خودکار فعال می‌شود.`
             : `باشگاه «${context.activeMembership.clubName}» توسط مدیریت جیم‌لیک معلق شده است. برای پیگیری با پشتیبانی تماس بگیرید.`
         }
@@ -53,23 +88,18 @@ export default async function DashboardLayout({
     );
   }
 
-  // Rule 2 / Rule 7 — Redirect Rules: role must be chosen before anything else.
-  if (!context.accountType) redirect("/choose-role");
-
-  // Club role must own a club before reaching the panel.
+  // The effect above is already redirecting for each of these; rendering the
+  // loading state keeps the panel from flashing in the meantime.
+  if (!context.accountType) return <RouteLoading />;
   if (context.accountType === "club" && !context.activeMembership) {
-    redirect("/create-club");
+    return <RouteLoading />;
   }
-
-  // An Athlete reaches the panel through a Trainer, or — since clubs can
-  // invite members directly — through an active club membership. With
-  // neither, there is nothing to show them yet.
   if (
     context.accountType === "athlete" &&
     !context.hasTrainer &&
     !context.activeMembership
   ) {
-    redirect("/invitation");
+    return <RouteLoading />;
   }
 
   const fullName =
