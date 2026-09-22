@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/table";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
+
+import { getAdminClubDetail } from "../services/admin-service";
 import { useSearchParams } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/client";
+
 import { NotFoundNotice } from "@/components/not-found-notice";
 import { RouteLoading } from "@/components/layout/route-loading";
 import { ClubStatusToggle } from "./club-status-toggle";
@@ -75,60 +77,7 @@ export function AdminClubDetailPage() {
   const { data, isPending } = useQuery({
     queryKey: ["admin", "club", id],
     enabled: id.length > 0,
-    queryFn: async () => {
-      const supabase = createClient();
-      const [{ data: club }, { data: memberships }, { data: paymentRequests }] =
-        await Promise.all([
-          supabase
-            .from("clubs")
-            .select(
-              "id, name, status, member_capacity, created_at, owner:profiles!owner_id(first_name, last_name, phone, email), subscriptions(status, plan_name, started_at, expires_at)"
-            )
-            .eq("id", id)
-            .maybeSingle()
-            .returns<{
-              id: string;
-              name: string;
-              status: ClubStatus;
-              member_capacity: number | null;
-              created_at: string;
-              owner: { first_name: string | null; last_name: string | null; phone: string | null; email: string | null } | null;
-              subscriptions: { status: SubscriptionStatus; plan_name: string; started_at: string; expires_at: string }[];
-            } | null>(),
-          supabase
-            .from("memberships")
-            .select("role, joined_at, profiles(first_name, last_name, phone)")
-            .eq("club_id", id)
-            .eq("status", "active")
-            .order("joined_at", { ascending: false })
-            .returns<
-              {
-                role: string;
-                joined_at: string;
-                profiles: { first_name: string | null; last_name: string | null; phone: string | null } | null;
-              }[]
-            >(),
-          supabase
-            .from("payment_requests")
-            .select("id, amount_toman, reference_note, status, admin_note, created_at, reviewed_at, plans(name)")
-            .eq("club_id", id)
-            .order("created_at", { ascending: false })
-            .returns<
-              {
-                id: string;
-                amount_toman: number;
-                reference_note: string | null;
-                status: PaymentRequestStatus;
-                admin_note: string | null;
-                created_at: string;
-                reviewed_at: string | null;
-                plans: { name: string } | null;
-              }[]
-            >(),
-        ]);
-
-      return { club, memberships, paymentRequests };
-    },
+    queryFn: () => getAdminClubDetail(id),
   });
 
   if (isPending) return <RouteLoading />;
@@ -144,13 +93,12 @@ export function AdminClubDetailPage() {
   }
 
   const ownerName =
-    [club.owner?.first_name, club.owner?.last_name].filter(Boolean).join(" ") ||
+    [club.owner_first_name, club.owner_last_name].filter(Boolean).join(" ") ||
     "بدون نام";
-  const subscription = club.subscriptions?.[0];
-  const memberRows = data?.memberships ?? [];
+  const memberRows = data?.members ?? [];
   const athleteCount = memberRows.filter((m) => m.role === "athlete").length;
   const trainerCount = memberRows.filter((m) => m.role === "trainer").length;
-  const requests = data?.paymentRequests ?? [];
+  const requests = data?.payment_requests ?? [];
 
   return (
 
@@ -160,8 +108,8 @@ export function AdminClubDetailPage() {
           <h1 className="text-xl font-bold text-foreground">{club.name}</h1>
           <p className="text-sm text-muted-foreground">
             صاحب باشگاه: {ownerName}
-            {club.owner?.phone && (
-              <span dir="ltr"> · {club.owner.phone}</span>
+            {club.owner_phone && (
+              <span dir="ltr"> · {club.owner_phone}</span>
             )}
           </p>
         </div>
@@ -180,14 +128,17 @@ export function AdminClubDetailPage() {
         <Card className="gap-2 py-5">
           <div className="px-6">
             <p className="text-sm text-muted-foreground">اشتراک فعلی</p>
-            {subscription ? (
+            {club.subscription_status ? (
               <div className="mt-2 space-y-1">
-                <Badge variant={SUB_STATUS_VARIANT[subscription.status]}>
-                  {SUB_STATUS_LABEL[subscription.status]}
+                <Badge
+                  variant={SUB_STATUS_VARIANT[club.subscription_status as SubscriptionStatus]}
+                >
+                  {SUB_STATUS_LABEL[club.subscription_status as SubscriptionStatus]}
                 </Badge>
-                <p className="text-sm text-foreground">{subscription.plan_name}</p>
+                <p className="text-sm text-foreground">{club.plan_name}</p>
                 <p className="text-xs text-muted-foreground">
-                  انقضا: {formatPersianDate(new Date(subscription.expires_at))}
+                  انقضا:{" "}
+                  {formatPersianDate(new Date(club.subscription_expires_at as string))}
                 </p>
               </div>
             ) : (
@@ -242,7 +193,7 @@ export function AdminClubDetailPage() {
             <TableBody>
               {memberRows.map((member, index) => {
                 const memberName =
-                  [member.profiles?.first_name, member.profiles?.last_name]
+                  [member.first_name, member.last_name]
                     .filter(Boolean)
                     .join(" ") || "بدون نام";
                 return (
@@ -252,7 +203,7 @@ export function AdminClubDetailPage() {
                       {ROLE_LABEL[member.role] ?? member.role}
                     </TableCell>
                     <TableCell className="text-muted-foreground" dir="ltr">
-                      {member.profiles?.phone ?? "—"}
+                      {member.phone ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatPersianDate(new Date(member.joined_at))}
@@ -290,14 +241,14 @@ export function AdminClubDetailPage() {
               {requests.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell className="text-foreground">
-                    {request.plans?.name ?? "—"}
+                    {request.plan_name}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatToman(request.amount_toman)} تومان
                   </TableCell>
                   <TableCell>
-                    <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>
-                      {REQUEST_STATUS_LABEL[request.status]}
+                    <Badge variant={REQUEST_STATUS_VARIANT[request.status as PaymentRequestStatus]}>
+                      {REQUEST_STATUS_LABEL[request.status as PaymentRequestStatus]}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">

@@ -11,7 +11,7 @@ import {
 
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { getAdminOverview } from "../services/admin-service";
 import { formatNumber, formatToman } from "@/lib/persian";
 import { StatisticCard } from "@/features/dashboard/components/shared/statistic-card";
 import { StatisticsGrid } from "@/features/dashboard/components/shared/statistics-grid";
@@ -19,61 +19,18 @@ import { StatisticsGrid } from "@/features/dashboard/components/shared/statistic
 export function AdminOverviewPage() {
   const { data } = useQuery({
     queryKey: ["admin", "overview"],
-    queryFn: async () => {
-
-    const supabase = createClient();
-
-    const [
-      { count: clubsCount },
-      { count: pendingClubsCount },
-      { count: trainersCount },
-      { count: athletesCount },
-      { count: pendingRequestsCount },
-      { data: subscriptions },
-      { data: approvedRequests },
-    ] = await Promise.all([
-      supabase.from("clubs").select("id", { count: "exact", head: true }),
-      supabase
-        .from("clubs")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
-      supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("account_type", "trainer"),
-      supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("account_type", "athlete"),
-      supabase
-        .from("payment_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
-      supabase.from("subscriptions").select("status"),
-      supabase.from("payment_requests").select("amount_toman").eq("status", "approved"),
-    ]);
-
-    const activeSubs = subscriptions?.filter((s) => s.status === "active").length ?? 0;
-    const expiringSubs = subscriptions?.filter((s) => s.status === "expiring").length ?? 0;
-    const expiredSubs = subscriptions?.filter((s) => s.status === "expired").length ?? 0;
-    const totalRevenue = (approvedRequests ?? []).reduce(
-      (sum, r) => sum + r.amount_toman,
-      0
-    );
-
-      return { clubsCount, pendingClubsCount, trainersCount, athletesCount, pendingRequestsCount, activeSubs, expiringSubs, expiredSubs, totalRevenue };
-    },
+    queryFn: getAdminOverview,
   });
 
-  const clubsCount = data?.clubsCount ?? 0;
-  const pendingClubsCount = data?.pendingClubsCount ?? 0;
-  const trainersCount = data?.trainersCount ?? 0;
-  const athletesCount = data?.athletesCount ?? 0;
-  const pendingRequestsCount = data?.pendingRequestsCount ?? 0;
-  const activeSubs = data?.activeSubs ?? 0;
-  const expiringSubs = data?.expiringSubs ?? 0;
-  const expiredSubs = data?.expiredSubs ?? 0;
-  const totalRevenue = data?.totalRevenue ?? 0;
+  const clubsCount = data?.clubs_count ?? 0;
+  const pendingClubsCount = data?.pending_clubs_count ?? 0;
+  const trainersCount = data?.trainers_count ?? 0;
+  const athletesCount = data?.athletes_count ?? 0;
+  const pendingRequestsCount = data?.pending_requests_count ?? 0;
+  const activeSubs = data?.active_subs ?? 0;
+  const expiringSubs = data?.expiring_subs ?? 0;
+  const expiredSubs = data?.expired_subs ?? 0;
+  const totalRevenue = data?.total_revenue ?? 0;
 
   return (
 

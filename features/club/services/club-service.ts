@@ -14,10 +14,17 @@ interface ClubRow {
   phone: string | null;
   working_hours: string | null;
   member_capacity: number | null;
+  subscription_plan_name: string | null;
+  subscription_status: string | null;
+  subscription_expires_at: string | null;
+}
+
+export async function getClubRow(clubId: string): Promise<ClubRow> {
+  return api.get<ClubRow>(`/clubs/${clubId}`);
 }
 
 export async function getClubProfile(clubId: string): Promise<ClubProfile> {
-  const row = await api.get<ClubRow>(`/clubs/${clubId}`);
+  const row = await getClubRow(clubId);
 
   return {
     id: row.id,

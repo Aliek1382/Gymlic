@@ -63,8 +63,14 @@ final class ClubController
         $pdo = Database::connection();
 
         $stmt = $pdo->prepare(
-            'SELECT id, name, logo_url, address, phone, working_hours, member_capacity, status, owner_id
-             FROM clubs WHERE id = :id'
+            'SELECT c.id, c.name, c.logo_url, c.address, c.phone, c.working_hours,
+                    c.member_capacity, c.status, c.owner_id,
+                    s.plan_name AS subscription_plan_name,
+                    s.status AS subscription_status,
+                    s.expires_at AS subscription_expires_at
+             FROM clubs c
+             LEFT JOIN subscriptions s ON s.club_id = c.id
+             WHERE c.id = :id'
         );
         $stmt->execute(['id' => $params['id']]);
         $club = $stmt->fetch();

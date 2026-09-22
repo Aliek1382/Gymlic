@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatNumber, formatToman } from "@/lib/persian";
-import { createClient } from "@/lib/supabase/client";
+import { listCatalogPlans } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { PlanActiveToggle } from "./plan-active-toggle";
 import { PlanFormDialog } from "./plan-form-dialog";
@@ -21,14 +21,7 @@ import { PlanFormDialog } from "./plan-form-dialog";
 export function AdminPlansPage() {
   const { data: plans } = useQuery({
     queryKey: ["admin", "plans"],
-    queryFn: async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("plans")
-        .select("id, name, price_toman, duration_days, max_members, is_active")
-        .order("price_toman", { ascending: true });
-      return data ?? [];
-    },
+    queryFn: listCatalogPlans,
   });
 
   const rows = plans ?? [];

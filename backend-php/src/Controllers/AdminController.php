@@ -360,6 +360,29 @@ final class AdminController
         Response::ok(['ok' => true]);
     }
 
+    /** The counters and subscription breakdown on the admin landing page. */
+    public static function overview(): void
+    {
+        Auth::requirePlatformAdmin();
+        $pdo = Database::connection();
+
+        $counts = $pdo->query(
+            "SELECT
+               (SELECT COUNT(*) FROM clubs) AS clubs_count,
+               (SELECT COUNT(*) FROM clubs WHERE status = 'pending') AS pending_clubs_count,
+               (SELECT COUNT(*) FROM profiles WHERE account_type = 'trainer') AS trainers_count,
+               (SELECT COUNT(*) FROM profiles WHERE account_type = 'athlete') AS athletes_count,
+               (SELECT COUNT(*) FROM payment_requests WHERE status = 'pending') AS pending_requests_count,
+               (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') AS active_subs,
+               (SELECT COUNT(*) FROM subscriptions WHERE status = 'expiring') AS expiring_subs,
+               (SELECT COUNT(*) FROM subscriptions WHERE status = 'expired') AS expired_subs,
+               (SELECT COALESCE(SUM(amount_toman), 0) FROM payment_requests
+                 WHERE status = 'approved') AS total_revenue"
+        )->fetch();
+
+        Response::ok(Cast::row($counts, [], array_keys($counts)));
+    }
+
     public static function listClubs(): void
     {
         Auth::requirePlatformAdmin();
@@ -367,7 +390,9 @@ final class AdminController
         $stmt = Database::connection()->query(
             "SELECT c.id, c.name, c.status, c.member_capacity, c.created_at,
                     c.owner_id, p.first_name AS owner_first_name, p.last_name AS owner_last_name,
-                    s.plan_name, s.status AS subscription_status, s.expires_at,
+                    p.phone AS owner_phone, p.email AS owner_email,
+                    s.plan_name, s.status AS subscription_status,
+                    s.started_at AS subscription_started_at, s.expires_at AS subscription_expires_at,
                     (SELECT COUNT(*) FROM memberships m
                       WHERE m.club_id = c.id AND m.role = 'athlete' AND m.status = 'active') AS member_count
              FROM clubs c
@@ -379,13 +404,86 @@ final class AdminController
         Response::ok(['items' => Cast::rows($stmt->fetchAll(), [], ['member_capacity', 'member_count'])]);
     }
 
+    /** One club's whole file: the club, its active members, and its payment history. */
+    public static function clubDetail(array $params): void
+    {
+        Auth::requirePlatformAdmin();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare(
+            "SELECT c.id, c.name, c.status, c.member_capacity, c.created_at,
+                    p.first_name AS owner_first_name, p.last_name AS owner_last_name,
+                    p.phone AS owner_phone, p.email AS owner_email,
+                    s.plan_name, s.status AS subscription_status,
+                    s.started_at AS subscription_started_at, s.expires_at AS subscription_expires_at
+             FROM clubs c
+             JOIN profiles p ON p.id = c.owner_id
+             LEFT JOIN subscriptions s ON s.club_id = c.id
+             WHERE c.id = :id"
+        );
+        $stmt->execute(['id' => $params['id']]);
+        $club = $stmt->fetch();
+
+        if ($club === false) {
+            Response::error(404, 'not_found', 'Club not found.');
+            return;
+        }
+
+        $members = $pdo->prepare(
+            "SELECT m.role, m.joined_at, p.first_name, p.last_name, p.phone
+             FROM memberships m
+             JOIN profiles p ON p.id = m.user_id
+             WHERE m.club_id = :club_id AND m.status = 'active'
+             ORDER BY m.joined_at DESC"
+        );
+        $members->execute(['club_id' => $params['id']]);
+
+        $requests = $pdo->prepare(
+            'SELECT pr.id, pr.amount_toman, pr.reference_note, pr.status, pr.admin_note,
+                    pr.created_at, pr.reviewed_at, p.name AS plan_name
+             FROM payment_requests pr
+             JOIN plans p ON p.id = pr.plan_id
+             WHERE pr.club_id = :club_id
+             ORDER BY pr.created_at DESC'
+        );
+        $requests->execute(['club_id' => $params['id']]);
+
+        Response::ok([
+            'club'             => Cast::row($club, [], ['member_capacity']),
+            'members'          => $members->fetchAll(),
+            'payment_requests' => Cast::rows($requests->fetchAll(), [], ['amount_toman']),
+        ]);
+    }
+
+    /**
+     * The people listings. Athletes carry their trainer's name and trainers
+     * their athlete count and club, which the admin pages used to assemble
+     * from a second query plus client-side tallying.
+     */
     public static function listProfiles(): void
     {
         Auth::requirePlatformAdmin();
 
         $type = $_GET['account_type'] ?? null;
+        $extra = '';
+
+        if ($type === 'athlete') {
+            $extra = ", (SELECT CONCAT_WS(' ', t.first_name, t.last_name)
+                          FROM trainer_athletes ta
+                          JOIN profiles t ON t.id = ta.trainer_id
+                          WHERE ta.athlete_id = profiles.id AND ta.status = 'active'
+                          ORDER BY ta.created_at ASC LIMIT 1) AS trainer_name";
+        } elseif ($type === 'trainer') {
+            $extra = ", (SELECT COUNT(*) FROM trainer_athletes ta
+                          WHERE ta.trainer_id = profiles.id AND ta.status = 'active') AS athlete_count,
+                        (SELECT c.name FROM memberships m
+                          JOIN clubs c ON c.id = m.club_id
+                          WHERE m.user_id = profiles.id AND m.role = 'trainer' AND m.status = 'active'
+                          ORDER BY m.joined_at ASC LIMIT 1) AS club_name";
+        }
+
         $sql = 'SELECT id, first_name, last_name, email, phone, account_type, birth_date,
-                       is_suspended, is_platform_admin, created_at
+                       avatar_url, is_suspended, is_platform_admin, created_at' . $extra . '
                 FROM profiles';
         $bind = [];
 
@@ -399,8 +497,61 @@ final class AdminController
         $stmt->execute($bind);
 
         Response::ok([
-            'items' => Cast::rows($stmt->fetchAll(), [], [], ['is_suspended', 'is_platform_admin']),
+            'items' => Cast::rows(
+                $stmt->fetchAll(),
+                [],
+                $type === 'trainer' ? ['athlete_count'] : [],
+                ['is_suspended', 'is_platform_admin']
+            ),
         ]);
+    }
+
+    /** One trainer's file: their profile, their club, and their athletes. */
+    public static function trainerDetail(array $params): void
+    {
+        Auth::requirePlatformAdmin();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare(
+            "SELECT p.id, p.first_name, p.last_name, p.phone, p.email, p.birth_date,
+                    p.avatar_url, p.is_suspended, p.account_type, p.created_at,
+                    (SELECT c.name FROM memberships m
+                      JOIN clubs c ON c.id = m.club_id
+                      WHERE m.user_id = p.id AND m.role = 'trainer' AND m.status = 'active'
+                      ORDER BY m.joined_at ASC LIMIT 1) AS club_name
+             FROM profiles p WHERE p.id = :id"
+        );
+        $stmt->execute(['id' => $params['id']]);
+        $trainer = $stmt->fetch();
+
+        if ($trainer === false) {
+            Response::error(404, 'not_found', 'Trainer not found.');
+            return;
+        }
+
+        $students = $pdo->prepare(
+            "SELECT ta.status, ta.created_at, p.first_name, p.last_name, p.phone
+             FROM trainer_athletes ta
+             JOIN profiles p ON p.id = ta.athlete_id
+             WHERE ta.trainer_id = :id AND ta.status = 'active'
+             ORDER BY ta.created_at DESC"
+        );
+        $students->execute(['id' => $params['id']]);
+
+        Response::ok([
+            'trainer'  => Cast::row($trainer, [], [], ['is_suspended']),
+            'students' => $students->fetchAll(),
+        ]);
+    }
+
+    /** Club names for the broadcast form's audience picker. */
+    public static function listClubOptions(): void
+    {
+        Auth::requirePlatformAdmin();
+
+        $stmt = Database::connection()->query('SELECT id, name FROM clubs ORDER BY name ASC');
+
+        Response::ok(['items' => $stmt->fetchAll()]);
     }
 
     public static function listActivity(): void
@@ -409,9 +560,11 @@ final class AdminController
 
         $stmt = Database::connection()->query(
             'SELECT a.id, a.club_id, a.actor_id, a.subject_id, a.action, a.metadata, a.created_at,
-                    c.name AS club_name
+                    c.name AS club_name,
+                    s.first_name AS subject_first_name, s.last_name AS subject_last_name
              FROM activity_logs a
              LEFT JOIN clubs c ON c.id = a.club_id
+             LEFT JOIN profiles s ON s.id = a.subject_id
              ORDER BY a.created_at DESC LIMIT 100'
         );
 

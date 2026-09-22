@@ -14,7 +14,7 @@ import {
 import { formatNumber, formatToman, getPersianMonthLabel } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { listPaymentRequests } from "../services/admin-service";
 import { StatisticCard } from "@/features/dashboard/components/shared/statistic-card";
 import { StatisticsGrid } from "@/features/dashboard/components/shared/statistics-grid";
 
@@ -22,44 +22,37 @@ export function AdminReportsPage() {
   const { data } = useQuery({
     queryKey: ["admin", "reports"],
     queryFn: async () => {
+      const rows = (await listPaymentRequests()).filter(
+        (request) => request.status === "approved"
+      );
 
-    const supabase = createClient();
+      const totalRevenue = rows.reduce((sum, r) => sum + r.amount_toman, 0);
+      const avgAmount = rows.length > 0 ? Math.round(totalRevenue / rows.length) : 0;
 
-    const { data: requests } = await supabase
-      .from("payment_requests")
-      .select("amount_toman, created_at, plans(name)")
-      .eq("status", "approved")
-      .order("created_at", { ascending: false })
-      .returns<{ amount_toman: number; created_at: string; plans: { name: string } | null }[]>();
+      const byMonth = new Map<string, { label: string; total: number; count: number }>();
+      for (const r of rows) {
+        const date = new Date(r.created_at);
+        const key = `${date.getFullYear()}-${date.getMonth()}`;
+        const label = getPersianMonthLabel(date);
+        const entry = byMonth.get(key) ?? { label, total: 0, count: 0 };
+        entry.total += r.amount_toman;
+        entry.count += 1;
+        byMonth.set(key, entry);
+      }
+      const monthRows = Array.from(byMonth.entries())
+        .sort(([a], [b]) => (a < b ? 1 : -1))
+        .slice(0, 12)
+        .map(([, value]) => value);
 
-    const rows = requests ?? [];
-    const totalRevenue = rows.reduce((sum, r) => sum + r.amount_toman, 0);
-    const avgAmount = rows.length > 0 ? Math.round(totalRevenue / rows.length) : 0;
-
-    const byMonth = new Map<string, { label: string; total: number; count: number }>();
-    for (const r of rows) {
-      const date = new Date(r.created_at);
-      const key = `${date.getFullYear()}-${date.getMonth()}`;
-      const label = getPersianMonthLabel(date);
-      const entry = byMonth.get(key) ?? { label, total: 0, count: 0 };
-      entry.total += r.amount_toman;
-      entry.count += 1;
-      byMonth.set(key, entry);
-    }
-    const monthRows = Array.from(byMonth.entries())
-      .sort(([a], [b]) => (a < b ? 1 : -1))
-      .slice(0, 12)
-      .map(([, value]) => value);
-
-    const byPlan = new Map<string, { total: number; count: number }>();
-    for (const r of rows) {
-      const name = r.plans?.name ?? "بدون پلن";
-      const entry = byPlan.get(name) ?? { total: 0, count: 0 };
-      entry.total += r.amount_toman;
-      entry.count += 1;
-      byPlan.set(name, entry);
-    }
-    const planRows = Array.from(byPlan.entries()).sort(([, a], [, b]) => b.total - a.total);
+      const byPlan = new Map<string, { total: number; count: number }>();
+      for (const r of rows) {
+        const name = r.plan_name ?? "بدون پلن";
+        const entry = byPlan.get(name) ?? { total: 0, count: 0 };
+        entry.total += r.amount_toman;
+        entry.count += 1;
+        byPlan.set(name, entry);
+      }
+      const planRows = Array.from(byPlan.entries()).sort(([, a], [, b]) => b.total - a.total);
 
       return { rows, totalRevenue, avgAmount, monthRows, planRows };
     },

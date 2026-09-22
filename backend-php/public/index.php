@@ -149,7 +149,11 @@ $router->get('/plans-catalog', fn () => AdminController::listPlans());
 $router->get('/payment-requests', fn () => AdminController::listPaymentRequests());
 $router->post('/payment-requests', fn () => AdminController::submitPaymentRequest());
 
+$router->get('/admin/overview', fn () => AdminController::overview());
 $router->get('/admin/clubs', fn () => AdminController::listClubs());
+$router->get('/admin/club-options', fn () => AdminController::listClubOptions());
+$router->get('/admin/clubs/{id}', fn (array $p) => AdminController::clubDetail($p));
+$router->get('/admin/trainers/{id}', fn (array $p) => AdminController::trainerDetail($p));
 $router->get('/admin/profiles', fn () => AdminController::listProfiles());
 $router->get('/admin/activity', fn () => AdminController::listActivity());
 $router->post('/admin/clubs/{id}/status', fn (array $p) => AdminController::setClubStatus($p));

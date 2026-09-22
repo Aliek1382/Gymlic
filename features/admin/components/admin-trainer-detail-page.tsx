@@ -13,9 +13,11 @@ import {
 } from "@/components/ui/table";
 import { formatAge, formatNumber, formatPersianDate } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
+
+import { getAdminTrainerDetail } from "../services/admin-service";
 import { useSearchParams } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/client";
+
 import { NotFoundNotice } from "@/components/not-found-notice";
 import { RouteLoading } from "@/components/layout/route-loading";
 import { AdminProfileEditForm } from "./admin-profile-edit-form";
@@ -29,40 +31,7 @@ export function AdminTrainerDetailPage() {
   const { data, isPending } = useQuery({
     queryKey: ["admin", "trainer", id],
     enabled: id.length > 0,
-    queryFn: async () => {
-      const supabase = createClient();
-      const [{ data: trainer }, { data: club }, { data: students }] =
-        await Promise.all([
-          supabase
-            .from("profiles")
-            .select("id, first_name, last_name, phone, email, birth_date, avatar_url, is_suspended, account_type, created_at")
-            .eq("id", id)
-            .maybeSingle(),
-          supabase
-            .from("memberships")
-            .select("clubs(name)")
-            .eq("user_id", id)
-            .eq("role", "trainer")
-            .eq("status", "active")
-            .maybeSingle()
-            .returns<{ clubs: { name: string } | null } | null>(),
-          supabase
-            .from("trainer_athletes")
-            .select("status, created_at, profiles:athlete_id(first_name, last_name, phone)")
-            .eq("trainer_id", id)
-            .eq("status", "active")
-            .order("created_at", { ascending: false })
-            .returns<
-              {
-                status: string;
-                created_at: string;
-                profiles: { first_name: string | null; last_name: string | null; phone: string | null } | null;
-              }[]
-            >(),
-        ]);
-
-      return { trainer, club, students };
-    },
+    queryFn: () => getAdminTrainerDetail(id),
   });
 
   if (isPending) return <RouteLoading />;
@@ -77,7 +46,6 @@ export function AdminTrainerDetailPage() {
     );
   }
 
-  const club = data?.club;
   const name =
     [trainer.first_name, trainer.last_name].filter(Boolean).join(" ") || "بدون نام";
   const age = formatAge(trainer.birth_date);
@@ -95,7 +63,7 @@ export function AdminTrainerDetailPage() {
           <div>
             <h1 className="text-xl font-bold text-foreground">{name}</h1>
             <p className="text-sm text-muted-foreground">
-              {club?.clubs?.name ?? "مربی مستقل"}
+              {trainer?.club_name ?? "مربی مستقل"}
               {age && ` · ${age}`}
             </p>
           </div>
@@ -163,7 +131,7 @@ export function AdminTrainerDetailPage() {
             <TableBody>
               {studentRows.map((s, index) => {
                 const studentName =
-                  [s.profiles?.first_name, s.profiles?.last_name].filter(Boolean).join(" ") ||
+                  [s.first_name, s.last_name].filter(Boolean).join(" ") ||
                   "بدون نام";
                 return (
                   <TableRow key={index}>
@@ -171,7 +139,7 @@ export function AdminTrainerDetailPage() {
                       {studentName}
                     </TableCell>
                     <TableCell className="text-muted-foreground" dir="ltr">
-                      {s.profiles?.phone ?? "—"}
+                      {s.phone ?? "—"}
                     </TableCell>
                   </TableRow>
                 );

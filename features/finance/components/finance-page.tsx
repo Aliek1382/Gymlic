@@ -14,7 +14,11 @@ import {
 import { useQuery } from "@tanstack/react-query";
 
 import { formatPersianDate, formatToman } from "@/lib/persian";
-import { createClient } from "@/lib/supabase/client";
+import { getClubRow } from "@/features/club/services/club-service";
+import {
+  listCatalogPlans,
+  listPaymentRequests,
+} from "@/features/admin/services/admin-service";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { SubscriptionCard } from "@/features/dashboard/components/shared/subscription-card";
@@ -42,54 +46,33 @@ export function FinancePage() {
     queryKey: ["finance", "club", clubId],
     enabled: clubId.length > 0,
     queryFn: async () => {
-      const supabase = createClient();
-      const [{ data: subscriptionRow }, { data: plans }, { data: requests }] =
-        await Promise.all([
-          supabase
-            .from("subscriptions")
-            .select("plan_name, status, expires_at")
-            .eq("club_id", clubId)
-            .order("expires_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from("plans")
-            .select("id, name, price_toman, duration_days")
-            .eq("is_active", true)
-            .order("price_toman", { ascending: true }),
-          supabase
-            .from("payment_requests")
-            .select("id, amount_toman, status, admin_note, created_at, plans(name)")
-            .eq("club_id", clubId)
-            .order("created_at", { ascending: false })
-            .returns<
-              {
-                id: string;
-                amount_toman: number;
-                status: PaymentRequestStatus;
-                admin_note: string | null;
-                created_at: string;
-                plans: { name: string } | null;
-              }[]
-            >(),
-        ]);
+      const [club, plans, requests] = await Promise.all([
+        getClubRow(clubId),
+        listCatalogPlans(),
+        listPaymentRequests(),
+      ]);
 
-      return { subscriptionRow, plans, requests };
+      return {
+        club,
+        plans: plans.filter((plan) => plan.is_active),
+        requests: requests.filter((request) => request.club_id === clubId),
+      };
     },
   });
 
-  const subscriptionRow = data?.subscriptionRow;
-  const subscription = subscriptionRow
-    ? {
-        planName: subscriptionRow.plan_name,
-        status: subscriptionRow.status as SubscriptionStatus,
-        expiresAt: subscriptionRow.expires_at,
-        remainingDays: Math.ceil(
-          (new Date(subscriptionRow.expires_at).getTime() - Date.now()) /
-            (1000 * 60 * 60 * 24)
-        ),
-      }
-    : null;
+  const club = data?.club;
+  const subscription =
+    club?.subscription_status && club.subscription_expires_at
+      ? {
+          planName: club.subscription_plan_name ?? "",
+          status: club.subscription_status as SubscriptionStatus,
+          expiresAt: club.subscription_expires_at,
+          remainingDays: Math.ceil(
+            (new Date(club.subscription_expires_at).getTime() - Date.now()) /
+              (1000 * 60 * 60 * 24)
+          ),
+        }
+      : null;
 
   const availablePlans = (data?.plans ?? []).map((p) => ({
     id: p.id,
@@ -155,7 +138,7 @@ export function FinancePage() {
                     {requestRows.map((request) => (
                       <TableRow key={request.id}>
                         <TableCell className="text-foreground">
-                          {request.plans?.name ?? "—"}
+                          {request.plan_name}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatToman(request.amount_toman)} تومان

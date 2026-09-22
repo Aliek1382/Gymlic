@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { listPaymentRequests } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { PaymentRequestActions } from "@/features/admin/components/payment-request-actions";
 import type { PaymentRequestStatus } from "@/types/database.types";
@@ -40,8 +40,8 @@ interface RequestRow {
   status: PaymentRequestStatus;
   admin_note: string | null;
   created_at: string;
-  clubs: { name: string } | null;
-  plans: { name: string } | null;
+  club_name: string;
+  plan_name: string;
 }
 
 function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions: boolean }) {
@@ -74,10 +74,10 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
         {rows.map((request) => (
           <TableRow key={request.id}>
             <TableCell className="font-medium text-foreground">
-              {request.clubs?.name ?? "—"}
+              {request.club_name}
             </TableCell>
             <TableCell className="text-muted-foreground">
-              {request.plans?.name ?? "—"}
+              {request.plan_name}
             </TableCell>
             <TableCell className="text-muted-foreground">
               {formatToman(request.amount_toman)} تومان
@@ -109,22 +109,13 @@ export function AdminPaymentsPage() {
   const { data } = useQuery({
     queryKey: ["admin", "payments"],
     queryFn: async () => {
+      const rows = await listPaymentRequests();
 
-    const supabase = createClient();
-
-    const { data: requests } = await supabase
-      .from("payment_requests")
-      .select(
-        "id, amount_toman, reference_note, status, admin_note, created_at, clubs(name), plans(name)"
-      )
-      .order("created_at", { ascending: false })
-      .returns<RequestRow[]>();
-
-    const rows = requests ?? [];
-    const pending = rows.filter((r) => r.status === "pending");
-    const reviewed = rows.filter((r) => r.status !== "pending");
-
-      return { rows, pending, reviewed };
+      return {
+        rows,
+        pending: rows.filter((request) => request.status === "pending"),
+        reviewed: rows.filter((request) => request.status !== "pending"),
+      };
     },
   });
 

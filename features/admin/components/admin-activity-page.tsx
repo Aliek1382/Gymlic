@@ -14,7 +14,7 @@ import {
 import { formatNumber, formatRelativeTime } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { listAdminActivity } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 
 const ADMIN_ACTIONS = [
@@ -33,37 +33,14 @@ const ACTION_LABEL: Record<string, string> = {
   profile_edited_by_admin: "ویرایش پروفایل توسط مدیر",
 };
 
-interface LogRow {
-  id: string;
-  action: string;
-  metadata: Record<string, unknown>;
-  created_at: string;
-  clubs: { name: string } | null;
-  actor: { first_name: string | null; last_name: string | null } | null;
-  subject: { first_name: string | null; last_name: string | null } | null;
-}
-
 export function AdminActivityPage() {
   const { data } = useQuery({
     queryKey: ["admin", "activity"],
-    queryFn: async () => {
-
-    const supabase = createClient();
-
-    const { data: logs } = await supabase
-      .from("activity_logs")
-      .select(
-        "id, action, metadata, created_at, clubs(name), actor:profiles!actor_id(first_name, last_name), subject:profiles!subject_id(first_name, last_name)"
-      )
-      .in("action", ADMIN_ACTIONS)
-      .order("created_at", { ascending: false })
-      .limit(200)
-      .returns<LogRow[]>();
-
-    const rows = logs ?? [];
-
-      return { rows };
-    },
+    queryFn: async () => ({
+      rows: (await listAdminActivity()).filter((log) =>
+        ADMIN_ACTIONS.includes(log.action)
+      ),
+    }),
   });
 
   const rows = data?.rows ?? [];
@@ -106,14 +83,14 @@ export function AdminActivityPage() {
             <TableBody>
               {rows.map((log) => {
                 const subjectName =
-                  [log.subject?.first_name, log.subject?.last_name].filter(Boolean).join(" ");
+                  [log.subject_first_name, log.subject_last_name].filter(Boolean).join(" ");
                 return (
                   <TableRow key={log.id}>
                     <TableCell className="font-medium text-foreground">
                       {ACTION_LABEL[log.action] ?? log.action}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {log.clubs?.name ?? "—"}
+                      {log.club_name ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {subjectName || "—"}

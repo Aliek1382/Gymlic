@@ -2,20 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { listClubOptions } from "../services/admin-service";
 import { BroadcastNotificationForm } from "@/features/notifications/components/broadcast-notification-form";
 
 export function AdminNotificationsPage() {
   const { data: clubs } = useQuery({
     queryKey: ["admin", "clubs", "names"],
-    queryFn: async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("clubs")
-        .select("id, name")
-        .order("name", { ascending: true });
-      return data ?? [];
-    },
+    queryFn: listClubOptions,
   });
 
   return (
