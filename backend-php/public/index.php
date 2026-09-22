@@ -13,8 +13,11 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+use Gymlic\Controllers\AthleteController;
 use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\ClubController;
+use Gymlic\Controllers\MemberController;
+use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\HealthController;
 use Gymlic\Controllers\InvitationController;
 use Gymlic\Controllers\NotificationController;
@@ -63,6 +66,31 @@ $router->post('/invitations/accept-club', fn () => InvitationController::acceptC
 $router->post('/clubs', fn () => ClubController::create());
 $router->get('/clubs/{id}', fn (array $p) => ClubController::get($p));
 $router->post('/clubs/{id}/logo', fn (array $p) => UploadController::clubLogo($p));
+
+$router->get('/clubs/{id}/members', fn (array $p) => MemberController::listMembers($p));
+$router->get('/clubs/{id}/members/{membershipId}/profile', fn (array $p) => MemberController::memberProfile($p));
+$router->get('/clubs/{id}/member-invites', fn (array $p) => MemberController::listInvites($p));
+$router->post('/clubs/{id}/member-invites', fn (array $p) => MemberController::createInvite($p));
+$router->get('/clubs/{id}/trainer-options', fn (array $p) => MemberController::listTrainerOptions($p));
+$router->get('/clubs/{id}/capacity', fn (array $p) => MemberController::capacity($p));
+$router->patch('/memberships/{id}', fn (array $p) => MemberController::updateMembership($p));
+$router->delete('/memberships/{id}', fn (array $p) => MemberController::removeMember($p));
+$router->post('/invitations/{id}/revoke', fn (array $p) => MemberController::revokeInvite($p));
+
+$router->get('/clubs/{id}/trainers', fn (array $p) => TrainerController::list($p));
+$router->get('/clubs/{id}/trainer-invites', fn (array $p) => TrainerController::listInvites($p));
+$router->post('/clubs/{id}/trainer-invites', fn (array $p) => TrainerController::createInvite($p));
+$router->patch('/trainer-memberships/{id}', fn (array $p) => TrainerController::updateMembership($p));
+$router->delete('/trainer-memberships/{id}', fn (array $p) => TrainerController::remove($p));
+
+$router->get('/athletes', fn () => AthleteController::list());
+$router->get('/athletes/{id}', fn (array $p) => AthleteController::get($p));
+$router->patch('/athletes/{id}/note', fn (array $p) => AthleteController::updateNote($p));
+$router->delete('/athletes/{id}', fn (array $p) => AthleteController::remove($p));
+$router->get('/athlete-invites', fn () => AthleteController::listInvites());
+$router->post('/athlete-invites', fn () => AthleteController::createInvite());
+$router->post('/athlete-invites/{id}/revoke', fn (array $p) => AthleteController::revokeInvite($p));
+$router->get('/trainer/club', fn () => AthleteController::club());
 
 $router->get('/profiles/{id}', fn (array $p) => ProfileController::get($p));
 $router->patch('/me/profile', fn () => ProfileController::updateProfile());
