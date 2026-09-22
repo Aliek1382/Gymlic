@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Gymlic;
 
 use PDO;
-use PDOException;
 
 final class Database
 {
@@ -26,16 +25,11 @@ final class Database
             $db['charset']
         );
 
-        try {
-            self::$instance = new PDO($dsn, $db['user'], $db['pass'], [
-                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => false,
-            ]);
-        } catch (PDOException $e) {
-            Response::error(500, 'db_connection_failed', 'Could not connect to the database.');
-            exit;
-        }
+        self::$instance = new PDO($dsn, $db['user'], $db['pass'], [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
 
         return self::$instance;
     }

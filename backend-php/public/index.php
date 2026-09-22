@@ -8,11 +8,13 @@ require_once __DIR__ . '/../src/Validate.php';
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Router.php';
 require_once __DIR__ . '/../src/Controllers/AuthController.php';
+require_once __DIR__ . '/../src/Controllers/HealthController.php';
 require_once __DIR__ . '/../src/Controllers/InvitationController.php';
 require_once __DIR__ . '/../src/Controllers/ClubController.php';
 
 use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\ClubController;
+use Gymlic\Controllers\HealthController;
 use Gymlic\Controllers\InvitationController;
 use Gymlic\Response;
 use Gymlic\Router;
@@ -41,6 +43,8 @@ $path = preg_replace('#^/api#', '', $path) ?: '/';
 
 $router = new Router();
 
+$router->get('/health', fn () => HealthController::check());
+
 $router->post('/auth/signup', fn () => AuthController::signup());
 $router->post('/auth/login', fn () => AuthController::login());
 $router->post('/auth/logout', fn () => AuthController::logout());
@@ -56,6 +60,8 @@ $router->get('/clubs/{id}', fn (array $p) => ClubController::get($p));
 
 try {
     $router->dispatch($_SERVER['REQUEST_METHOD'], $path);
+} catch (PDOException $e) {
+    Response::error(500, 'db_connection_failed', 'Could not reach the database.');
 } catch (Throwable $e) {
     Response::error(500, 'server_error', 'Something went wrong.');
 }

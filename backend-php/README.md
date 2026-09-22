@@ -17,19 +17,34 @@ feature.
 
 ## Deploying on shared hosting (no SSH)
 
-1. In cPanel → MySQL Databases, create a database and a user with all
-   privileges on it.
-2. In phpMyAdmin, import `schema/schema.sql` into that database.
-3. Upload this whole `backend-php/` folder via FTP/File Manager, e.g. to
-   `~/api.yourdomain.com/` if using a subdomain (recommended — set the
-   subdomain's document root to `backend-php/public`), or to
-   `~/public_html/api/` if you don't have subdomain access (then `public/`
-   itself is what visitors hit at `yourdomain.com/api/`).
-4. Edit `config.php` with the real DB host/name/user/password and your
+1. In cPanel → MySQL Databases, create a database and a user, and add the user
+   to the database with ALL PRIVILEGES.
+2. In phpMyAdmin, select that database → Import → upload `schema/schema.sql`.
+3. Upload this whole `backend-php/` folder via FTP/File Manager, in one of two
+   layouts (both are supported and both keep `src/`, `config.php` and
+   `schema/` unreachable over HTTP):
+
+   **A. Subdomain (recommended).** Upload to `~/backend-php/`, then create a
+   subdomain like `api.yourdomain.com` with its document root set to
+   `backend-php/public`. Endpoints are then `https://api.yourdomain.com/health`.
+
+   **B. Subfolder.** Upload the folder to `~/public_html/api/` (so that
+   `public_html/api/.htaccess` and `public_html/api/public/` both exist).
+   Endpoints are then `https://yourdomain.com/api/health`.
+
+4. Edit `config.php`: the DB host/name/user/password from step 1, and your
    frontend's real origin(s) in `cors_origins`.
-5. Make sure `public/uploads/` is writable by PHP (usually `755`/`775`
-   depending on the host).
-6. Point the frontend's API base URL at this deployment.
+5. Make sure `public/uploads/` is writable by PHP (`755`, or `775` on some
+   hosts).
+6. Check the deployment: open `<your API base>/health` in a browser. You want
+   `{"ok":true,"database":"connected","schema":"loaded"}`. `"database":
+   "unavailable"` means step 4's credentials are wrong; `"schema":"missing"`
+   means step 2 didn't run.
+7. Point the frontend's API base URL at this deployment.
+
+Both layouts are verified against Apache with `mod_rewrite`: requests route to
+the front controller, `/uploads/...` is served straight off disk, and
+`src/`, `schema/` and `config.php` are not fetchable.
 
 ## Local development
 
