@@ -16,7 +16,9 @@ spl_autoload_register(static function (string $class): void {
 use Gymlic\Controllers\AthleteController;
 use Gymlic\Controllers\AdminController;
 use Gymlic\Controllers\AuthController;
+use Gymlic\Controllers\DashboardController;
 use Gymlic\Controllers\EarningsController;
+use Gymlic\Controllers\ReportController;
 use Gymlic\Controllers\RevenueController;
 use Gymlic\Controllers\ClubController;
 use Gymlic\Controllers\LibraryController;
@@ -117,6 +119,16 @@ $router->get('/library/{kind}', fn (array $p) => LibraryController::list($p));
 $router->get('/library/{kind}/picker', fn (array $p) => LibraryController::picker($p));
 $router->post('/library/{kind}', fn (array $p) => LibraryController::create($p));
 $router->post('/library/{kind}/{id}/usage', fn (array $p) => LibraryController::recordUsage($p));
+
+$router->get('/dashboard/athlete', fn () => DashboardController::athlete());
+$router->get('/dashboard/trainer', fn () => DashboardController::trainer());
+$router->get('/dashboard/club/{id}', fn (array $p) => DashboardController::club($p));
+
+$router->get('/reports/trainer/monthly-stats', fn () => ReportController::monthlyStats());
+$router->get('/reports/trainer/athlete-progress', fn () => ReportController::athleteProgress());
+$router->get('/reports/trainer/weekly-adherence', fn () => ReportController::weeklyAdherence());
+$router->get('/reports/trainer/completion-rates', fn () => ReportController::completionRates());
+$router->get('/athletes/{id}/completed-plans', fn (array $p) => ReportController::completedPlans($p));
 
 $router->get('/clubs/{id}/revenue', fn (array $p) => RevenueController::list($p));
 $router->post('/clubs/{id}/revenue', fn (array $p) => RevenueController::create($p));
