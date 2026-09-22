@@ -18,6 +18,7 @@ use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\ClubController;
 use Gymlic\Controllers\LibraryController;
 use Gymlic\Controllers\MemberController;
+use Gymlic\Controllers\MessageController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
@@ -113,6 +114,11 @@ $router->get('/library/{kind}', fn (array $p) => LibraryController::list($p));
 $router->get('/library/{kind}/picker', fn (array $p) => LibraryController::picker($p));
 $router->post('/library/{kind}', fn (array $p) => LibraryController::create($p));
 $router->post('/library/{kind}/{id}/usage', fn (array $p) => LibraryController::recordUsage($p));
+
+$router->get('/messages/threads', fn () => MessageController::threads());
+$router->get('/messages/conversation/{id}', fn (array $p) => MessageController::conversation($p));
+$router->post('/messages/conversation/{id}/read', fn (array $p) => MessageController::markRead($p));
+$router->post('/messages', fn () => MessageController::send());
 
 $router->get('/profiles/{id}', fn (array $p) => ProfileController::get($p));
 $router->patch('/me/profile', fn () => ProfileController::updateProfile());
