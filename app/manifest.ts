@@ -16,9 +16,9 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "پلتفرم مدیریت باشگاه، مربی و ورزشکار",
     lang: "fa",
     dir: "rtl",
-    // Middleware sends a signed-out visitor from here to /login, so the
-    // installed app opens on the panel for a returning user and on the login
-    // screen for everyone else.
+    // The (dashboard) layout sends a signed-out visitor from here to /login,
+    // so the installed app opens on the panel for a returning user and on the
+    // login screen for everyone else.
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
