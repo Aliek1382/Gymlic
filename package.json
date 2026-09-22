@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack && cp deploy/.htaccess out/.htaccess",
+    "build": "next build --turbopack && cp deploy/.htaccess deploy/serve.json out/",
     "lint": "eslint",
     "preview": "npx --yes serve out"
   },
