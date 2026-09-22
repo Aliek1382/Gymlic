@@ -1,21 +1,26 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../src/Database.php';
-require_once __DIR__ . '/../src/Response.php';
-require_once __DIR__ . '/../src/Uuid.php';
-require_once __DIR__ . '/../src/Validate.php';
-require_once __DIR__ . '/../src/Auth.php';
-require_once __DIR__ . '/../src/Router.php';
-require_once __DIR__ . '/../src/Controllers/AuthController.php';
-require_once __DIR__ . '/../src/Controllers/HealthController.php';
-require_once __DIR__ . '/../src/Controllers/InvitationController.php';
-require_once __DIR__ . '/../src/Controllers/ClubController.php';
+// Maps Gymlic\Foo\Bar to src/Foo/Bar.php. Composer isn't available on the
+// shared hosts this targets, and the mapping is one rule.
+spl_autoload_register(static function (string $class): void {
+    if (!str_starts_with($class, 'Gymlic\\')) {
+        return;
+    }
+    $path = __DIR__ . '/../src/' . str_replace('\\', '/', substr($class, strlen('Gymlic\\'))) . '.php';
+    if (is_file($path)) {
+        require_once $path;
+    }
+});
 
 use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\ClubController;
 use Gymlic\Controllers\HealthController;
 use Gymlic\Controllers\InvitationController;
+use Gymlic\Controllers\NotificationController;
+use Gymlic\Controllers\ProfileController;
+use Gymlic\Controllers\ProgressController;
+use Gymlic\Controllers\UploadController;
 use Gymlic\Response;
 use Gymlic\Router;
 
@@ -57,6 +62,23 @@ $router->post('/invitations/accept-club', fn () => InvitationController::acceptC
 
 $router->post('/clubs', fn () => ClubController::create());
 $router->get('/clubs/{id}', fn (array $p) => ClubController::get($p));
+$router->post('/clubs/{id}/logo', fn (array $p) => UploadController::clubLogo($p));
+
+$router->get('/profiles/{id}', fn (array $p) => ProfileController::get($p));
+$router->patch('/me/profile', fn () => ProfileController::updateProfile());
+$router->patch('/me/email', fn () => ProfileController::updateEmail());
+$router->patch('/me/password', fn () => ProfileController::updatePassword());
+$router->post('/me/avatar', fn () => UploadController::avatar());
+
+$router->get('/athletes/{id}/measurements', fn (array $p) => ProgressController::list($p));
+$router->post('/athletes/{id}/measurements', fn (array $p) => ProgressController::create($p));
+$router->patch('/measurements/{id}', fn (array $p) => ProgressController::update($p));
+
+$router->get('/notifications', fn () => NotificationController::list());
+$router->get('/notifications/archive', fn () => NotificationController::archive());
+$router->post('/notifications/{id}/read', fn (array $p) => NotificationController::markRead($p));
+$router->post('/notifications/read-all', fn () => NotificationController::markAllRead());
+$router->post('/admin/notifications/broadcast', fn () => NotificationController::broadcast());
 
 try {
     $router->dispatch($_SERVER['REQUEST_METHOD'], $path);

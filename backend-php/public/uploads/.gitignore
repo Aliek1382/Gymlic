@@ -1,0 +1,4 @@
+# Uploaded avatars and club logos are runtime data, not source.
+*
+!.gitkeep
+!.gitignore
