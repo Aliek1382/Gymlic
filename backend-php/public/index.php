@@ -16,8 +16,11 @@ spl_autoload_register(static function (string $class): void {
 use Gymlic\Controllers\AthleteController;
 use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\ClubController;
+use Gymlic\Controllers\LibraryController;
 use Gymlic\Controllers\MemberController;
+use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\TrainerController;
+use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
 use Gymlic\Controllers\InvitationController;
 use Gymlic\Controllers\NotificationController;
@@ -91,6 +94,25 @@ $router->get('/athlete-invites', fn () => AthleteController::listInvites());
 $router->post('/athlete-invites', fn () => AthleteController::createInvite());
 $router->post('/athlete-invites/{id}/revoke', fn (array $p) => AthleteController::revokeInvite($p));
 $router->get('/trainer/club', fn () => AthleteController::club());
+
+$router->get('/plans/{kind}', fn (array $p) => PlanController::list($p));
+$router->get('/plans/{kind}/mine', fn (array $p) => PlanController::listMine($p));
+$router->get('/plans/{kind}/templates', fn (array $p) => PlanController::listTemplates($p));
+$router->post('/plans/{kind}/templates', fn (array $p) => PlanController::saveTemplate($p));
+$router->delete('/plans/{kind}/templates/{id}', fn (array $p) => PlanController::deleteTemplate($p));
+$router->post('/plans/{kind}', fn (array $p) => PlanController::save($p));
+$router->get('/plans/{kind}/{id}', fn (array $p) => PlanController::get($p));
+$router->post('/plans/{kind}/{id}/complete', fn (array $p) => PlanController::complete($p));
+$router->delete('/plans/{kind}/{id}', fn (array $p) => PlanController::remove($p));
+
+$router->get('/workout-day-logs', fn () => WorkoutLogController::list());
+$router->post('/workout-day-logs', fn () => WorkoutLogController::create());
+$router->delete('/workout-day-logs/{id}', fn (array $p) => WorkoutLogController::remove($p));
+
+$router->get('/library/{kind}', fn (array $p) => LibraryController::list($p));
+$router->get('/library/{kind}/picker', fn (array $p) => LibraryController::picker($p));
+$router->post('/library/{kind}', fn (array $p) => LibraryController::create($p));
+$router->post('/library/{kind}/{id}/usage', fn (array $p) => LibraryController::recordUsage($p));
 
 $router->get('/profiles/{id}', fn (array $p) => ProfileController::get($p));
 $router->patch('/me/profile', fn () => ProfileController::updateProfile());
