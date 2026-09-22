@@ -33,7 +33,7 @@ export function useMarkAllNotificationsRead(userId: string | null) {
   const queryKey = notificationsQueryKey(userId);
 
   return useMutation({
-    mutationFn: () => markAllNotificationsRead(userId as string),
+    mutationFn: () => markAllNotificationsRead(),
     onMutate: async () => {
       queryClient.setQueryData<NotificationItem[]>(queryKey, (current) =>
         current?.map((notification) => ({ ...notification, isRead: true }))

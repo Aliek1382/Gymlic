@@ -74,6 +74,17 @@ final class ReportController
         $from = $_GET['from'] ?? date('Y-m-d', strtotime('-7 days'));
         $pdo = Database::connection();
 
+        // The whole roster, so an athlete with no active plan still appears
+        // in the report (measured against zero sessions) rather than vanishing.
+        $athletes = $pdo->prepare(
+            "SELECT ta.athlete_id, p.first_name, p.last_name
+             FROM trainer_athletes ta
+             JOIN profiles p ON p.id = ta.athlete_id
+             WHERE ta.trainer_id = :trainer_id AND ta.status = 'active'
+             ORDER BY ta.created_at DESC"
+        );
+        $athletes->execute(['trainer_id' => $user['id']]);
+
         $plans = $pdo->prepare(
             "SELECT a.id, a.athlete_id, a.description, p.first_name, p.last_name
              FROM workout_assignments a
@@ -102,8 +113,9 @@ final class ReportController
         $logs->execute(['trainer_id' => $user['id'], 'from' => $from]);
 
         Response::ok([
-            'plans' => array_values($planByAthlete),
-            'logs'  => $logs->fetchAll(),
+            'athletes' => $athletes->fetchAll(),
+            'plans'    => array_values($planByAthlete),
+            'logs'     => $logs->fetchAll(),
         ]);
     }
 

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { api, fullName } from "@/lib/api/client";
 import type {
   AccountType,
   ClubStatus,
@@ -34,96 +34,72 @@ export interface AuthContext {
   trainerAvatarUrl: string | null;
 }
 
+interface MeResponse {
+  user: {
+    id: string;
+    phone: string | null;
+    email: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    avatar_url: string | null;
+    birth_date: string | null;
+    account_type: AccountType | null;
+    is_platform_admin: boolean;
+    is_suspended: boolean;
+  };
+  membership: {
+    club_id: string;
+    role: MembershipRole;
+    club_name: string;
+    club_status: ClubStatus;
+  } | null;
+  trainer: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
 /**
  * Loads everything the Redirect Rules need to decide where an authenticated
  * user should land. Returns null when there is no session — callers send the
  * visitor to /login in that case.
+ *
+ * This was four separate queries against Supabase; the API answers it in one.
  */
 export async function getAuthContext(): Promise<AuthContext | null> {
-  const supabase = createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "phone, email, first_name, last_name, avatar_url, birth_date, account_type, is_platform_admin, is_suspended"
-    )
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("club_id, role, clubs(name, status)")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle()
-    .returns<{
-      club_id: string;
-      role: MembershipRole;
-      clubs: { name: string; status: ClubStatus } | null;
-    }>();
-
-  const { count: trainerCount } = await supabase
-    .from("trainer_athletes")
-    .select("id", { count: "exact", head: true })
-    .eq("athlete_id", user.id)
-    .eq("status", "active");
-
-  let trainerName: string | null = null;
-  let trainerAvatarUrl: string | null = null;
-  if (profile?.account_type === "athlete") {
-    // trainer_athletes has two foreign keys into profiles (trainer_id and
-    // athlete_id) — the embed must be disambiguated via the column hint.
-    const { data: trainerRelation } = await supabase
-      .from("trainer_athletes")
-      .select("profiles!trainer_id(first_name, last_name, avatar_url)")
-      .eq("athlete_id", user.id)
-      .eq("status", "active")
-      .limit(1)
-      .maybeSingle()
-      .returns<{
-        profiles: {
-          first_name: string | null;
-          last_name: string | null;
-          avatar_url: string | null;
-        } | null;
-      }>();
-
-    trainerName =
-      [trainerRelation?.profiles?.first_name, trainerRelation?.profiles?.last_name]
-        .filter(Boolean)
-        .join(" ") || null;
-    trainerAvatarUrl = trainerRelation?.profiles?.avatar_url ?? null;
+  let data: MeResponse;
+  try {
+    data = await api.get<MeResponse>("/auth/me");
+  } catch {
+    return null;
   }
+
+  const { user, membership, trainer } = data;
 
   return {
     userId: user.id,
-    phone: profile?.phone || user.phone || null,
-    email: profile?.email || user.email || null,
-    firstName: profile?.first_name ?? null,
-    lastName: profile?.last_name ?? null,
-    avatarUrl: profile?.avatar_url ?? null,
-    birthDate: profile?.birth_date ?? null,
-    accountType: (profile?.account_type as AccountType | null) ?? null,
-    isPlatformAdmin: profile?.is_platform_admin ?? false,
-    isSuspended: profile?.is_suspended ?? false,
+    phone: user.phone,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    avatarUrl: user.avatar_url,
+    birthDate: user.birth_date,
+    accountType: user.account_type,
+    isPlatformAdmin: user.is_platform_admin,
+    isSuspended: user.is_suspended,
     activeMembership: membership
       ? {
           clubId: membership.club_id,
           role: membership.role,
-          clubName: membership.clubs?.name ?? "",
-          clubStatus: membership.clubs?.status ?? "active",
+          clubName: membership.club_name ?? "",
+          clubStatus: membership.club_status ?? "active",
         }
       : null,
-    hasTrainer: (trainerCount ?? 0) > 0,
-    trainerName,
-    trainerAvatarUrl,
+    hasTrainer: trainer !== null,
+    trainerName: trainer ? fullName(trainer.first_name, trainer.last_name, "") || null : null,
+    trainerAvatarUrl: trainer?.avatar_url ?? null,
   };
 }
 
@@ -139,32 +115,17 @@ export interface AdminContext {
  *
  * On a static host this check is a routing convenience, not the security
  * boundary: /admin's HTML shell is served to anyone who asks for it. What
- * actually protects the data is the admin_* RLS policies, which re-check
- * is_platform_admin on every row the page tries to read or write.
+ * actually protects the data is the API, which re-checks is_platform_admin
+ * on every admin endpoint.
  */
 export async function getAdminContext(): Promise<AdminContext | null> {
-  const supabase = createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("first_name, last_name, avatar_url, is_platform_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile?.is_platform_admin) return null;
+  const context = await getAuthContext();
+  if (!context?.isPlatformAdmin) return null;
 
   return {
-    userId: user.id,
-    fullName:
-      [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
-      "مدیر کل",
-    avatarUrl: profile.avatar_url,
+    userId: context.userId,
+    fullName: fullName(context.firstName, context.lastName, "مدیر کل"),
+    avatarUrl: context.avatarUrl,
   };
 }
 
@@ -177,26 +138,27 @@ export interface InvitationPreview {
 }
 
 /**
- * Lookup for the public /join/[code] page. Calls the get_invitation_preview
- * SECURITY DEFINER function, so it works with no session at all — possession
- * of the (unguessable) code is the authorization model.
+ * Lookup for the public /join/[code] page. The endpoint takes no session —
+ * possession of the (unguessable) code is the authorization model.
  */
 export async function getInvitationPreview(
   code: string
 ): Promise<InvitationPreview | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("get_invitation_preview", {
-    p_code: code,
-  });
-  if (error) return null;
+  try {
+    const row = await api.get<{
+      first_name: string | null;
+      last_name: string | null;
+      club_name: string | null;
+      invited_role: InvitationRole;
+    }>(`/invitations/preview?code=${encodeURIComponent(code)}`);
 
-  const row = data?.[0];
-  if (!row) return null;
-
-  return {
-    firstName: row.first_name,
-    lastName: row.last_name,
-    clubName: row.club_name,
-    invitedRole: row.invited_role,
-  };
+    return {
+      firstName: row.first_name,
+      lastName: row.last_name,
+      clubName: row.club_name,
+      invitedRole: row.invited_role,
+    };
+  } catch {
+    return null;
+  }
 }

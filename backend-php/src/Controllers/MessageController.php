@@ -160,6 +160,77 @@ final class MessageController
         Response::ok(['plans' => $plans, 'messages' => $messages]);
     }
 
+    /**
+     * The thread attached to one plan: a filtered view of the same messages
+     * table the inbox reads (0036).
+     */
+    public static function planComments(array $params): void
+    {
+        $user = Auth::requireUser();
+        $plan = self::planOr404($params['kind'], $params['id']);
+        Acl::require(Acl::canViewPlan($user, $plan));
+
+        $stmt = Database::connection()->prepare(
+            'SELECT m.id, m.sender_id, m.body, m.created_at,
+                    p.first_name, p.last_name, p.avatar_url
+             FROM messages m
+             JOIN profiles p ON p.id = m.sender_id
+             WHERE m.plan_kind = :kind AND m.plan_id = :plan_id
+             ORDER BY m.created_at ASC'
+        );
+        $stmt->execute(['kind' => $params['kind'], 'plan_id' => $params['id']]);
+
+        Response::ok(['items' => $stmt->fetchAll()]);
+    }
+
+    /**
+     * Writing here is writing a message that happens to be about a plan. The
+     * recipient isn't sent by the client: it is whichever side of the plan
+     * isn't the person writing.
+     */
+    public static function addPlanComment(array $params): void
+    {
+        $user = Auth::requireUser();
+        $kind = $params['kind'];
+        $plan = self::planOr404($kind, $params['id']);
+        $data = Validate::required(Validate::body(), ['body']);
+
+        if ($plan['athlete_id'] === null) {
+            Response::error(409, 'plan_unassigned', 'This plan has no athlete yet.');
+            return;
+        }
+
+        $recipientId = $plan['trainer_id'] === $user['id'] ? $plan['athlete_id'] : $plan['trainer_id'];
+        if ($recipientId === $user['id']) {
+            Response::error(400, 'invalid_recipient', 'You cannot message yourself.');
+            return;
+        }
+        Acl::require(Acl::canMessage($user['id'], $recipientId), 'You cannot message this person.');
+
+        self::insertMessage($user, $recipientId, (string) $data['body'], $kind, $params['id']);
+    }
+
+    private static function planOr404(string $kind, string $id): array
+    {
+        if (!in_array($kind, ['workout', 'nutrition'], true)) {
+            Response::error(404, 'not_found', 'Unknown plan kind.');
+            exit;
+        }
+
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM ' . Acl::planTable($kind) . ' WHERE id = :id'
+        );
+        $stmt->execute(['id' => $id]);
+        $plan = $stmt->fetch();
+
+        if ($plan === false) {
+            Response::error(404, 'not_found', 'Plan not found.');
+            exit;
+        }
+
+        return $plan;
+    }
+
     public static function send(): void
     {
         $user = Auth::requireUser();
@@ -186,6 +257,23 @@ final class MessageController
                 Acl::planBelongsToPair($planKind, $planId, $user['id'], $recipientId),
                 'That plan does not belong to this conversation.'
             );
+        }
+
+        self::insertMessage($user, $recipientId, $body, $planKind, $planId);
+    }
+
+    /** Shared by the direct composer and the per-plan thread. */
+    private static function insertMessage(
+        array $user,
+        string $recipientId,
+        string $rawBody,
+        ?string $planKind,
+        ?string $planId
+    ): void {
+        $body = trim($rawBody);
+        if ($body === '' || mb_strlen($body) > self::MAX_BODY) {
+            Response::error(400, 'invalid_body', 'A message must be between 1 and 1000 characters.');
+            return;
         }
 
         $pdo = Database::connection();

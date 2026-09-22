@@ -1,16 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
-import { compressImageToBlob } from "@/lib/image-compression";
-
-const MAX_ORIGINAL_AVATAR_BYTES = 8 * 1024 * 1024;
-
-async function getCurrentUserId(): Promise<string> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("نشست کاربر معتبر نیست.");
-  return user.id;
-}
+import { api, setToken } from "@/lib/api/client";
 
 export async function updateProfileInfo(input: {
   firstName: string;
@@ -18,79 +6,46 @@ export async function updateProfileInfo(input: {
   phone: string | null;
   birthDate?: string | null;
 }): Promise<void> {
-  const supabase = createClient();
-  const userId = await getCurrentUserId();
-
-  const update: {
-    first_name: string;
-    last_name: string;
-    phone: string | null;
-    birth_date?: string | null;
-  } = {
+  const patch: Record<string, string | null> = {
     first_name: input.firstName,
     last_name: input.lastName,
     phone: input.phone,
   };
   if (input.birthDate !== undefined) {
-    update.birth_date = input.birthDate;
+    patch.birth_date = input.birthDate;
   }
 
-  const { error } = await supabase.from("profiles").update(update).eq("id", userId);
-  if (error) throw error;
+  await api.patch("/me/profile", patch);
 }
 
-// auth.users.email requires (project-config-dependent) confirmation before
-// it actually switches, so profiles.email — a display-only mirror used
-// elsewhere in the app — is updated eagerly rather than waiting for that.
 export async function updateEmail(email: string): Promise<void> {
-  const supabase = createClient();
-  const userId = await getCurrentUserId();
-
-  const { error: authError } = await supabase.auth.updateUser({ email });
-  if (authError) throw authError;
-
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({ email })
-    .eq("id", userId);
-  if (profileError) throw profileError;
+  await api.patch("/me/email", { email });
 }
 
-export async function updatePassword(password: string): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) throw error;
+/**
+ * Changing the password invalidates every other session, so the API mints a
+ * fresh token for this browser and it replaces the stored one.
+ */
+export async function updatePassword(
+  currentPassword: string,
+  password: string
+): Promise<void> {
+  const data = await api.patch<{ token: string }>("/me/password", {
+    current_password: currentPassword,
+    password,
+  });
+  setToken(data.token);
 }
 
+/**
+ * The image is validated and resized server-side, so the browser sends the
+ * file as picked. The returned URL carries a cache-busting suffix: the new
+ * avatar overwrites the old one at the same path.
+ */
 export async function uploadAvatar(file: File): Promise<{ url: string }> {
-  const supabase = createClient();
-  const userId = await getCurrentUserId();
-
   if (!file.type.startsWith("image/")) {
     throw new Error("فقط فایل تصویری مجاز است.");
   }
-  if (file.size > MAX_ORIGINAL_AVATAR_BYTES) {
-    throw new Error("حجم تصویر انتخابی خیلی زیاد است (حداکثر ۸ مگابایت).");
-  }
 
-  const blob = await compressImageToBlob(file, { maxDimension: 512, initialQuality: 0.9 });
-  const path = `${userId}/avatar.jpg`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("avatars")
-    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
-  if (uploadError) throw uploadError;
-
-  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-  // Cache-bust so <img> re-fetches the new file instead of a stale copy
-  // cached under the same URL as the previous avatar.
-  const url = `${data.publicUrl}?t=${Date.now()}`;
-
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({ avatar_url: url })
-    .eq("id", userId);
-  if (profileError) throw profileError;
-
-  return { url };
+  return api.upload<{ url: string }>("/me/avatar", file);
 }

@@ -74,7 +74,12 @@ $router->post('/invitations/accept-club', fn () => InvitationController::acceptC
 
 $router->post('/clubs', fn () => ClubController::create());
 $router->get('/clubs/{id}', fn (array $p) => ClubController::get($p));
+$router->patch('/clubs/{id}', fn (array $p) => ClubController::update($p));
 $router->post('/clubs/{id}/logo', fn (array $p) => UploadController::clubLogo($p));
+$router->get('/clubs/{id}/membership-plans', fn (array $p) => ClubController::listMembershipPlans($p));
+$router->post('/clubs/{id}/membership-plans', fn (array $p) => ClubController::createMembershipPlan($p));
+$router->patch('/membership-plans/{id}', fn (array $p) => ClubController::updateMembershipPlan($p));
+$router->delete('/membership-plans/{id}', fn (array $p) => ClubController::deleteMembershipPlan($p));
 
 $router->get('/clubs/{id}/members', fn (array $p) => MemberController::listMembers($p));
 $router->get('/clubs/{id}/members/{membershipId}/profile', fn (array $p) => MemberController::memberProfile($p));
@@ -159,6 +164,8 @@ $router->get('/messages/threads', fn () => MessageController::threads());
 $router->get('/messages/conversation/{id}', fn (array $p) => MessageController::conversation($p));
 $router->post('/messages/conversation/{id}/read', fn (array $p) => MessageController::markRead($p));
 $router->post('/messages', fn () => MessageController::send());
+$router->get('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::planComments($p));
+$router->post('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::addPlanComment($p));
 
 $router->get('/profiles/{id}', fn (array $p) => ProfileController::get($p));
 $router->patch('/me/profile', fn () => ProfileController::updateProfile());

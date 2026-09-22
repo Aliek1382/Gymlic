@@ -102,34 +102,41 @@ final class AuthController
         Response::ok(['ok' => true]);
     }
 
+    /**
+     * Everything the app's redirect rules need in one call: the profile, the
+     * active club membership with the club's own name and status, and the
+     * athlete's trainer. The browser used to assemble this from four separate
+     * Supabase queries on every page load.
+     */
     public static function me(): void
     {
         $user = Auth::requireUser();
-
         $pdo = Database::connection();
 
-        // Trainer link (if account_type = athlete)
-        $trainer = null;
-        if ($user['account_type'] === 'athlete') {
-            $stmt = $pdo->prepare(
-                "SELECT trainer_id FROM trainer_athletes WHERE athlete_id = :id AND status = 'active' LIMIT 1"
-            );
-            $stmt->execute(['id' => $user['id']]);
-            $row = $stmt->fetch();
-            $trainer = $row['trainer_id'] ?? null;
-        }
-
-        // Club membership (if any)
         $stmt = $pdo->prepare(
-            "SELECT club_id, role, status FROM memberships WHERE user_id = :id AND status = 'active' LIMIT 1"
+            "SELECT m.club_id, m.role, c.name AS club_name, c.status AS club_status
+             FROM memberships m
+             JOIN clubs c ON c.id = m.club_id
+             WHERE m.user_id = :id AND m.status = 'active'
+             ORDER BY m.joined_at ASC LIMIT 1"
         );
         $stmt->execute(['id' => $user['id']]);
         $membership = $stmt->fetch() ?: null;
 
+        $stmt = $pdo->prepare(
+            "SELECT p.id, p.first_name, p.last_name, p.avatar_url
+             FROM trainer_athletes ta
+             JOIN profiles p ON p.id = ta.trainer_id
+             WHERE ta.athlete_id = :id AND ta.status = 'active'
+             ORDER BY ta.created_at ASC LIMIT 1"
+        );
+        $stmt->execute(['id' => $user['id']]);
+        $trainer = $stmt->fetch() ?: null;
+
         Response::ok([
-            'user'       => self::profilePublic($user),
-            'trainer_id' => $trainer,
-            'membership' => $membership,
+            'user'        => self::profilePublic($user) + ['is_suspended' => (bool) $user['is_suspended']],
+            'membership'  => $membership,
+            'trainer'     => $trainer,
         ]);
     }
 

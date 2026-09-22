@@ -1,22 +1,12 @@
-import { createClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api/client";
 import type { ClubStatus } from "@/types/database.types";
 
 export async function setClubStatus(clubId: string, status: ClubStatus) {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("admin_set_club_status", {
-    p_club_id: clubId,
-    p_status: status,
-  });
-  if (error) throw error;
+  await api.post(`/admin/clubs/${clubId}/status`, { status });
 }
 
 export async function setProfileSuspended(userId: string, suspended: boolean) {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("admin_set_profile_suspended", {
-    p_user_id: userId,
-    p_suspended: suspended,
-  });
-  if (error) throw error;
+  await api.post(`/admin/profiles/${userId}/suspend`, { suspended });
 }
 
 export interface AdminProfileEditInput {
@@ -28,35 +18,27 @@ export interface AdminProfileEditInput {
   birthDate: string | null;
 }
 
+/** account_type and is_platform_admin are deliberately not editable here. */
 export async function updateProfileAsAdmin(input: AdminProfileEditInput) {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("admin_update_profile", {
-    p_user_id: input.userId,
-    p_first_name: input.firstName,
-    p_last_name: input.lastName,
-    p_email: input.email,
-    p_phone: input.phone,
-    p_birth_date: input.birthDate,
+  await api.patch(`/admin/profiles/${input.userId}`, {
+    first_name: input.firstName,
+    last_name: input.lastName,
+    email: input.email,
+    phone: input.phone,
+    birth_date: input.birthDate,
   });
-  if (error) throw error;
 }
 
 export async function approvePaymentRequest(requestId: string, adminNote?: string) {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("approve_payment_request", {
-    p_request_id: requestId,
-    p_admin_note: adminNote || null,
+  await api.post(`/admin/payment-requests/${requestId}/approve`, {
+    admin_note: adminNote || null,
   });
-  if (error) throw error;
 }
 
 export async function rejectPaymentRequest(requestId: string, adminNote?: string) {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("reject_payment_request", {
-    p_request_id: requestId,
-    p_admin_note: adminNote || null,
+  await api.post(`/admin/payment-requests/${requestId}/reject`, {
+    admin_note: adminNote || null,
   });
-  if (error) throw error;
 }
 
 export interface PlanInput {
@@ -68,29 +50,20 @@ export interface PlanInput {
   isActive?: boolean;
 }
 
+function toPlanPayload(input: Partial<PlanInput>) {
+  const payload: Record<string, unknown> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.priceToman !== undefined) payload.price_toman = input.priceToman;
+  if (input.durationDays !== undefined) payload.duration_days = input.durationDays;
+  if (input.maxMembers !== undefined) payload.max_members = input.maxMembers;
+  if (input.isActive !== undefined) payload.is_active = input.isActive;
+  return payload;
+}
+
 export async function createPlan(input: PlanInput) {
-  const supabase = createClient();
-  const { error } = await supabase.from("plans").insert({
-    name: input.name,
-    price_toman: input.priceToman,
-    duration_days: input.durationDays,
-    max_members: input.maxMembers ?? null,
-    is_active: input.isActive ?? true,
-  });
-  if (error) throw error;
+  await api.post("/admin/plans", toPlanPayload(input));
 }
 
 export async function updatePlan(planId: string, input: Partial<PlanInput>) {
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("plans")
-    .update({
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.priceToman !== undefined && { price_toman: input.priceToman }),
-      ...(input.durationDays !== undefined && { duration_days: input.durationDays }),
-      ...(input.maxMembers !== undefined && { max_members: input.maxMembers }),
-      ...(input.isActive !== undefined && { is_active: input.isActive }),
-    })
-    .eq("id", planId);
-  if (error) throw error;
+  await api.patch(`/admin/plans/${planId}`, toPlanPayload(input));
 }

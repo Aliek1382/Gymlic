@@ -1,12 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
-import { getTrainerStatistics } from "../services/trainer-dashboard-service";
+import { useTrainerDashboardSlice } from "./use-trainer-dashboard";
 
 export function useTrainerStatistics() {
-  return useQuery({
-    queryKey: ["dashboard", "trainer-statistics"],
-    queryFn: getTrainerStatistics,
-  });
+  return useTrainerDashboardSlice((data) => data.statistics);
 }

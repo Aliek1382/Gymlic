@@ -1,5 +1,6 @@
 export const MAX_RECENT_ACTIVITIES = 10;
 export const SUBSCRIPTION_WARNING_DAYS = 7;
+export const DEFAULT_REVENUE_MONTHS = 6;
 
 export const REVENUE_RANGE_OPTIONS = [
   { value: "3", label: "۳ ماه گذشته" },

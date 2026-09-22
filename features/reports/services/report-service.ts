@@ -1,17 +1,12 @@
-import { createClient } from "@/lib/supabase/client";
+import { api, fullName, query, type ListResponse } from "@/lib/api/client";
 import {
   calendarWindowStart,
   computeWeekStreak,
   getPersianWeekStart,
-  listAthletes,
   parsePlanDescription,
   toDateKey,
   type WorkoutDayLog,
 } from "@/features/athletes";
-
-// How far back the streak query looks. Matches the training calendar's
-// window, so the two never disagree about a run they both show.
-const STREAK_WEEKS = 12;
 import type {
   AthleteProgressSummary,
   AthleteWeeklyAdherence,
@@ -20,149 +15,94 @@ import type {
   TrainerMonthlyStatsSummary,
 } from "../types/report-types";
 
-async function getCurrentUserId(): Promise<string> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("نشست کاربر معتبر نیست.");
-  return user.id;
-}
+// How far back the streak query looks. Matches the training calendar's
+// window, so the two never disagree about a run they both show.
+const STREAK_WEEKS = 12;
 
 export async function getTrainerMonthlyStats(): Promise<TrainerMonthlyStatsSummary> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-
-  const [athletes, workouts, nutrition] = await Promise.all([
-    supabase
-      .from("trainer_athletes")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", trainerId)
-      .eq("status", "active"),
-    supabase
-      .from("workout_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", trainerId)
-      .eq("is_template", false)
-      .neq("status", "draft")
-      .gte("assigned_at", monthStart.toISOString()),
-    supabase
-      .from("nutrition_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", trainerId)
-      .eq("is_template", false)
-      .neq("status", "draft")
-      .gte("assigned_at", monthStart.toISOString()),
-  ]);
-  if (athletes.error) throw athletes.error;
-  if (workouts.error) throw workouts.error;
-  if (nutrition.error) throw nutrition.error;
+  const data = await api.get<{
+    athletes_count: number;
+    workout_plans_this_month: number;
+    nutrition_plans_this_month: number;
+  }>("/reports/trainer/monthly-stats");
 
   return {
-    athletesCount: athletes.count ?? 0,
-    workoutPlansThisMonth: workouts.count ?? 0,
-    nutritionPlansThisMonth: nutrition.count ?? 0,
+    athletesCount: data.athletes_count,
+    workoutPlansThisMonth: data.workout_plans_this_month,
+    nutritionPlansThisMonth: data.nutrition_plans_this_month,
   };
 }
 
 export async function listAthleteProgress(): Promise<AthleteProgressSummary[]> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
+  const data = await api.get<
+    ListResponse<{
+      athlete_id: string;
+      first_name: string | null;
+      last_name: string | null;
+      completed_count: number;
+    }>
+  >("/reports/trainer/athlete-progress");
 
-  const [athletes, workouts, nutrition] = await Promise.all([
-    listAthletes(),
-    supabase
-      .from("workout_assignments")
-      .select("athlete_id")
-      .eq("trainer_id", trainerId)
-      .eq("status", "completed"),
-    supabase
-      .from("nutrition_assignments")
-      .select("athlete_id")
-      .eq("trainer_id", trainerId)
-      .eq("status", "completed"),
-  ]);
-  if (workouts.error) throw workouts.error;
-  if (nutrition.error) throw nutrition.error;
-
-  const counts = new Map<string, number>();
-  for (const row of [...(workouts.data ?? []), ...(nutrition.data ?? [])]) {
-    if (!row.athlete_id) continue;
-    counts.set(row.athlete_id, (counts.get(row.athlete_id) ?? 0) + 1);
-  }
-
-  return athletes.map((athlete) => ({
-    athleteId: athlete.id,
-    name: athlete.name,
-    completedCount: counts.get(athlete.id) ?? 0,
+  return data.items.map((row) => ({
+    athleteId: row.athlete_id,
+    name: fullName(row.first_name, row.last_name),
+    completedCount: row.completed_count,
   }));
 }
 
-// How many of this week's training days each athlete has ticked off. The
-// target isn't stored anywhere — a plan's "days" are the headings inside its
-// free-text description — so it's counted by parsing that description, the
-// same way the athlete's own screen counts the days it offers a tick for.
+interface AdherenceResponse {
+  athletes: {
+    athlete_id: string;
+    first_name: string | null;
+    last_name: string | null;
+  }[];
+  plans: {
+    id: string;
+    athlete_id: string;
+    description: string | null;
+  }[];
+  logs: {
+    athlete_id: string;
+    assignment_id: string;
+    day_key: string;
+    completed_on: string;
+  }[];
+}
+
+/**
+ * How many of this week's training days each athlete has ticked off. The
+ * target isn't stored anywhere — a plan's "days" are the headings inside its
+ * free-text description — so it's counted by parsing that description, the
+ * same way the athlete's own screen counts the days it offers a tick for.
+ *
+ * The API returns the raw descriptions and logs rather than a number, so this
+ * parser stays the only one and can't drift from the athlete's view.
+ */
 export async function listWeeklyAdherence(): Promise<AthleteWeeklyAdherence[]> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
   const weekStart = toDateKey(getPersianWeekStart());
 
-  const [athletes, plans] = await Promise.all([
-    listAthletes(),
-    supabase
-      .from("workout_assignments")
-      .select("id, athlete_id, description")
-      .eq("trainer_id", trainerId)
-      .eq("is_template", false)
-      .eq("status", "active")
-      .order("assigned_at", { ascending: false }),
-  ]);
-  if (plans.error) throw plans.error;
+  // Logs come back over the streak window rather than just this week: a
+  // streak shouldn't reset because the trainer issued a new plan, so it has
+  // to see the ticks from the athlete's earlier ones too.
+  const data = await api.get<AdherenceResponse>(
+    `/reports/trainer/weekly-adherence${query({
+      from: calendarWindowStart(STREAK_WEEKS),
+    })}`
+  );
 
-  // The athlete's own screen ticks against their most recent active plan, so
-  // adherence is measured against that same one — hence first-wins over a
-  // newest-first list.
-  const planByAthlete = new Map<string, { id: string; description: string | null }>();
-  for (const row of plans.data ?? []) {
-    if (!row.athlete_id || planByAthlete.has(row.athlete_id)) continue;
-    planByAthlete.set(row.athlete_id, { id: row.id, description: row.description });
-  }
-
-  // Fetched by athlete rather than by assignment, and over the streak window
-  // rather than just this week: a streak shouldn't reset because the trainer
-  // issued a new plan, so it has to see logs from the athlete's earlier ones
-  // too. The select policy admits is_trainer_of, so this reads fine.
-  const athleteIds = athletes.map((athlete) => athlete.id);
-  const streakFrom = calendarWindowStart(STREAK_WEEKS);
-  const logs =
-    athleteIds.length > 0
-      ? await supabase
-          .from("workout_day_logs")
-          .select("assignment_id, athlete_id, day_key, completed_on")
-          .in("athlete_id", athleteIds)
-          .gte("completed_on", streakFrom)
-      : null;
-  if (logs?.error) throw logs.error;
-
-  const rows = logs?.data ?? [];
-
-  // "This week" still counts only the active plan's own ticks, matching how
-  // the athlete's own line counts them — and a day ticked on two dates in one
+  // "This week" counts only the active plan's own ticks, matching how the
+  // athlete's own line counts them — and a day ticked on two dates in one
   // week still counts once.
   const doneDaysByPlan = new Map<string, Set<string>>();
-  for (const log of rows) {
-    if (log.completed_on < weekStart) continue;
-    const days = doneDaysByPlan.get(log.assignment_id) ?? new Set<string>();
-    days.add(log.day_key);
-    doneDaysByPlan.set(log.assignment_id, days);
-  }
-
   const logsByAthlete = new Map<string, WorkoutDayLog[]>();
-  for (const log of rows) {
+
+  for (const log of data.logs) {
+    if (log.completed_on >= weekStart) {
+      const days = doneDaysByPlan.get(log.assignment_id) ?? new Set<string>();
+      days.add(log.day_key);
+      doneDaysByPlan.set(log.assignment_id, days);
+    }
+
     const existing = logsByAthlete.get(log.athlete_id) ?? [];
     existing.push({
       id: `${log.assignment_id}-${log.day_key}-${log.completed_on}`,
@@ -173,14 +113,19 @@ export async function listWeeklyAdherence(): Promise<AthleteWeeklyAdherence[]> {
     logsByAthlete.set(log.athlete_id, existing);
   }
 
-  return athletes.map((athlete) => {
-    const streak = computeWeekStreak(logsByAthlete.get(athlete.id) ?? []);
-    const plan = planByAthlete.get(athlete.id);
+  const planByAthlete = new Map(data.plans.map((plan) => [plan.athlete_id, plan]));
+
+  // Every athlete on the roster appears, including one with no active plan —
+  // measured against zero sessions rather than left out of the report.
+  return data.athletes.map((athlete) => {
+    const streak = computeWeekStreak(logsByAthlete.get(athlete.athlete_id) ?? []);
+    const plan = planByAthlete.get(athlete.athlete_id);
+    const name = fullName(athlete.first_name, athlete.last_name);
 
     if (!plan) {
       return {
-        athleteId: athlete.id,
-        name: athlete.name,
+        athleteId: athlete.athlete_id,
+        name,
         doneThisWeek: 0,
         sessionsPerWeek: 0,
         streakWeeks: streak.current,
@@ -193,8 +138,8 @@ export async function listWeeklyAdherence(): Promise<AthleteWeeklyAdherence[]> {
     ).length;
 
     return {
-      athleteId: athlete.id,
-      name: athlete.name,
+      athleteId: athlete.athlete_id,
+      name,
       doneThisWeek: doneDaysByPlan.get(plan.id)?.size ?? 0,
       sessionsPerWeek,
       streakWeeks: streak.current,
@@ -203,88 +148,28 @@ export async function listWeeklyAdherence(): Promise<AthleteWeeklyAdherence[]> {
 }
 
 export async function getTrainerCompletionRates(): Promise<TrainerCompletionRatesSummary> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const [completedWorkouts, totalWorkouts, completedNutrition, totalNutrition] =
-    await Promise.all([
-      supabase
-        .from("workout_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", trainerId)
-        .eq("status", "completed")
-        .eq("is_template", false),
-      supabase
-        .from("workout_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", trainerId)
-        .neq("status", "draft")
-        .eq("is_template", false),
-      supabase
-        .from("nutrition_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", trainerId)
-        .eq("status", "completed")
-        .eq("is_template", false),
-      supabase
-        .from("nutrition_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("trainer_id", trainerId)
-        .neq("status", "draft")
-        .eq("is_template", false),
-    ]);
-  if (completedWorkouts.error) throw completedWorkouts.error;
-  if (totalWorkouts.error) throw totalWorkouts.error;
-  if (completedNutrition.error) throw completedNutrition.error;
-  if (totalNutrition.error) throw totalNutrition.error;
+  const data = await api.get<{
+    workout_completion_rate: number;
+    nutrition_completion_rate: number;
+  }>("/reports/trainer/completion-rates");
 
   return {
-    workoutCompletionRate: totalWorkouts.count
-      ? Math.round(((completedWorkouts.count ?? 0) / totalWorkouts.count) * 100)
-      : 0,
-    nutritionCompletionRate: totalNutrition.count
-      ? Math.round(((completedNutrition.count ?? 0) / totalNutrition.count) * 100)
-      : 0,
+    workoutCompletionRate: data.workout_completion_rate,
+    nutritionCompletionRate: data.nutrition_completion_rate,
   };
 }
 
 export async function listCompletedPlansForAthlete(
   athleteId: string
 ): Promise<CompletedPlanEntry[]> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
+  const data = await api.get<
+    ListResponse<{ id: string; title: string; kind: "workout" | "nutrition"; assigned_at: string }>
+  >(`/athletes/${athleteId}/completed-plans`);
 
-  const [workouts, nutrition] = await Promise.all([
-    supabase
-      .from("workout_assignments")
-      .select("id, title, assigned_at")
-      .eq("trainer_id", trainerId)
-      .eq("athlete_id", athleteId)
-      .eq("status", "completed"),
-    supabase
-      .from("nutrition_assignments")
-      .select("id, title, assigned_at")
-      .eq("trainer_id", trainerId)
-      .eq("athlete_id", athleteId)
-      .eq("status", "completed"),
-  ]);
-  if (workouts.error) throw workouts.error;
-  if (nutrition.error) throw nutrition.error;
-
-  const combined: CompletedPlanEntry[] = [
-    ...(workouts.data ?? []).map((row) => ({
-      id: row.id,
-      title: row.title,
-      kind: "workout" as const,
-      assignedAt: row.assigned_at,
-    })),
-    ...(nutrition.data ?? []).map((row) => ({
-      id: row.id,
-      title: row.title,
-      kind: "nutrition" as const,
-      assignedAt: row.assigned_at,
-    })),
-  ];
-
-  return combined.sort((a, b) => b.assignedAt.localeCompare(a.assignedAt));
+  return data.items.map((row) => ({
+    id: row.id,
+    title: row.title,
+    kind: row.kind,
+    assignedAt: row.assigned_at,
+  }));
 }

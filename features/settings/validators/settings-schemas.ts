@@ -23,7 +23,8 @@ export type EmailFormValues = z.infer<typeof emailFormSchema>;
 
 export const passwordFormSchema = z
   .object({
-    newPassword: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد."),
+    currentPassword: z.string().min(1, "رمز عبور فعلی را وارد کنید."),
+    newPassword: z.string().min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد."),
     confirmPassword: z.string(),
   })
   .refine((values) => values.newPassword === values.confirmPassword, {

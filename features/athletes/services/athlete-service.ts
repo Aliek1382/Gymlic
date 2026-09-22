@@ -1,5 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
-import { INVITE_EXPIRES_DAYS } from "../constants/athletes";
+import { api, fullName, query, type ListResponse } from "@/lib/api/client";
 import type {
   AthleteProfile,
   AthleteSummary,
@@ -10,222 +9,104 @@ import type {
   TrainerClub,
 } from "../types/athlete-types";
 
-async function getCurrentUserId(): Promise<string> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("نشست کاربر معتبر نیست.");
-  return user.id;
-}
-
-// Tallies rows by whichever id column is present — athlete_id for joined
-// athletes, invitation_id for plans pre-assigned to a pending invite.
-function countRowsById(rows: { id: string | null }[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.id) continue;
-    counts.set(row.id, (counts.get(row.id) ?? 0) + 1);
-  }
-  return counts;
+interface AthleteRow {
+  id: string;
+  created_at: string;
+  first_name: string | null;
+  last_name: string | null;
+  birth_date: string | null;
+  avatar_url: string | null;
+  workout_plan_count: number;
+  nutrition_plan_count: number;
 }
 
 export async function listAthletes(): Promise<AthleteSummary[]> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
+  const data = await api.get<ListResponse<AthleteRow>>("/athletes");
 
-  // trainer_athletes has two foreign keys into profiles (trainer_id and
-  // athlete_id) — the embed must be disambiguated via the column-based
-  // hint, or PostgREST rejects the query as ambiguous.
-  const [athletesResult, workouts, nutrition] = await Promise.all([
-    supabase
-      .from("trainer_athletes")
-      .select(
-        "athlete_id, created_at, profiles!athlete_id(first_name, last_name, birth_date, avatar_url)"
-      )
-      .eq("trainer_id", trainerId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .returns<
-        {
-          athlete_id: string;
-          created_at: string;
-          profiles: {
-            first_name: string | null;
-            last_name: string | null;
-            birth_date: string | null;
-            avatar_url: string | null;
-          } | null;
-        }[]
-      >(),
-    // Counted for the "most/fewest plans" sort options — drafts don't
-    // count (never sent to the athlete) and templates never carry an
-    // athlete_id to begin with.
-    supabase
-      .from("workout_assignments")
-      .select("id:athlete_id")
-      .eq("trainer_id", trainerId)
-      .eq("is_template", false)
-      .neq("status", "draft"),
-    supabase
-      .from("nutrition_assignments")
-      .select("id:athlete_id")
-      .eq("trainer_id", trainerId)
-      .eq("is_template", false)
-      .neq("status", "draft"),
-  ]);
-  if (athletesResult.error) throw athletesResult.error;
-  if (workouts.error) throw workouts.error;
-  if (nutrition.error) throw nutrition.error;
-
-  const workoutCounts = countRowsById(workouts.data ?? []);
-  const nutritionCounts = countRowsById(nutrition.data ?? []);
-
-  return (athletesResult.data ?? []).map((row) => ({
-    id: row.athlete_id,
-    name:
-      [row.profiles?.first_name, row.profiles?.last_name]
-        .filter(Boolean)
-        .join(" ") || "بدون نام",
-    birthDate: row.profiles?.birth_date ?? null,
-    avatarUrl: row.profiles?.avatar_url ?? null,
+  return data.items.map((row) => ({
+    id: row.id,
+    name: fullName(row.first_name, row.last_name),
+    birthDate: row.birth_date,
+    avatarUrl: row.avatar_url,
     joinedAt: row.created_at,
-    workoutPlanCount: workoutCounts.get(row.athlete_id) ?? 0,
-    nutritionPlanCount: nutritionCounts.get(row.athlete_id) ?? 0,
+    workoutPlanCount: row.workout_plan_count,
+    nutritionPlanCount: row.nutrition_plan_count,
   }));
 }
 
 export async function getAthleteProfile(
   athleteId: string
 ): Promise<AthleteProfile | null> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const { data, error } = await supabase
-    .from("trainer_athletes")
-    .select(
-      "created_at, note, profiles!athlete_id(first_name, last_name, birth_date, avatar_url, phone)"
-    )
-    .eq("trainer_id", trainerId)
-    .eq("athlete_id", athleteId)
-    .eq("status", "active")
-    .maybeSingle()
-    .returns<{
+  try {
+    const row = await api.get<{
+      id: string;
       created_at: string;
       note: string | null;
-      profiles: {
-        first_name: string | null;
-        last_name: string | null;
-        birth_date: string | null;
-        avatar_url: string | null;
-        phone: string | null;
-      } | null;
-    } | null>();
-  if (error) throw error;
-  if (!data) return null;
+      first_name: string | null;
+      last_name: string | null;
+      birth_date: string | null;
+      avatar_url: string | null;
+      phone: string | null;
+    }>(`/athletes/${athleteId}`);
 
-  return {
-    id: athleteId,
-    name:
-      [data.profiles?.first_name, data.profiles?.last_name]
-        .filter(Boolean)
-        .join(" ") || "بدون نام",
-    birthDate: data.profiles?.birth_date ?? null,
-    avatarUrl: data.profiles?.avatar_url ?? null,
-    phone: data.profiles?.phone ?? null,
-    joinedAt: data.created_at,
-    note: data.note,
-  };
+    return {
+      id: row.id,
+      name: fullName(row.first_name, row.last_name),
+      birthDate: row.birth_date,
+      avatarUrl: row.avatar_url,
+      phone: row.phone,
+      joinedAt: row.created_at,
+      note: row.note,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function updateAthleteNote(
   athleteId: string,
   note: string | null
 ): Promise<void> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const { error } = await supabase
-    .from("trainer_athletes")
-    .update({ note })
-    .eq("trainer_id", trainerId)
-    .eq("athlete_id", athleteId);
-  if (error) throw error;
+  await api.patch(`/athletes/${athleteId}/note`, { note });
 }
 
-export async function listPendingAthleteInvites(): Promise<
-  PendingAthleteInvite[]
-> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
+interface PendingInviteRow {
+  id: string;
+  code: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  created_at: string;
+  expires_at: string;
+  workout_plan_count: number;
+  nutrition_plan_count: number;
+}
 
-  const [invitesResult, workouts, nutrition] = await Promise.all([
-    supabase
-      .from("invitations")
-      .select("id, code, first_name, last_name, phone, height_cm, weight_kg, created_at, expires_at")
-      .eq("created_by", trainerId)
-      .eq("invited_role", "athlete")
-      .eq("status", "pending")
-      .order("created_at", { ascending: false }),
-    // A trainer can pre-assign plans to a pending invite before the athlete
-    // even joins, so these can be counted the same way as listAthletes().
-    supabase
-      .from("workout_assignments")
-      .select("id:invitation_id")
-      .eq("trainer_id", trainerId)
-      .eq("is_template", false)
-      .neq("status", "draft"),
-    supabase
-      .from("nutrition_assignments")
-      .select("id:invitation_id")
-      .eq("trainer_id", trainerId)
-      .eq("is_template", false)
-      .neq("status", "draft"),
-  ]);
-  if (invitesResult.error) throw invitesResult.error;
-  if (workouts.error) throw workouts.error;
-  if (nutrition.error) throw nutrition.error;
+export async function listPendingAthleteInvites(): Promise<PendingAthleteInvite[]> {
+  const data = await api.get<ListResponse<PendingInviteRow>>("/athlete-invites");
 
-  const workoutCounts = countRowsById(workouts.data ?? []);
-  const nutritionCounts = countRowsById(nutrition.data ?? []);
-
-  return (invitesResult.data ?? []).map((row) => ({
+  return data.items.map((row) => ({
     id: row.id,
     code: row.code,
-    name:
-      [row.first_name, row.last_name].filter(Boolean).join(" ") || "بدون نام",
+    name: fullName(row.first_name, row.last_name),
     phone: row.phone,
     heightCm: row.height_cm,
     weightKg: row.weight_kg,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
-    workoutPlanCount: workoutCounts.get(row.id) ?? 0,
-    nutritionPlanCount: nutritionCounts.get(row.id) ?? 0,
+    workoutPlanCount: row.workout_plan_count,
+    nutritionPlanCount: row.nutrition_plan_count,
   }));
 }
 
 export async function removeAthlete(athleteId: string): Promise<void> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const { error } = await supabase
-    .from("trainer_athletes")
-    .delete()
-    .eq("trainer_id", trainerId)
-    .eq("athlete_id", athleteId);
-  if (error) throw error;
+  await api.delete(`/athletes/${athleteId}`);
 }
 
 export async function revokeAthleteInvite(invitationId: string): Promise<void> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const { error } = await supabase
-    .from("invitations")
-    .update({ status: "revoked" })
-    .eq("id", invitationId)
-    .eq("created_by", trainerId);
-  if (error) throw error;
+  await api.post(`/athlete-invites/${invitationId}/revoke`);
 }
 
 /**
@@ -235,23 +116,12 @@ export async function revokeAthleteInvite(invitationId: string): Promise<void> {
  * plan distribution and "member joined" notification never see them.
  */
 export async function getTrainerClub(): Promise<TrainerClub | null> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
+  const data = await api.get<{ club: { club_id: string; name: string } | null }>(
+    "/trainer/club"
+  );
+  if (!data.club) return null;
 
-  const { data, error } = await supabase
-    .from("memberships")
-    .select("club_id, clubs(name)")
-    .eq("user_id", trainerId)
-    .eq("role", "trainer")
-    .eq("status", "active")
-    .order("joined_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-    .returns<{ club_id: string; clubs: { name: string } | null } | null>();
-  if (error) throw error;
-  if (!data) return null;
-
-  return { id: data.club_id, name: data.clubs?.name ?? "" };
+  return { id: data.club.club_id, name: data.club.name };
 }
 
 export async function createAthleteInvite(input: {
@@ -261,44 +131,16 @@ export async function createAthleteInvite(input: {
   heightCm: number | null;
   weightKg: number | null;
 }): Promise<{ code: string }> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-  // Carried on the invitation so accept_athlete_invitation can create the
-  // club membership alongside the trainer/athlete link. Null for a trainer
-  // who works independently, which is the pre-existing behaviour.
-  const club = await getTrainerClub();
-
-  const code = crypto.randomUUID();
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRES_DAYS);
-
-  const { error } = await supabase.from("invitations").insert({
-    code,
-    trainer_id: trainerId,
-    club_id: club?.id ?? null,
-    invited_role: "athlete",
-    created_by: trainerId,
+  // The trainer's club is attached server-side, so the invite can create the
+  // club membership alongside the trainer/athlete link when it's accepted.
+  return api.post<{ code: string }>("/athlete-invites", {
     first_name: input.firstName,
     last_name: input.lastName,
     phone: input.phone,
     height_cm: input.heightCm,
     weight_kg: input.weightKg,
-    expires_at: expiresAt.toISOString(),
   });
-  if (error) throw error;
-
-  return { code };
 }
-
-const TABLE_BY_KIND = {
-  workout: "workout_assignments",
-  nutrition: "nutrition_assignments",
-} as const;
-
-const COMPLETE_RPC_BY_KIND = {
-  workout: "complete_workout_assignment",
-  nutrition: "complete_nutrition_assignment",
-} as const;
 
 export interface PlanEntry {
   id: string;
@@ -308,57 +150,42 @@ export interface PlanEntry {
   assignedAt: string;
 }
 
+interface PlanRow {
+  id: string;
+  title: string;
+  description: string | null;
+  status: PlanEntry["status"];
+  assigned_at: string;
+}
+
+function toPlanEntry(row: PlanRow): PlanEntry {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    assignedAt: row.assigned_at,
+  };
+}
+
 export async function listPlans(
   kind: PlanKind,
   target: PlanTarget
 ): Promise<PlanEntry[]> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  let query = supabase
-    .from(TABLE_BY_KIND[kind])
-    .select("id, title, description, status, assigned_at")
-    .eq("trainer_id", trainerId);
-  query =
+  const params =
     "athleteId" in target
-      ? query.eq("athlete_id", target.athleteId)
-      : query.eq("invitation_id", target.invitationId);
+      ? { athlete_id: target.athleteId }
+      : { invitation_id: target.invitationId };
 
-  const { data, error } = await query.order("assigned_at", {
-    ascending: false,
-  });
-  if (error) throw error;
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    status: row.status,
-    assignedAt: row.assigned_at,
-  }));
+  const data = await api.get<ListResponse<PlanRow>>(`/plans/${kind}${query(params)}`);
+  return data.items.map(toPlanEntry);
 }
 
 export async function listMyPlans(kind: PlanKind): Promise<PlanEntry[]> {
-  const supabase = createClient();
-  const athleteId = await getCurrentUserId();
-
-  // Drafts are unfinished — an athlete should never see a plan their
-  // trainer hasn't submitted yet.
-  const { data, error } = await supabase
-    .from(TABLE_BY_KIND[kind])
-    .select("id, title, description, status, assigned_at")
-    .eq("athlete_id", athleteId)
-    .neq("status", "draft")
-    .order("assigned_at", { ascending: false });
-  if (error) throw error;
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    status: row.status,
-    assignedAt: row.assigned_at,
-  }));
+  // Drafts are unfinished — the API never returns a plan the trainer hasn't
+  // submitted yet.
+  const data = await api.get<ListResponse<PlanRow>>(`/plans/${kind}/mine`);
+  return data.items.map(toPlanEntry);
 }
 
 export async function savePlan(
@@ -371,61 +198,24 @@ export async function savePlan(
     status: "active" | "draft";
   }
 ): Promise<{ id: string }> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  if (input.id) {
-    const { error } = await supabase
-      .from(TABLE_BY_KIND[kind])
-      .update({
-        title: input.title,
-        description: input.description,
-        status: input.status,
-      })
-      .eq("id", input.id)
-      .eq("trainer_id", trainerId);
-    if (error) throw error;
-    return { id: input.id };
-  }
-
-  const { data, error } = await supabase
-    .from(TABLE_BY_KIND[kind])
-    .insert({
-      trainer_id: trainerId,
-      athlete_id: "athleteId" in target ? target.athleteId : null,
-      invitation_id: "invitationId" in target ? target.invitationId : null,
-      title: input.title,
-      description: input.description,
-      status: input.status,
-    })
-    .select("id")
-    .single();
-  if (error) throw error;
-
-  return { id: data.id };
+  return api.post<{ id: string }>(`/plans/${kind}`, {
+    id: input.id,
+    title: input.title,
+    description: input.description,
+    status: input.status,
+    athlete_id: "athleteId" in target ? target.athleteId : null,
+    invitation_id: "invitationId" in target ? target.invitationId : null,
+  });
 }
 
 export async function completePlan(kind: PlanKind, planId: string): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase.rpc(COMPLETE_RPC_BY_KIND[kind], {
-    p_id: planId,
-  });
-  if (error) throw error;
+  await api.post(`/plans/${kind}/${planId}/complete`);
 }
 
 export async function listTemplates(kind: PlanKind): Promise<PlanTemplate[]> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
+  const data = await api.get<ListResponse<PlanRow>>(`/plans/${kind}/templates`);
 
-  const { data, error } = await supabase
-    .from(TABLE_BY_KIND[kind])
-    .select("id, title, description, assigned_at")
-    .eq("trainer_id", trainerId)
-    .eq("is_template", true)
-    .order("assigned_at", { ascending: false });
-  if (error) throw error;
-
-  return (data ?? []).map((row) => ({
+  return data.items.map((row) => ({
     id: row.id,
     title: row.title,
     description: row.description,
@@ -437,33 +227,12 @@ export async function saveTemplate(
   kind: PlanKind,
   input: { title: string; description: string | null }
 ): Promise<{ id: string }> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const { data, error } = await supabase
-    .from(TABLE_BY_KIND[kind])
-    .insert({
-      trainer_id: trainerId,
-      title: input.title,
-      description: input.description,
-      is_template: true,
-    })
-    .select("id")
-    .single();
-  if (error) throw error;
-
-  return { id: data.id };
+  return api.post<{ id: string }>(`/plans/${kind}/templates`, {
+    title: input.title,
+    description: input.description,
+  });
 }
 
 export async function deleteTemplate(kind: PlanKind, templateId: string): Promise<void> {
-  const supabase = createClient();
-  const trainerId = await getCurrentUserId();
-
-  const { error } = await supabase
-    .from(TABLE_BY_KIND[kind])
-    .delete()
-    .eq("id", templateId)
-    .eq("trainer_id", trainerId)
-    .eq("is_template", true);
-  if (error) throw error;
+  await api.delete(`/plans/${kind}/templates/${templateId}`);
 }

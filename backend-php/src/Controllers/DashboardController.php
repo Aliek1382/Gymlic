@@ -75,6 +75,18 @@ final class DashboardController
 
         $pdo = Database::connection();
 
+        $monthStart = date('Y-m-01');
+        $prevStart = date('Y-m-01', strtotime('-1 month'));
+
+        $club = $pdo->prepare('SELECT name, member_capacity FROM clubs WHERE id = :id');
+        $club->execute(['id' => $clubId]);
+        $clubRow = $club->fetch();
+
+        if ($clubRow === false) {
+            Response::error(404, 'not_found', 'Club not found.');
+            return;
+        }
+
         $stmt = $pdo->prepare(
             "SELECT
                (SELECT COUNT(*) FROM memberships
@@ -87,28 +99,60 @@ final class DashboardController
                    AND joined_at >= :prev_start AND joined_at < :month_start2) AS members_last_month,
                (SELECT COUNT(*) FROM memberships
                  WHERE club_id = :c4 AND role = 'trainer' AND status = 'active') AS trainer_count,
+               (SELECT COUNT(*) FROM memberships
+                 WHERE club_id = :c7 AND role = 'trainer' AND status = 'active'
+                   AND joined_at >= :month_start5) AS trainers_this_month,
+               (SELECT COUNT(*) FROM memberships
+                 WHERE club_id = :c8 AND role = 'trainer' AND status = 'active'
+                   AND joined_at >= :prev_start3 AND joined_at < :month_start6) AS trainers_last_month,
                (SELECT COALESCE(SUM(amount), 0) FROM revenue_entries
                  WHERE club_id = :c5 AND occurred_at >= :month_start3) AS revenue_this_month,
                (SELECT COALESCE(SUM(amount), 0) FROM revenue_entries
                  WHERE club_id = :c6 AND occurred_at >= :prev_start2 AND occurred_at < :month_start4)
                  AS revenue_last_month"
         );
-        $monthStart = date('Y-m-01');
-        $prevStart = date('Y-m-01', strtotime('-1 month'));
         $stmt->execute([
-            'c1' => $clubId, 'c2' => $clubId, 'c3' => $clubId,
-            'c4' => $clubId, 'c5' => $clubId, 'c6' => $clubId,
+            'c1' => $clubId, 'c2' => $clubId, 'c3' => $clubId, 'c4' => $clubId,
+            'c5' => $clubId, 'c6' => $clubId, 'c7' => $clubId, 'c8' => $clubId,
             'month_start' => $monthStart, 'month_start2' => $monthStart,
             'month_start3' => $monthStart, 'month_start4' => $monthStart,
-            'prev_start' => $prevStart, 'prev_start2' => $prevStart,
+            'month_start5' => $monthStart, 'month_start6' => $monthStart,
+            'prev_start' => $prevStart, 'prev_start2' => $prevStart, 'prev_start3' => $prevStart,
         ]);
 
-        $attendance = $pdo->prepare(
-            'SELECT COUNT(*) AS total, COALESCE(SUM(attended), 0) AS attended
-             FROM class_attendance_logs WHERE club_id = :club_id AND class_date >= :from'
+        $attendanceRates = [];
+        foreach ([
+            'this_month' => [$monthStart, null],
+            'last_month' => [$prevStart, $monthStart],
+        ] as $key => [$from, $until]) {
+            $sql = 'SELECT COUNT(*) AS total, COALESCE(SUM(attended), 0) AS attended
+                    FROM class_attendance_logs WHERE club_id = :club_id AND class_date >= :from';
+            $bind = ['club_id' => $clubId, 'from' => $from];
+            if ($until !== null) {
+                $sql .= ' AND class_date < :until';
+                $bind['until'] = $until;
+            }
+            $attendance = $pdo->prepare($sql);
+            $attendance->execute($bind);
+            $row = $attendance->fetch();
+            $total = (int) $row['total'];
+            $attendanceRates[$key] = $total === 0 ? 0 : (int) round((int) $row['attended'] / $total * 100);
+        }
+
+        // Five weekly buckets across the last 35 days, oldest first — the
+        // revenue sparkline on the statistics card.
+        $sparkline = array_fill(0, 5, 0.0);
+        $buckets = $pdo->prepare(
+            'SELECT DATEDIFF(CURDATE(), occurred_at) AS days_ago, amount
+             FROM revenue_entries WHERE club_id = :club_id AND occurred_at >= :from'
         );
-        $attendance->execute(['club_id' => $clubId, 'from' => date('Y-m-d', strtotime('-30 days'))]);
-        $attendanceRow = $attendance->fetch();
+        $buckets->execute(['club_id' => $clubId, 'from' => date('Y-m-d', strtotime('-34 days'))]);
+        foreach ($buckets->fetchAll() as $row) {
+            // An entry dated ahead (a fee taken in advance) belongs in the
+            // newest bucket rather than off the end of the array.
+            $index = min(4, max(0, (int) floor(max(0, (int) $row['days_ago']) / 7)));
+            $sparkline[4 - $index] += (float) $row['amount'];
+        }
 
         $series = $pdo->prepare(
             "SELECT DATE_FORMAT(occurred_at, '%Y-%m') AS month, COALESCE(SUM(amount), 0) AS total
@@ -134,11 +178,14 @@ final class DashboardController
         $subscription->execute(['club_id' => $clubId]);
 
         $recentMembers = $pdo->prepare(
-            "SELECT m.user_id, m.joined_at, p.first_name, p.last_name, p.avatar_url
+            "SELECT m.id, m.user_id, m.status, m.joined_at,
+                    p.first_name, p.last_name, p.phone,
+                    cmp.name AS plan_name
              FROM memberships m
              JOIN profiles p ON p.id = m.user_id
-             WHERE m.club_id = :club_id AND m.role = 'athlete' AND m.status = 'active'
-             ORDER BY m.joined_at DESC LIMIT 5"
+             LEFT JOIN club_membership_plans cmp ON cmp.id = m.plan_id
+             WHERE m.club_id = :club_id AND m.role = 'athlete'
+             ORDER BY m.joined_at DESC LIMIT 10"
         );
         $recentMembers->execute(['club_id' => $clubId]);
 
@@ -147,18 +194,25 @@ final class DashboardController
              FROM memberships m
              JOIN profiles p ON p.id = m.user_id
              WHERE m.club_id = :club_id AND m.role = 'trainer' AND m.status = 'active'
-             LIMIT 8"
+             LIMIT 4"
         );
         $trainers->execute(['club_id' => $clubId]);
 
-        $total = (int) $attendanceRow['total'];
-
         Response::ok([
+            'club_name'  => $clubRow['name'],
             'statistics' => Cast::row($stmt->fetch(),
                 ['revenue_this_month', 'revenue_last_month'],
-                ['member_count', 'members_this_month', 'members_last_month', 'trainer_count']
-            ),
-            'attendance_rate'   => $total === 0 ? null : (int) round((int) $attendanceRow['attended'] / $total * 100),
+                [
+                    'member_count', 'members_this_month', 'members_last_month',
+                    'trainer_count', 'trainers_this_month', 'trainers_last_month',
+                ]
+            ) + [
+                'member_capacity'          => $clubRow['member_capacity'] === null
+                    ? null : (int) $clubRow['member_capacity'],
+                'attendance_this_month'    => $attendanceRates['this_month'],
+                'attendance_last_month'    => $attendanceRates['last_month'],
+                'revenue_sparkline'        => $sparkline,
+            ],
             'revenue_series'    => Cast::rows($series->fetchAll(), ['total']),
             'plan_distribution' => Cast::rows($planDistribution->fetchAll(), [], ['member_count']),
             'subscription'      => $subscription->fetch() ?: null,

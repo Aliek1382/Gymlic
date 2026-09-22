@@ -1,13 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
-import { getClubStatistics } from "../services/dashboard-service";
+import { useClubDashboardSlice } from "./use-club-dashboard";
 
 export function useDashboardStatistics(clubId: string | null) {
-  return useQuery({
-    queryKey: ["dashboard", "statistics", clubId],
-    queryFn: () => getClubStatistics(clubId as string),
-    enabled: !!clubId,
-  });
+  return useClubDashboardSlice(clubId, (data) => data.statistics);
 }
