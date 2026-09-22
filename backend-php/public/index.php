@@ -14,7 +14,10 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use Gymlic\Controllers\AthleteController;
+use Gymlic\Controllers\AdminController;
 use Gymlic\Controllers\AuthController;
+use Gymlic\Controllers\EarningsController;
+use Gymlic\Controllers\RevenueController;
 use Gymlic\Controllers\ClubController;
 use Gymlic\Controllers\LibraryController;
 use Gymlic\Controllers\MemberController;
@@ -114,6 +117,31 @@ $router->get('/library/{kind}', fn (array $p) => LibraryController::list($p));
 $router->get('/library/{kind}/picker', fn (array $p) => LibraryController::picker($p));
 $router->post('/library/{kind}', fn (array $p) => LibraryController::create($p));
 $router->post('/library/{kind}/{id}/usage', fn (array $p) => LibraryController::recordUsage($p));
+
+$router->get('/clubs/{id}/revenue', fn (array $p) => RevenueController::list($p));
+$router->post('/clubs/{id}/revenue', fn (array $p) => RevenueController::create($p));
+$router->patch('/revenue/{id}', fn (array $p) => RevenueController::update($p));
+$router->delete('/revenue/{id}', fn (array $p) => RevenueController::remove($p));
+
+$router->get('/earnings', fn () => EarningsController::list());
+$router->post('/earnings', fn () => EarningsController::create());
+$router->patch('/earnings/{id}', fn (array $p) => EarningsController::update($p));
+$router->delete('/earnings/{id}', fn (array $p) => EarningsController::remove($p));
+
+$router->get('/plans-catalog', fn () => AdminController::listPlans());
+$router->get('/payment-requests', fn () => AdminController::listPaymentRequests());
+$router->post('/payment-requests', fn () => AdminController::submitPaymentRequest());
+
+$router->get('/admin/clubs', fn () => AdminController::listClubs());
+$router->get('/admin/profiles', fn () => AdminController::listProfiles());
+$router->get('/admin/activity', fn () => AdminController::listActivity());
+$router->post('/admin/clubs/{id}/status', fn (array $p) => AdminController::setClubStatus($p));
+$router->post('/admin/profiles/{id}/suspend', fn (array $p) => AdminController::setProfileSuspended($p));
+$router->patch('/admin/profiles/{id}', fn (array $p) => AdminController::updateProfile($p));
+$router->post('/admin/payment-requests/{id}/approve', fn (array $p) => AdminController::approvePaymentRequest($p));
+$router->post('/admin/payment-requests/{id}/reject', fn (array $p) => AdminController::rejectPaymentRequest($p));
+$router->post('/admin/plans', fn () => AdminController::createPlan());
+$router->patch('/admin/plans/{id}', fn (array $p) => AdminController::updatePlan($p));
 
 $router->get('/messages/threads', fn () => MessageController::threads());
 $router->get('/messages/conversation/{id}', fn (array $p) => MessageController::conversation($p));
