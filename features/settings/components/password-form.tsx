@@ -21,14 +21,17 @@ export function PasswordForm() {
 
   const form = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordFormSchema),
-    defaultValues: { newPassword: "", confirmPassword: "" },
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
   });
 
   async function onSubmit(values: PasswordFormValues) {
     try {
-      await updatePassword.mutateAsync(values.newPassword);
+      await updatePassword.mutateAsync({
+        currentPassword: values.currentPassword,
+        password: values.newPassword,
+      });
       toast.success("رمز عبور با موفقیت تغییر کرد.");
-      form.reset({ newPassword: "", confirmPassword: "" });
+      form.reset({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (error) {
       toast.error(getErrorMessage(error, "تغییر رمز عبور با خطا مواجه شد."));
     }
@@ -41,6 +44,22 @@ export function PasswordForm() {
       </div>
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="settings-current-password">رمز عبور فعلی</Label>
+            <Input
+              id="settings-current-password"
+              type="password"
+              dir="ltr"
+              autoComplete="current-password"
+              {...form.register("currentPassword")}
+            />
+            {form.formState.errors.currentPassword && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.currentPassword.message}
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="settings-new-password">رمز عبور جدید</Label>

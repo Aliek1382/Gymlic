@@ -16,50 +16,17 @@ import {
 import { formatAge, formatNumber } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { listAdminProfiles } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { SuspendToggle } from "@/features/admin/components/suspend-toggle";
 
 export function AdminAthletesPage() {
   const { data } = useQuery({
     queryKey: ["admin", "athletes"],
-    queryFn: async () => {
-
-    const supabase = createClient();
-
-    const [{ data: athletes }, { data: relations }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, first_name, last_name, phone, birth_date, avatar_url, is_suspended")
-        .eq("account_type", "athlete")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("trainer_athletes")
-        .select("athlete_id, profiles:trainer_id(first_name, last_name)")
-        .eq("status", "active")
-        .returns<
-          {
-            athlete_id: string;
-            profiles: { first_name: string | null; last_name: string | null } | null;
-          }[]
-        >(),
-    ]);
-
-    const trainerByAthlete = new Map<string, string>();
-    for (const r of relations ?? []) {
-      if (trainerByAthlete.has(r.athlete_id)) continue;
-      const name = [r.profiles?.first_name, r.profiles?.last_name].filter(Boolean).join(" ");
-      if (name) trainerByAthlete.set(r.athlete_id, name);
-    }
-
-    const rows = athletes ?? [];
-
-      return { rows, trainerByAthlete };
-    },
+    queryFn: async () => ({ rows: await listAdminProfiles("athlete") }),
   });
 
   const rows = data?.rows ?? [];
-  const trainerByAthlete = data?.trainerByAthlete ?? new Map<string, string>();
 
   return (
 
@@ -127,7 +94,7 @@ export function AdminAthletesPage() {
                       {age ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {trainerByAthlete.get(athlete.id) ?? "—"}
+                      {athlete.trainer_name || "—"}
                     </TableCell>
                     <TableCell>
                       {athlete.is_suspended ? (

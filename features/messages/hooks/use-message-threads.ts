@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useId } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { INBOX_POLL_MS } from "@/lib/api/polling";
 import { listMessageThreads } from "../services/message-service";
 
 export function messageThreadsQueryKey() {
@@ -11,46 +10,15 @@ export function messageThreadsQueryKey() {
 }
 
 /**
- * The inbox list, kept live the same way the notification bell is: any
- * message arriving or being marked read re-runs the aggregate, so a reply
- * shows up without a refresh. Realtime respects RLS, so only rows this user
- * may see ever arrive.
+ * The inbox list, kept fresh the same way the notification bell is: polled on
+ * a short interval, so a reply shows up without a refresh.
  */
 export function useMessageThreads() {
-  const queryClient = useQueryClient();
-  // supabase.channel() hands back the *existing* channel when the topic is
-  // already taken, so a fixed name would give every subscriber the same
-  // instance — and the first one to unmount would tear it down for the rest
-  // (the sidebar badge and the inbox are both on screen at /messages). A
-  // per-subscriber topic keeps them independent.
-  const channelId = useId();
-
-  const query = useQuery({
+  return useQuery({
     queryKey: messageThreadsQueryKey(),
     queryFn: listMessageThreads,
+    refetchInterval: INBOX_POLL_MS,
   });
-
-  useEffect(() => {
-    const supabase = createClient();
-    const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: messageThreadsQueryKey() });
-    };
-
-    const channel = supabase
-      .channel(`message-threads:${channelId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        invalidate
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [channelId, queryClient]);
-
-  return query;
 }
 
 /** Total unread messages across every conversation — the sidebar badge. */

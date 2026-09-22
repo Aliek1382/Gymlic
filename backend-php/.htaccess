@@ -1,0 +1,17 @@
+# Used only when this whole folder sits inside the web root (e.g. public_html/api/).
+# When a subdomain's document root points straight at public/, public/.htaccess
+# takes over instead and these rules never run.
+
+# Never serve application source, config, or SQL over HTTP.
+RedirectMatch 404 ^/(.*/)?(src|schema)/
+RedirectMatch 404 ^/(.*/)?config\.php$
+
+RewriteEngine On
+
+# Uploaded avatars/logos are served straight off disk.
+RewriteRule ^uploads/(.*)$ public/uploads/$1 [L]
+
+# Everything else goes through the front controller.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ public/index.php [QSA,L]

@@ -1,9 +1,7 @@
 /**
- * Hand-written mirror of the Supabase schema defined in
- * supabase/migrations/0001_init.sql and 0002_dashboard_metrics.sql.
- * Regenerate with the Supabase CLI (`supabase gen types typescript`) once a
- * live project is connected, and replace this file with the generated
- * output.
+ * The enumerated values the API speaks, mirroring the MySQL schema in
+ * backend-php/schema/schema.sql. Keep the two in step by hand: the columns
+ * are ENUMs there, so a new value needs a migration on that side too.
  */
 
 export type AccountType = "club" | "trainer" | "athlete";

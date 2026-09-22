@@ -1,216 +1,75 @@
-import { createClient } from "@/lib/supabase/client";
+import { api, fullName } from "@/lib/api/client";
 import type {
   TrainerActivityItem,
   TrainerDraftPlan,
   TrainerStatistics,
 } from "../types/dashboard-types";
 
-export async function getTrainerStatistics(): Promise<TrainerStatistics> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("نشست کاربر معتبر نیست.");
+interface TrainerDashboardResponse {
+  statistics: {
+    athletes_count: number;
+    active_workout_count: number;
+    active_nutrition_count: number;
+    completed_count: number;
+  };
+  activity: {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    assigned_at: string;
+    first_name: string | null;
+    last_name: string | null;
+    kind: "workout" | "nutrition";
+  }[];
+  drafts: {
+    id: string;
+    title: string;
+    updated_at: string;
+    athlete_first_name: string | null;
+    athlete_last_name: string | null;
+    invite_first_name: string | null;
+    invite_last_name: string | null;
+    kind: "workout" | "nutrition";
+  }[];
+}
 
-  const [
-    athletes,
-    activeWorkouts,
-    completedWorkouts,
-    completedNutrition,
-    activeNutrition,
-  ] = await Promise.all([
-    supabase
-      .from("trainer_athletes")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", user.id)
-      .eq("status", "active"),
-    supabase
-      .from("workout_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", user.id)
-      .eq("status", "active")
-      .eq("is_template", false),
-    supabase
-      .from("workout_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", user.id)
-      .eq("status", "completed")
-      .eq("is_template", false),
-    supabase
-      .from("nutrition_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", user.id)
-      .eq("status", "completed")
-      .eq("is_template", false),
-    supabase
-      .from("nutrition_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("trainer_id", user.id)
-      .eq("status", "active")
-      .eq("is_template", false),
-  ]);
+/** Counts, recent activity and unfinished drafts in one request. */
+export async function getTrainerDashboard(): Promise<{
+  statistics: TrainerStatistics;
+  activity: TrainerActivityItem[];
+  drafts: TrainerDraftPlan[];
+}> {
+  const data = await api.get<TrainerDashboardResponse>("/dashboard/trainer");
 
   return {
-    athletesCount: athletes.count ?? 0,
-    activeWorkoutProgramsCount: activeWorkouts.count ?? 0,
-    completedProgramsCount:
-      (completedWorkouts.count ?? 0) + (completedNutrition.count ?? 0),
-    activeNutritionPlansCount: activeNutrition.count ?? 0,
-  };
-}
-
-export async function getTrainerRecentActivities(
-  limit = 10
-): Promise<TrainerActivityItem[]> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("نشست کاربر معتبر نیست.");
-
-  // workout_assignments/nutrition_assignments have two foreign keys into
-  // profiles (trainer_id and athlete_id) — the embed must be disambiguated
-  // via the column hint, or PostgREST rejects the query as ambiguous.
-  const [workouts, nutrition] = await Promise.all([
-    supabase
-      .from("workout_assignments")
-      .select(
-        "id, title, description, status, assigned_at, profiles!athlete_id(first_name, last_name)"
-      )
-      .eq("trainer_id", user.id)
-      .neq("status", "draft")
-      .eq("is_template", false)
-      .order("assigned_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("nutrition_assignments")
-      .select(
-        "id, title, description, status, assigned_at, profiles!athlete_id(first_name, last_name)"
-      )
-      .eq("trainer_id", user.id)
-      .neq("status", "draft")
-      .eq("is_template", false)
-      .order("assigned_at", { ascending: false })
-      .limit(limit),
-  ]);
-  if (workouts.error) throw workouts.error;
-  if (nutrition.error) throw nutrition.error;
-
-  const mapRow = (
-    row: {
-      id: string;
-      title: string;
-      description: string | null;
-      status: string;
-      assigned_at: string;
-      profiles: unknown;
+    statistics: {
+      athletesCount: data.statistics.athletes_count,
+      activeWorkoutProgramsCount: data.statistics.active_workout_count,
+      completedProgramsCount: data.statistics.completed_count,
+      activeNutritionPlansCount: data.statistics.active_nutrition_count,
     },
-    type: "workout" | "nutrition"
-  ): TrainerActivityItem => {
-    const profile = row.profiles as unknown as {
-      first_name: string | null;
-      last_name: string | null;
-    } | null;
-    return {
-      id: `${type}-${row.id}`,
-      athleteName:
-        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-        "ورزشکار",
+    activity: data.activity.map((row) => ({
+      id: `${row.kind}-${row.id}`,
+      athleteName: fullName(row.first_name, row.last_name, "ورزشکار"),
       title: row.title,
       description: row.description,
-      type,
+      type: row.kind,
       status: row.status === "cancelled" ? "cancelled" : "active",
       date: row.assigned_at,
-    };
-  };
-
-  const combined = [
-    ...(workouts.data ?? []).map((row) => mapRow(row, "workout")),
-    ...(nutrition.data ?? []).map((row) => mapRow(row, "nutrition")),
-  ];
-
-  return combined
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, limit);
-}
-
-export async function getTrainerDraftPlans(
-  limit = 5
-): Promise<TrainerDraftPlan[]> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("نشست کاربر معتبر نیست.");
-
-  // A draft can target either a joined athlete (athlete_id) or a pending
-  // invite (invitation_id) — embedding both profiles and invitations is
-  // unambiguous since they're different related tables, so one query
-  // covers both cases.
-  const [workouts, nutrition] = await Promise.all([
-    supabase
-      .from("workout_assignments")
-      .select(
-        "id, title, description, updated_at, profiles!athlete_id(first_name, last_name), invitations!invitation_id(first_name, last_name)"
-      )
-      .eq("trainer_id", user.id)
-      .eq("status", "draft")
-      .order("updated_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("nutrition_assignments")
-      .select(
-        "id, title, description, updated_at, profiles!athlete_id(first_name, last_name), invitations!invitation_id(first_name, last_name)"
-      )
-      .eq("trainer_id", user.id)
-      .eq("status", "draft")
-      .order("updated_at", { ascending: false })
-      .limit(limit),
-  ]);
-  if (workouts.error) throw workouts.error;
-  if (nutrition.error) throw nutrition.error;
-
-  const mapRow = (
-    row: {
-      id: string;
-      title: string;
-      description: string | null;
-      updated_at: string;
-      profiles: unknown;
-      invitations: unknown;
-    },
-    type: "workout" | "nutrition"
-  ): TrainerDraftPlan => {
-    const profile = row.profiles as unknown as {
-      first_name: string | null;
-      last_name: string | null;
-    } | null;
-    const invitation = row.invitations as unknown as {
-      first_name: string | null;
-      last_name: string | null;
-    } | null;
-    const nameSource = profile ?? invitation;
-    return {
-      id: `${type}-${row.id}`,
-      athleteName:
-        [nameSource?.first_name, nameSource?.last_name]
-          .filter(Boolean)
-          .join(" ") || "ورزشکار",
+    })),
+    drafts: data.drafts.map((row) => ({
+      id: `${row.kind}-${row.id}`,
+      // A draft can be aimed at a joined athlete or at a pending invitation.
+      athleteName: fullName(
+        row.athlete_first_name ?? row.invite_first_name,
+        row.athlete_last_name ?? row.invite_last_name,
+        "ورزشکار"
+      ),
       title: row.title,
-      description: row.description,
-      type,
+      description: null,
+      type: row.kind,
       updatedAt: row.updated_at,
-    };
+    })),
   };
-
-  const combined = [
-    ...(workouts.data ?? []).map((row) => mapRow(row, "workout")),
-    ...(nutrition.data ?? []).map((row) => mapRow(row, "nutrition")),
-  ];
-
-  return combined
-    .sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )
-    .slice(0, limit);
 }

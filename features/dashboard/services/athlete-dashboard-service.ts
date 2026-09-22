@@ -1,46 +1,33 @@
-import { createClient } from "@/lib/supabase/client";
-import type { AthleteDashboardData } from "../types/dashboard-types";
+import { api } from "@/lib/api/client";
+import type { AthleteDashboardData, AthletePlanSummary } from "../types/dashboard-types";
 
-export async function getAthleteDashboard(
-  athleteId: string
-): Promise<AthleteDashboardData> {
-  const supabase = createClient();
+interface PlanRow {
+  id: string;
+  title: string;
+  description: string | null;
+  assigned_at: string;
+}
 
-  const [workout, nutrition] = await Promise.all([
-    supabase
-      .from("workout_assignments")
-      .select("id, title, description, assigned_at")
-      .eq("athlete_id", athleteId)
-      .eq("status", "active")
-      .order("assigned_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("nutrition_assignments")
-      .select("id, title, description, assigned_at")
-      .eq("athlete_id", athleteId)
-      .eq("status", "active")
-      .order("assigned_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+function mapPlan(row: PlanRow | null): AthletePlanSummary | null {
+  if (!row) return null;
 
   return {
-    todaysWorkout: workout.data
-      ? {
-          id: workout.data.id,
-          title: workout.data.title,
-          description: workout.data.description,
-          assignedAt: workout.data.assigned_at,
-        }
-      : null,
-    nutritionPlan: nutrition.data
-      ? {
-          id: nutrition.data.id,
-          title: nutrition.data.title,
-          description: nutrition.data.description,
-          assignedAt: nutrition.data.assigned_at,
-        }
-      : null,
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    assignedAt: row.assigned_at,
+  };
+}
+
+/** The athlete's own current plans — the API resolves them from the session. */
+export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
+  const data = await api.get<{
+    todays_workout: PlanRow | null;
+    nutrition_plan: PlanRow | null;
+  }>("/dashboard/athlete");
+
+  return {
+    todaysWorkout: mapPlan(data.todays_workout),
+    nutritionPlan: mapPlan(data.nutrition_plan),
   };
 }

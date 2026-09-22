@@ -1,48 +1,20 @@
 "use client";
 
-import { useEffect, useId } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { CONVERSATION_POLL_MS } from "@/lib/api/polling";
 import { getConversation } from "../services/message-service";
 
 export function conversationQueryKey(counterpartId: string | null) {
   return ["messages", "conversation", counterpartId];
 }
 
+/** An open thread polls faster than the inbox — a reply is awaited here. */
 export function useConversation(counterpartId: string | null) {
-  const queryClient = useQueryClient();
-  // Unique per subscriber — see the note in useMessageThreads.
-  const channelId = useId();
-
-  const query = useQuery({
+  return useQuery({
     queryKey: conversationQueryKey(counterpartId),
     queryFn: () => getConversation(counterpartId as string),
     enabled: !!counterpartId,
+    refetchInterval: CONVERSATION_POLL_MS,
   });
-
-  useEffect(() => {
-    if (!counterpartId) return;
-
-    const supabase = createClient();
-    // Postgres changes filters take one column, and a conversation is
-    // "either direction between these two" — so this listens to the user's
-    // visible messages and lets getConversation decide what belongs here.
-    const channel = supabase
-      .channel(`conversation:${counterpartId}:${channelId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: conversationQueryKey(counterpartId) });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [channelId, counterpartId, queryClient]);
-
-  return query;
 }

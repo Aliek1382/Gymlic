@@ -1,8 +1,6 @@
-import { createClient } from "@/lib/supabase/client";
+import { api, query, type ListResponse } from "@/lib/api/client";
 import type { NotificationType } from "@/types/database.types";
 import type { NotificationItem } from "../types/notification-types";
-
-const NOTIFICATION_PAGE_SIZE = 20;
 
 interface NotificationRow {
   id: string;
@@ -30,21 +28,10 @@ function toNotificationItem(row: NotificationRow): NotificationItem {
   };
 }
 
-export async function getNotifications(userId: string): Promise<NotificationItem[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("id, actor_id, type, title, body, link, metadata, read_at, created_at")
-    .eq("recipient_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(NOTIFICATION_PAGE_SIZE)
-    .returns<NotificationRow[]>();
-  if (error) throw error;
-
-  return (data ?? []).map(toNotificationItem);
+export async function getNotifications(): Promise<NotificationItem[]> {
+  const data = await api.get<ListResponse<NotificationRow>>("/notifications");
+  return data.items.map(toNotificationItem);
 }
-
-const ARCHIVE_PAGE_SIZE = 30;
 
 export interface NotificationsPage {
   items: NotificationItem[];
@@ -53,51 +40,28 @@ export interface NotificationsPage {
   nextCursor: string | null;
 }
 
-// Keyset pagination on `created_at` rather than `.range()` offsets — offsets
-// shift under a live-updating list (a new notification lands, or one's
-// marked read) and would duplicate or skip rows across pages.
+// Keyset pagination on `created_at` rather than offsets — offsets shift under
+// a live-updating list (a new notification lands, or one's marked read) and
+// would duplicate or skip rows across pages.
 export async function getNotificationsPage(
-  userId: string,
   cursor?: string | null
 ): Promise<NotificationsPage> {
-  const supabase = createClient();
-  let query = supabase
-    .from("notifications")
-    .select("id, actor_id, type, title, body, link, metadata, read_at, created_at")
-    .eq("recipient_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(ARCHIVE_PAGE_SIZE);
+  const data = await api.get<ListResponse<NotificationRow> & { next_cursor: string | null }>(
+    `/notifications/archive${query({ cursor })}`
+  );
 
-  if (cursor) query = query.lt("created_at", cursor);
-
-  const { data, error } = await query.returns<NotificationRow[]>();
-  if (error) throw error;
-
-  const rows = data ?? [];
-  const nextCursor =
-    rows.length === ARCHIVE_PAGE_SIZE ? rows[rows.length - 1].created_at : null;
-
-  return { items: rows.map(toNotificationItem), nextCursor };
+  return {
+    items: data.items.map(toNotificationItem),
+    nextCursor: data.next_cursor,
+  };
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", id)
-    .is("read_at", null);
-  if (error) throw error;
+  await api.post(`/notifications/${id}/read`);
 }
 
-export async function markAllNotificationsRead(userId: string): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("recipient_id", userId)
-    .is("read_at", null);
-  if (error) throw error;
+export async function markAllNotificationsRead(): Promise<void> {
+  await api.post("/notifications/read-all");
 }
 
 export interface BroadcastNotificationInput {
@@ -109,18 +73,15 @@ export interface BroadcastNotificationInput {
   clubIds?: string[];
 }
 
-/** Fans out one notification row to every profile (or every member of the
- * given clubs) — restricted server-side (create_broadcast_notification) to
- * profiles.is_platform_admin. */
+/** Fans out one notification to every profile (or every member of the given
+ * clubs) — restricted server-side to profiles.is_platform_admin. */
 export async function sendBroadcastNotification(
   input: BroadcastNotificationInput
 ): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("create_broadcast_notification", {
-    p_title: input.title,
-    p_body: input.body ?? null,
-    p_link: input.link ?? null,
-    p_club_ids: input.clubIds && input.clubIds.length > 0 ? input.clubIds : null,
+  await api.post("/admin/notifications/broadcast", {
+    title: input.title,
+    body: input.body ?? null,
+    link: input.link ?? null,
+    club_ids: input.clubIds && input.clubIds.length > 0 ? input.clubIds : null,
   });
-  if (error) throw error;
 }

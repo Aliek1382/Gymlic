@@ -17,53 +17,16 @@ import {
 import { formatAge, formatNumber } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { listAdminProfiles } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 
 export function AdminTrainersPage() {
   const { data } = useQuery({
     queryKey: ["admin", "trainers"],
-    queryFn: async () => {
-
-    const supabase = createClient();
-
-    const [{ data: trainers }, { data: relations }, { data: memberships }] =
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, first_name, last_name, phone, email, birth_date, avatar_url, is_suspended")
-          .eq("account_type", "trainer")
-          .order("created_at", { ascending: false }),
-        supabase.from("trainer_athletes").select("trainer_id").eq("status", "active"),
-        supabase
-          .from("memberships")
-          .select("user_id, clubs(name)")
-          .eq("role", "trainer")
-          .eq("status", "active")
-          .returns<{ user_id: string; clubs: { name: string } | null }[]>(),
-      ]);
-
-    const studentCounts = new Map<string, number>();
-    for (const r of relations ?? []) {
-      studentCounts.set(r.trainer_id, (studentCounts.get(r.trainer_id) ?? 0) + 1);
-    }
-
-    const clubByTrainer = new Map<string, string>();
-    for (const m of memberships ?? []) {
-      if (m.clubs?.name && !clubByTrainer.has(m.user_id)) {
-        clubByTrainer.set(m.user_id, m.clubs.name);
-      }
-    }
-
-    const rows = trainers ?? [];
-
-      return { rows, studentCounts, clubByTrainer };
-    },
+    queryFn: async () => ({ rows: await listAdminProfiles("trainer") }),
   });
 
   const rows = data?.rows ?? [];
-  const studentCounts = data?.studentCounts ?? new Map<string, number>();
-  const clubByTrainer = data?.clubByTrainer ?? new Map<string, string>();
 
   return (
 
@@ -143,10 +106,10 @@ export function AdminTrainersPage() {
                       {age ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {clubByTrainer.get(trainer.id) ?? "مستقل"}
+                      {trainer.club_name || "مستقل"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatNumber(studentCounts.get(trainer.id) ?? 0)}
+                      {formatNumber(trainer.athlete_count ?? 0)}
                     </TableCell>
                     <TableCell>
                       {trainer.is_suspended ? (

@@ -1,5 +1,6 @@
-import { createClient } from "@/lib/supabase/client";
+import { api, fullName } from "@/lib/api/client";
 import { getPersianMonthLabel } from "@/lib/persian";
+import { parseIsoDate, toIsoDate } from "@/lib/iso-date";
 import { SUBSCRIPTION_WARNING_DAYS } from "../constants/dashboard";
 import { trendFromChange } from "../utils/trend";
 import type {
@@ -24,295 +25,140 @@ const PLAN_COLORS = [
 ];
 const NO_PLAN_COLOR = "var(--border)";
 
-export async function getClubName(clubId: string): Promise<string> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("clubs")
-    .select("name")
-    .eq("id", clubId)
-    .single();
-  if (error) throw error;
-  return data.name;
+interface ClubDashboardResponse {
+  club_name: string;
+  statistics: {
+    member_count: number;
+    members_this_month: number;
+    members_last_month: number;
+    trainer_count: number;
+    trainers_this_month: number;
+    trainers_last_month: number;
+    revenue_this_month: number;
+    revenue_last_month: number;
+    member_capacity: number | null;
+    attendance_this_month: number;
+    attendance_last_month: number;
+    revenue_sparkline: number[];
+  };
+  revenue_series: { month: string; total: number }[];
+  plan_distribution: { plan_name: string; member_count: number }[];
+  subscription: { plan_name: string; status: string; expires_at: string } | null;
+  recent_members: {
+    id: string;
+    user_id: string;
+    status: string;
+    joined_at: string;
+    first_name: string | null;
+    last_name: string | null;
+    phone: string | null;
+    plan_name: string | null;
+  }[];
+  trainers: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    avatar_url: string | null;
+  }[];
 }
 
-export async function getClubStatistics(
-  clubId: string
-): Promise<ClubStatistics> {
-  const supabase = createClient();
-  const now = new Date();
-  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-  const [
-    membersThisMonth,
-    membersLastMonth,
-    totalMembers,
-    trainersThisMonth,
-    trainersLastMonth,
-    totalTrainers,
-    trainerRows,
-    revenueThisMonth,
-    revenueLastMonth,
-    attendanceThisMonth,
-    attendanceLastMonth,
-    club,
-    monthlyRevenueSeries,
-  ] = await Promise.all([
-    countMembers(clubId, "athlete", startOfThisMonth),
-    countMembers(clubId, "athlete", startOfLastMonth, startOfThisMonth),
-    countMembers(clubId, "athlete"),
-    countMembers(clubId, "trainer", startOfThisMonth),
-    countMembers(clubId, "trainer", startOfLastMonth, startOfThisMonth),
-    countMembers(clubId, "trainer"),
-    supabase
-      .from("memberships")
-      .select("user_id, profiles(first_name, last_name, avatar_url)")
-      .eq("club_id", clubId)
-      .eq("role", "trainer")
-      .eq("status", "active")
-      .limit(4)
-      .returns<
-        {
-          user_id: string;
-          profiles: {
-            first_name: string | null;
-            last_name: string | null;
-            avatar_url: string | null;
-          } | null;
-        }[]
-      >(),
-    sumRevenue(clubId, startOfThisMonth),
-    sumRevenue(clubId, startOfLastMonth, startOfThisMonth),
-    attendanceRate(clubId, startOfThisMonth),
-    attendanceRate(clubId, startOfLastMonth, startOfThisMonth),
-    supabase.from("clubs").select("member_capacity").eq("id", clubId).single(),
-    getRevenueSparkline(clubId),
-  ]);
+/**
+ * The whole club dashboard in one request. This was 8-13 parallel queries
+ * from the browser; the API assembles it server-side instead.
+ */
+export async function getClubDashboard(
+  clubId: string,
+  revenueMonths = 6
+): Promise<ClubDashboardData> {
+  const data = await api.get<ClubDashboardResponse>(`/dashboard/club/${clubId}`);
 
   return {
-    classAttendancePercent: attendanceThisMonth,
-    classAttendanceTrend: trendFromChange(attendanceThisMonth, attendanceLastMonth),
-    monthlyRevenue: revenueThisMonth,
-    monthlyRevenueTrend: trendFromChange(revenueThisMonth, revenueLastMonth),
-    monthlyRevenueSeries,
-    activeTrainersCount: totalTrainers,
-    activeTrainersTrend: trendFromChange(trainersThisMonth, trainersLastMonth),
-    trainerAvatars: (trainerRows.data ?? []).map((row) => {
-      const profile = row.profiles;
-      return {
-        id: row.user_id,
-        name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" "),
-        avatarUrl: profile?.avatar_url ?? null,
-      };
-    }),
-    totalMembersCount: totalMembers,
-    totalMembersTrend: trendFromChange(membersThisMonth, membersLastMonth),
-    totalMembersTarget: club.data?.member_capacity ?? totalMembers,
+    clubName: data.club_name,
+    statistics: toStatistics(data),
+    memberDistribution: toMemberDistribution(data),
+    revenueSeries: toRevenueSeries(data, revenueMonths),
+    recentActivities: toRecentActivities(data),
+    subscription: toSubscription(data),
   };
 }
 
-async function countMembers(
-  clubId: string,
-  role: "athlete" | "trainer",
-  joinedAfter?: Date,
-  joinedBefore?: Date
-) {
-  const supabase = createClient();
-  let query = supabase
-    .from("memberships")
-    .select("id", { count: "exact", head: true })
-    .eq("club_id", clubId)
-    .eq("role", role)
-    .eq("status", "active");
+function toStatistics(data: ClubDashboardResponse): ClubStatistics {
+  const stats = data.statistics;
 
-  if (joinedAfter) query = query.gte("joined_at", joinedAfter.toISOString());
-  if (joinedBefore) query = query.lt("joined_at", joinedBefore.toISOString());
-
-  const { count, error } = await query;
-  if (error) throw error;
-  return count ?? 0;
+  return {
+    classAttendancePercent: stats.attendance_this_month,
+    classAttendanceTrend: trendFromChange(
+      stats.attendance_this_month,
+      stats.attendance_last_month
+    ),
+    monthlyRevenue: stats.revenue_this_month,
+    monthlyRevenueTrend: trendFromChange(
+      stats.revenue_this_month,
+      stats.revenue_last_month
+    ),
+    monthlyRevenueSeries: stats.revenue_sparkline,
+    activeTrainersCount: stats.trainer_count,
+    activeTrainersTrend: trendFromChange(
+      stats.trainers_this_month,
+      stats.trainers_last_month
+    ),
+    trainerAvatars: data.trainers.map((row) => ({
+      id: row.id,
+      name: fullName(row.first_name, row.last_name, ""),
+      avatarUrl: row.avatar_url,
+    })),
+    totalMembersCount: stats.member_count,
+    totalMembersTrend: trendFromChange(
+      stats.members_this_month,
+      stats.members_last_month
+    ),
+    totalMembersTarget: stats.member_capacity ?? stats.member_count,
+  };
 }
 
-async function sumRevenue(clubId: string, from: Date, to?: Date) {
-  const supabase = createClient();
-  let query = supabase
-    .from("revenue_entries")
-    .select("amount")
-    .eq("club_id", clubId)
-    .gte("occurred_at", from.toISOString());
-  if (to) query = query.lt("occurred_at", to.toISOString());
+function toMemberDistribution(data: ClubDashboardResponse): MemberDistribution {
+  const total = data.plan_distribution.reduce((sum, row) => sum + row.member_count, 0);
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
-}
-
-async function attendanceRate(clubId: string, from: Date, to?: Date) {
-  const supabase = createClient();
-  let query = supabase
-    .from("class_attendance_logs")
-    .select("attended")
-    .eq("club_id", clubId)
-    .gte("class_date", from.toISOString().slice(0, 10));
-  if (to) query = query.lt("class_date", to.toISOString().slice(0, 10));
-
-  const { data, error } = await query;
-  if (error) throw error;
-  if (!data || data.length === 0) return 0;
-  const attended = data.filter((row) => row.attended).length;
-  return Math.round((attended / data.length) * 100);
-}
-
-async function getRevenueSparkline(clubId: string): Promise<number[]> {
-  const supabase = createClient();
-  const now = new Date();
-  const start = new Date(now);
-  start.setDate(start.getDate() - 35);
-
-  const { data, error } = await supabase
-    .from("revenue_entries")
-    .select("amount, occurred_at")
-    .eq("club_id", clubId)
-    .gte("occurred_at", start.toISOString());
-  if (error) throw error;
-
-  const buckets = new Array(5).fill(0);
-  for (const row of data ?? []) {
-    const daysAgo = Math.floor(
-      (now.getTime() - new Date(row.occurred_at).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const bucketIndex = Math.min(4, Math.floor(daysAgo / 7));
-    buckets[4 - bucketIndex] += Number(row.amount);
-  }
-  return buckets;
-}
-
-export async function getMemberDistribution(
-  clubId: string
-): Promise<MemberDistribution> {
-  const supabase = createClient();
-
-  // Every plan the club has, so a plan nobody is on still shows as 0% —
-  // and so the chart reads in the same order as the settings page.
-  const [membershipsResult, plansResult] = await Promise.all([
-    supabase
-      .from("memberships")
-      .select("plan_id")
-      .eq("club_id", clubId)
-      .eq("role", "athlete")
-      .eq("status", "active"),
-    supabase
-      .from("club_membership_plans")
-      .select("id, name")
-      .eq("club_id", clubId)
-      .order("sort_order", { ascending: true }),
-  ]);
-  if (membershipsResult.error) throw membershipsResult.error;
-  if (plansResult.error) throw plansResult.error;
-
-  const rows = membershipsResult.data ?? [];
-  const total = rows.length;
-
-  const counts = new Map<string, number>();
-  let withoutPlan = 0;
-  for (const row of rows) {
-    if (!row.plan_id) {
-      withoutPlan += 1;
-      continue;
-    }
-    counts.set(row.plan_id, (counts.get(row.plan_id) ?? 0) + 1);
-  }
-
-  const percent = (count: number) =>
-    total > 0 ? Math.round((count / total) * 100) : 0;
-
-  const segments = (plansResult.data ?? []).map((plan, index) => ({
-    label: plan.name,
-    percent: percent(counts.get(plan.id) ?? 0),
-    color: PLAN_COLORS[index % PLAN_COLORS.length],
+  const segments = data.plan_distribution.map((row, index) => ({
+    label: row.plan_name,
+    percent: total === 0 ? 0 : Math.round((row.member_count / total) * 100),
+    color:
+      row.plan_name === NO_PLAN_LABEL
+        ? NO_PLAN_COLOR
+        : PLAN_COLORS[index % PLAN_COLORS.length],
   }));
-
-  if (withoutPlan > 0) {
-    segments.push({
-      label: NO_PLAN_LABEL,
-      percent: percent(withoutPlan),
-      color: NO_PLAN_COLOR,
-    });
-  }
 
   return { totalActive: total, segments };
 }
 
-export async function getRevenueSeries(
-  clubId: string,
-  months = 6
-): Promise<RevenuePoint[]> {
-  const supabase = createClient();
+function toRevenueSeries(
+  data: ClubDashboardResponse,
+  months: number
+): RevenuePoint[] {
+  const totals = new Map(data.revenue_series.map((row) => [row.month, row.total]));
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-
-  const { data, error } = await supabase
-    .from("revenue_entries")
-    .select("amount, occurred_at")
-    .eq("club_id", clubId)
-    .gte("occurred_at", start.toISOString());
-  if (error) throw error;
-
   const points: RevenuePoint[] = [];
+
   for (let i = months - 1; i >= 0; i -= 1) {
     const bucketDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const nextBucketDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-    const value = (data ?? [])
-      .filter((row) => {
-        const t = new Date(row.occurred_at).getTime();
-        return t >= bucketDate.getTime() && t < nextBucketDate.getTime();
-      })
-      .reduce((sum, row) => sum + Number(row.amount), 0);
-    points.push({ label: getPersianMonthLabel(bucketDate), value });
+    points.push({
+      label: getPersianMonthLabel(bucketDate),
+      value: totals.get(toIsoDate(bucketDate).slice(0, 7)) ?? 0,
+    });
   }
 
-  // Newest month first so it renders on the right edge of the RTL chart.
-  return points.reverse();
+  return points;
 }
 
-export async function getRecentActivities(
-  clubId: string,
-  limit = 10
-): Promise<RecentActivityItem[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("memberships")
-    .select(
-      "id, status, joined_at, profiles(first_name, last_name, phone), club_membership_plans(name)"
-    )
-    .eq("club_id", clubId)
-    .eq("role", "athlete")
-    .order("joined_at", { ascending: false })
-    .limit(limit)
-    .returns<
-      {
-        id: string;
-        status: string;
-        joined_at: string;
-        profiles: {
-          first_name: string | null;
-          last_name: string | null;
-          phone: string | null;
-        } | null;
-        club_membership_plans: { name: string } | null;
-      }[]
-    >();
-  if (error) throw error;
-
-  return (data ?? []).map((row) => {
-    const profile = row.profiles;
-    const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ");
+function toRecentActivities(data: ClubDashboardResponse): RecentActivityItem[] {
+  return data.recent_members.map((row) => {
+    const name = fullName(row.first_name, row.last_name);
     return {
       id: row.id,
-      memberName: name || "بدون نام",
-      memberEmail: profile?.phone ?? "",
+      memberName: name,
+      memberEmail: row.phone ?? "",
       memberInitials: (name || "کا").trim().slice(0, 2),
-      planName: row.club_membership_plans?.name ?? NO_PLAN_LABEL,
+      planName: row.plan_name ?? NO_PLAN_LABEL,
       status:
         row.status === "active"
           ? "active"
@@ -324,22 +170,12 @@ export async function getRecentActivities(
   });
 }
 
-export async function getSubscription(
-  clubId: string
-): Promise<SubscriptionInfo | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("subscriptions")
-    .select("plan_name, status, expires_at")
-    .eq("club_id", clubId)
-    .order("expires_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
+function toSubscription(data: ClubDashboardResponse): SubscriptionInfo | null {
+  if (!data.subscription) return null;
 
   const remainingDays = Math.ceil(
-    (new Date(data.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    (parseIsoDate(data.subscription.expires_at.slice(0, 10)).getTime() - Date.now()) /
+      (1000 * 60 * 60 * 24)
   );
 
   const status =
@@ -350,33 +186,9 @@ export async function getSubscription(
         : "active";
 
   return {
-    planName: data.plan_name,
+    planName: data.subscription.plan_name,
     status,
-    expiresAt: data.expires_at,
+    expiresAt: data.subscription.expires_at,
     remainingDays: Math.max(0, remainingDays),
-  };
-}
-
-export async function getClubDashboard(
-  clubId: string,
-  revenueMonths = 6
-): Promise<ClubDashboardData> {
-  const [clubName, statistics, memberDistribution, revenueSeries, recentActivities, subscription] =
-    await Promise.all([
-      getClubName(clubId),
-      getClubStatistics(clubId),
-      getMemberDistribution(clubId),
-      getRevenueSeries(clubId, revenueMonths),
-      getRecentActivities(clubId),
-      getSubscription(clubId),
-    ]);
-
-  return {
-    clubName,
-    statistics,
-    memberDistribution,
-    revenueSeries,
-    recentActivities,
-    subscription,
   };
 }

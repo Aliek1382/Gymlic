@@ -17,7 +17,7 @@ import {
 import { formatNumber, formatPersianDate } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
-import { createClient } from "@/lib/supabase/client";
+import { listAdminClubs } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import type { ClubStatus, SubscriptionStatus } from "@/types/database.types";
 
@@ -49,50 +49,22 @@ export function AdminClubsPage() {
   const { data } = useQuery({
     queryKey: ["admin", "clubs"],
     queryFn: async () => {
+      const rows = [...(await listAdminClubs())].sort((a, b) => {
+        // Pending clubs need attention first — above everything else
+        // regardless of registration date.
+        if (a.status === "pending" && b.status !== "pending") return -1;
+        if (b.status === "pending" && a.status !== "pending") return 1;
+        return 0;
+      });
 
-    const supabase = createClient();
-
-    const [{ data: clubs }, { data: memberships }] = await Promise.all([
-      supabase
-        .from("clubs")
-        .select(
-          "id, name, status, created_at, owner:profiles!owner_id(first_name, last_name, phone), subscriptions(status, plan_name, expires_at)"
-        )
-        .order("created_at", { ascending: false })
-        .returns<
-          {
-            id: string;
-            name: string;
-            status: ClubStatus;
-            created_at: string;
-            owner: { first_name: string | null; last_name: string | null; phone: string | null } | null;
-            subscriptions: { status: SubscriptionStatus; plan_name: string; expires_at: string }[];
-          }[]
-        >(),
-      supabase.from("memberships").select("club_id, role").eq("status", "active"),
-    ]);
-
-    const memberCounts = new Map<string, number>();
-    for (const m of memberships ?? []) {
-      if (m.role !== "athlete") continue;
-      memberCounts.set(m.club_id, (memberCounts.get(m.club_id) ?? 0) + 1);
-    }
-
-    // Pending clubs need attention first — surface them above everything else
-    // regardless of registration date.
-    const rows = [...(clubs ?? [])].sort((a, b) => {
-      if (a.status === "pending" && b.status !== "pending") return -1;
-      if (b.status === "pending" && a.status !== "pending") return 1;
-      return 0;
-    });
-    const pendingCount = rows.filter((c) => c.status === "pending").length;
-
-      return { rows, memberCounts, pendingCount };
+      return {
+        rows,
+        pendingCount: rows.filter((club) => club.status === "pending").length,
+      };
     },
   });
 
   const rows = data?.rows ?? [];
-  const memberCounts = data?.memberCounts ?? new Map<string, number>();
   const pendingCount = data?.pendingCount ?? 0;
 
   return (
@@ -138,9 +110,8 @@ export function AdminClubsPage() {
             <TableBody>
               {rows.map((club) => {
                 const ownerName =
-                  [club.owner?.first_name, club.owner?.last_name].filter(Boolean).join(" ") ||
+                  [club.owner_first_name, club.owner_last_name].filter(Boolean).join(" ") ||
                   "بدون نام";
-                const subscription = club.subscriptions?.[0];
 
                 return (
                   <TableRow key={club.id} className="cursor-pointer">
@@ -156,14 +127,14 @@ export function AdminClubsPage() {
                     </TableCell>
                     <TableCell>
                       <p className="text-foreground">{ownerName}</p>
-                      {club.owner?.phone && (
+                      {club.owner_phone && (
                         <p className="text-xs text-muted-foreground" dir="ltr">
-                          {club.owner.phone}
+                          {club.owner_phone}
                         </p>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatNumber(memberCounts.get(club.id) ?? 0)}
+                      {formatNumber(club.member_count)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={CLUB_STATUS_VARIANT[club.status]}>
@@ -171,9 +142,13 @@ export function AdminClubsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {subscription ? (
-                        <Badge variant={SUB_STATUS_VARIANT[subscription.status]}>
-                          {SUB_STATUS_LABEL[subscription.status]}
+                      {club.subscription_status ? (
+                        <Badge
+                          variant={
+                            SUB_STATUS_VARIANT[club.subscription_status as SubscriptionStatus]
+                          }
+                        >
+                          {SUB_STATUS_LABEL[club.subscription_status as SubscriptionStatus]}
                         </Badge>
                       ) : (
                         <Badge variant="secondary">بدون اشتراک</Badge>
