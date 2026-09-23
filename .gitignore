@@ -34,8 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
-# vercel
-.vercel
+# deploy (host paths and WinSCP's transfer log -- machine-specific)
+/deploy/deploy.config.bat
+/deploy/winscp.log
 
 # typescript
 *.tsbuildinfo
