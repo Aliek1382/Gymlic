@@ -19,8 +19,9 @@ export default function AdminLayout({
   // way this route group does not exist for them.
   //
   // On a static host this only decides what gets rendered: the /admin HTML is
-  // a public file like any other. The admin_* RLS policies are what actually
-  // keep a non-admin from reading anything through it.
+  // a public file like any other. What actually keeps a non-admin from reading
+  // anything through it is the API, which re-checks is_platform_admin on every
+  // admin endpoint.
   useEffect(() => {
     if (!isPending && !admin) router.replace("/dashboard");
   }, [admin, isPending, router]);

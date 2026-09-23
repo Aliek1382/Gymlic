@@ -15,8 +15,8 @@ export interface PrintablePlan {
   trainerAvatarUrl?: string | null;
 }
 
-// Avatars are fetched from Supabase storage, so they can still be in flight
-// when the print dialog opens — long enough to be captured as blank circles.
+// Avatars are fetched from the API's uploads folder, so they can still be in
+// flight when the print dialog opens — long enough to print as blank circles.
 // Past this budget the sheet prints regardless: a missing avatar is a far
 // smaller problem than a download that never starts.
 const IMAGE_WAIT_MS = 1500;
