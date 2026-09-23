@@ -1,0 +1,10 @@
+# Mirrors the built static export onto the host. Driven by deploy.bat:
+#   %1% saved session   %2% local out\   %3% remote document root
+#
+# -delete is wanted here: every build renames its hashed JS/CSS chunks, so
+# without it the remote folder collects one dead copy of the app per deploy.
+option batch abort
+option confirm off
+open %1%
+synchronize remote -delete -criteria=either "%2%" "%3%"
+exit

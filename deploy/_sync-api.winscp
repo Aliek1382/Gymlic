@@ -1,0 +1,17 @@
+# Mirrors the PHP backend onto the host. Driven by deploy.bat:
+#   %1% saved session   %2% local backend-php\   %3% remote backend root
+#
+# Two things must survive a deploy, so they are masked out of the comparison
+# entirely -- they are neither uploaded nor deleted:
+#   config.php      holds the host's real database password; the copy in git
+#                   still says CHANGE_ME and would take the API down.
+#   public/uploads  every avatar and club logo users have uploaded.
+#
+# No -delete here either. A stale .php file left behind is harmless because
+# index.php routes every request, and the risk of deleting the wrong thing on
+# a folder that holds live user data is not worth the tidiness.
+option batch abort
+option confirm off
+open %1%
+synchronize remote -criteria=either -filemask="|config.php;public/uploads/" "%2%" "%3%"
+exit
