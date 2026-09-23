@@ -20,8 +20,8 @@ import type { AccountType } from "@/types/database.types";
  * request and only decides what to show.
  *
  * Like every other guard in a static build this is routing, not security:
- * the page's HTML is a public file. RLS is what keeps the wrong role from
- * reading anything through it.
+ * the page's HTML is a public file. What keeps the wrong role from reading
+ * anything through it is the API, which authorizes every request itself.
  */
 export function RoleGate({
   allow,
