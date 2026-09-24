@@ -52,8 +52,8 @@ exit /b 1
 
 echo.
 echo   session : %SESSION%
-if /i not "%TARGET%"=="api" echo   frontend: %ROOT%\out  ^-^>  %REMOTE_FRONT%   ^(removes remote files that are no longer in the build^)
 if /i not "%TARGET%"=="front" echo   backend : %ROOT%\backend-php  ^-^>  %REMOTE_API%   ^(keeps config.php and uploads^)
+if /i not "%TARGET%"=="api" echo   frontend: %ROOT%\out  ^-^>  %REMOTE_FRONT%   ^(removes remote files that are no longer in the build^)
 echo.
 
 rem set /p has to run outside a parenthesised block: %GO% inside one would be
@@ -66,9 +66,11 @@ if /i not "%GO%"=="y" (
 )
 :confirmed
 
-if /i "%TARGET%"=="api" goto :api
+rem --- build ---------------------------------------------------------------
+rem The build runs before anything is uploaded so that a compile error leaves
+rem the host untouched.
+if /i "%TARGET%"=="api" goto :upload
 
-rem --- frontend ------------------------------------------------------------
 rem NEXT_PUBLIC_API_URL is read at build time and baked into the bundle, so it
 rem has to be set here rather than on the host.
 set "NEXT_PUBLIC_API_URL=%API_URL%"
@@ -89,21 +91,29 @@ rem every /join/<code> invite link 404s.
 if not exist "%ROOT%\out\.htaccess" (
   echo.
   echo   out\.htaccess is missing -- the build did not copy deploy\.htaccess.
+  echo   Nothing was uploaded.
   exit /b 1
 )
 
-echo.
-echo   Uploading the frontend...
-"%WINSCP_COM%" /log="%HERE%winscp.log" /script="%HERE%_sync-front.winscp" /parameter // "%SESSION%" "%ROOT%\out" "%REMOTE_FRONT%"
-if errorlevel 1 goto :failed
+rem --- upload --------------------------------------------------------------
+rem Backend before frontend, deliberately. A feature normally adds an endpoint
+rem and the page that calls it; shipping the page first puts a live page in
+rem front of a route the host does not serve yet, and whoever opens it in that
+rem window gets an error. The other way round the new endpoint just sits unused
+rem until the frontend catches up.
+:upload
+if /i "%TARGET%"=="front" goto :front
 
-if /i "%TARGET%"=="front" goto :done
-
-rem --- backend -------------------------------------------------------------
-:api
 echo.
 echo   Uploading the backend...
 "%WINSCP_COM%" /log="%HERE%winscp.log" /script="%HERE%_sync-api.winscp" /parameter // "%SESSION%" "%ROOT%\backend-php" "%REMOTE_API%"
+if errorlevel 1 goto :failed
+if /i "%TARGET%"=="api" goto :done
+
+:front
+echo.
+echo   Uploading the frontend...
+"%WINSCP_COM%" /log="%HERE%winscp.log" /script="%HERE%_sync-front.winscp" /parameter // "%SESSION%" "%ROOT%\out" "%REMOTE_FRONT%"
 if errorlevel 1 goto :failed
 
 :done

@@ -1,0 +1,5 @@
+# The deploy scripts are run by cmd.exe and by WinSCP's script interpreter on
+# Windows, so pin their line endings rather than leaving them to whatever
+# core.autocrlf the checkout happens to have.
+*.bat     text eol=crlf
+*.winscp  text eol=crlf
