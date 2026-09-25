@@ -35,13 +35,17 @@ if not exist "%HERE%deploy.config.bat" (
 )
 call "%HERE%deploy.config.bat"
 
-if not exist "%WINSCP_COM%" (
-  echo.
-  echo   WinSCP not found at: %WINSCP_COM%
-  echo   Fix WINSCP_COM in deploy.config.bat ^(it is WinSCP.com, not WinSCP.exe^).
-  echo.
-  exit /b 1
-)
+rem The default WinSCP path contains "(x86)", and cmd expands variables while
+rem it parses a parenthesised block -- printing the path inside one would let
+rem that ")" close the block early and break the script before it runs. Hence
+rem the label instead of an if-block.
+if exist "%WINSCP_COM%" goto :winscp_found
+echo.
+echo   WinSCP not found at: %WINSCP_COM%
+echo   Fix WINSCP_COM in deploy.config.bat ^(it is WinSCP.com, not WinSCP.exe^).
+echo.
+exit /b 1
+:winscp_found
 
 if /i "%TARGET%"=="front" goto :ok
 if /i "%TARGET%"=="api"   goto :ok
