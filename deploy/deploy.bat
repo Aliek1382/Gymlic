@@ -131,7 +131,11 @@ if errorlevel 1 goto :failed
 :done
 echo.
 echo   Done.
-echo   Check %API_URL%/health -- it should say {"ok":true}.
+rem What to check depends on what was uploaded. Naming the API health
+rem endpoint after a frontend-only deploy sends you to a URL this run never
+rem touched, which reads as a failure of the deploy you just did.
+if /i not "%TARGET%"=="front" echo   Check %API_URL%/health -- it should say {"ok":true}.
+if /i not "%TARGET%"=="api" echo   Open the site and hard-refresh ^(Ctrl+F5^) to get past the cached HTML.
 exit /b 0
 
 :failed
