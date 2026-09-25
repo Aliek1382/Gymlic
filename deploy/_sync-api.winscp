@@ -1,23 +1,27 @@
 # Mirrors the PHP backend onto the host. Driven by deploy.bat:
 #   %1% saved session   %2% local backend-php\   %3% remote backend root
 #
-# Two things must survive a deploy, so they are masked out of the comparison
-# entirely -- they are neither uploaded nor deleted:
-#   config.php      holds the host's real database password; the copy in git
-#                   still says CHANGE_ME and would take the API down.
-#   public/uploads  every avatar and club logo users have uploaded. Written
-#                   with a leading slash: a WinSCP mask containing a path is
-#                   matched against the full path, and only a leading slash
-#                   anchors it to the root of the transfer. Without it the
-#                   mask silently matched nothing and the folder was synced.
-#                   config.php stays bare on purpose -- a name-only mask
-#                   matches at any depth, which is the safer direction here.
+# Two things on the host must survive a deploy:
+#   config.php          holds the host's real database password; the copy in
+#                       git still says CHANGE_ME and would take the API down.
+#   public/uploads/     every avatar and club logo users have uploaded.
 #
-# No -delete here either. A stale .php file left behind is harmless because
-# index.php routes every request, and the risk of deleting the wrong thing on
-# a folder that holds live user data is not worth the tidiness.
+# Nothing is ever deleted here -- there is no -delete -- so the live uploads
+# are safe by construction. The masks only stop this end from pushing over
+# them. Locally that folder holds nothing but .gitignore and .gitkeep, the two
+# markers that keep it in git, so excluding those names keeps the whole folder
+# out of the transfer.
+#
+# The obvious spelling, a directory mask "public/uploads/", was tried twice --
+# with and without a leading slash -- and WinSCP matched neither: both runs
+# uploaded the markers anyway. Name-only masks demonstrably work, since
+# config.php has been correctly skipped on every run, so the masks are written
+# in the form that is known to hold.
+#
+# The absent -delete is also why a stale .php file left behind is fine:
+# index.php routes every request, so nothing reaches an orphan.
 option batch abort
 option confirm off
 open %1%
-synchronize remote -criteria=either -filemask="|config.php;/public/uploads/" "%2%" "%3%"
+synchronize remote -criteria=either -filemask="|config.php;*.gitignore;*.gitkeep" "%2%" "%3%"
 exit
