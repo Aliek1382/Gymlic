@@ -60,8 +60,17 @@ npm run preview    # پیش‌نمایش محلی همان خروجی روی htt
   اجرا. پس هر بار که تغییرش دادید باید دوباره بیلد و آپلود کنید:
 
   ```bash
+  # لینوکس / macOS
   NEXT_PUBLIC_API_URL=https://api.yourdomain.com npm run build
   ```
+
+  ```
+  rem ویندوز (cmd)
+  set "NEXT_PUBLIC_API_URL=https://api.yourdomain.com" && npm run build
+  ```
+
+  `deploy\deploy.bat` این متغیر را خودش از `API_URL` داخل `deploy.config.bat`
+  می‌خواند، پس اگر با اسکریپت استقرار می‌کنید لازم نیست دستی ست‌اش کنید.
 
 - دامنه‌ی سایت باید در `cors_origins` داخل `backend-php/config.php` باشد، وگرنه
   مرورگر درخواست‌ها را بلاک می‌کند.
