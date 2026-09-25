@@ -1,5 +1,19 @@
-# The deploy scripts are run by cmd.exe and by WinSCP's script interpreter on
-# Windows, so pin their line endings rather than leaving them to whatever
-# core.autocrlf the checkout happens to have.
+# Line endings are pinned rather than left to whatever core.autocrlf the
+# checkout happens to have, because these files are deployed verbatim: the
+# deploy script uploads in binary mode, so whatever is in the working tree is
+# exactly what lands on the other machine.
+
+# Parsed by Apache/LiteSpeed and PHP on the Linux host. A CRLF .htaccess puts
+# a stray \r on the end of every directive -- "[QSA,L]" becomes "[QSA,L]\r",
+# which the server rejects with a 500.
+.htaccess text eol=lf
+*.php     text eol=lf
+*.sh      text eol=lf
+*.sql     text eol=lf
+
+# Run by cmd.exe and by WinSCP's script interpreter on Windows.
 *.bat     text eol=crlf
 *.winscp  text eol=crlf
+
+# PowerShell helper run by deploy.bat on Windows.
+*.ps1     text eol=crlf

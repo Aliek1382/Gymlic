@@ -5,7 +5,13 @@
 # entirely -- they are neither uploaded nor deleted:
 #   config.php      holds the host's real database password; the copy in git
 #                   still says CHANGE_ME and would take the API down.
-#   public/uploads  every avatar and club logo users have uploaded.
+#   public/uploads  every avatar and club logo users have uploaded. Written
+#                   with a leading slash: a WinSCP mask containing a path is
+#                   matched against the full path, and only a leading slash
+#                   anchors it to the root of the transfer. Without it the
+#                   mask silently matched nothing and the folder was synced.
+#                   config.php stays bare on purpose -- a name-only mask
+#                   matches at any depth, which is the safer direction here.
 #
 # No -delete here either. A stale .php file left behind is harmless because
 # index.php routes every request, and the risk of deleting the wrong thing on
@@ -13,5 +19,5 @@
 option batch abort
 option confirm off
 open %1%
-synchronize remote -criteria=either -filemask="|config.php;public/uploads/" "%2%" "%3%"
+synchronize remote -criteria=either -filemask="|config.php;/public/uploads/" "%2%" "%3%"
 exit
