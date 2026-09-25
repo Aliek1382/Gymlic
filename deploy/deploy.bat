@@ -108,6 +108,14 @@ rem until the frontend catches up.
 :upload
 if /i "%TARGET%"=="front" goto :front
 
+rem Checked before the upload, not after: a CRLF .htaccess reaching the host
+rem takes the API down immediately, and the deploy would report success.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%_check-eol.ps1" "%ROOT%\backend-php"
+if errorlevel 1 (
+  echo   Nothing was uploaded.
+  exit /b 1
+)
+
 echo.
 echo   Uploading the backend...
 "%WINSCP_COM%" /log="%HERE%winscp.log" /script="%HERE%_sync-api.winscp" /parameter // "%SESSION%" "%ROOT%\backend-php" "%REMOTE_API%"
