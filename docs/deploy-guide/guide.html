@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>راهنمای استقرار جیم‌لیک</title>
+<style>
+@font-face { font-family: Vazirmatn; src: url("fonts/Vazirmatn-Regular.woff2") format("woff2");  font-weight: 400; }
+@font-face { font-family: Vazirmatn; src: url("fonts/Vazirmatn-Medium.woff2") format("woff2");   font-weight: 500; }
+@font-face { font-family: Vazirmatn; src: url("fonts/Vazirmatn-SemiBold.woff2") format("woff2"); font-weight: 600; }
+@font-face { font-family: Vazirmatn; src: url("fonts/Vazirmatn-Bold.woff2") format("woff2");     font-weight: 700; }
+
+:root{
+  --ink:#16161d; --ink-2:#3d3d4e; --ink-3:#6b6b80;
+  --line:#e2e2ea; --line-2:#eeeef4;
+  --brand:#4338ca; --brand-soft:#eef0fd; --brand-line:#c8cdf6;
+  --warn:#b45309; --warn-soft:#fef6ec; --warn-line:#f5d9b0;
+  --stop:#b42318; --stop-soft:#fdf2f1; --stop-line:#f4c9c4;
+  --good:#0f7b57; --good-soft:#eef8f4; --good-line:#bde3d3;
+  --paper:#fbfbfd;
+}
+
+@page { size: A4; margin: 16mm 14mm 14mm; }
+
+*{ box-sizing:border-box; }
+html{ direction:rtl; }
+body{
+  margin:0; font-family:Vazirmatn, sans-serif; font-weight:400;
+  color:var(--ink); background:#fff; font-size:10.2pt; line-height:1.85;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+code, .mono{ font-family:"DejaVu Sans Mono", monospace; direction:ltr; unicode-bidi:isolate; }
+
+/* ---------- cover ---------- */
+.cover{ height:265mm; display:flex; flex-direction:column; justify-content:center; page-break-after:always; }
+.cover .kicker{ color:var(--brand); font-weight:600; font-size:11pt; letter-spacing:.02em; }
+.cover h1{ font-size:31pt; font-weight:700; line-height:1.35; margin:.25em 0 .1em; letter-spacing:-.01em; }
+.cover .sub{ font-size:13pt; color:var(--ink-2); font-weight:500; margin-bottom:2.2em; }
+.cover .rule{ width:64px; height:4px; background:var(--brand); border-radius:2px; margin-bottom:2.2em; }
+.cover .lede{ font-size:10.6pt; color:var(--ink-2); max-width:118mm; line-height:2; }
+.cover .meta{ margin-top:auto; padding-top:2em; border-top:1px solid var(--line); display:flex; gap:14mm; font-size:9pt; color:var(--ink-3); }
+.cover .meta b{ display:block; color:var(--ink); font-weight:600; font-size:9.6pt; }
+
+/* ---------- sections ---------- */
+section{ page-break-inside:auto; }
+.break{ page-break-before:always; }
+h2{
+  font-size:16pt; font-weight:700; margin:0 0 .15em; letter-spacing:-.005em;
+  page-break-after:avoid;
+}
+.h2wrap{ border-bottom:2px solid var(--brand); padding-bottom:.45em; margin:0 0 1.5em; page-break-after:avoid; }
+.h2wrap .num{ color:var(--brand); font-weight:700; font-size:9.5pt; letter-spacing:.14em; display:block; margin-bottom:.15em; }
+.h2wrap p{ margin:.5em 0 0; color:var(--ink-3); font-size:9.6pt; }
+h3{ font-size:11.6pt; font-weight:600; margin:1.7em 0 .7em; page-break-after:avoid; }
+h3:first-child{ margin-top:0; }
+p{ margin:0 0 1em; }
+
+/* ---------- steps ---------- */
+.step{ display:flex; gap:11px; margin-bottom:1.5em; }
+.step .n{ page-break-after:avoid;
+  flex:0 0 26px; height:26px; border-radius:50%; background:var(--brand); color:#fff;
+  font-weight:700; font-size:10.5pt; display:flex; align-items:center; justify-content:center;
+  margin-top:1px;
+}
+.step .body{ flex:1; min-width:0; }
+.step .t{ font-weight:600; font-size:11pt; margin-bottom:.25em; }
+.step p{ margin:0 0 .6em; color:var(--ink-2); }
+
+/* ---------- code ---------- */
+pre{
+  background:#1c1c28; color:#e8e8f0; border-radius:7px; padding:11px 13px;
+  font-family:"DejaVu Sans Mono", monospace; font-size:8.6pt; line-height:1.7;
+  direction:ltr; text-align:left; margin:.7em 0 1em; overflow:hidden;
+  white-space:pre-wrap; word-break:break-word; page-break-inside:avoid;
+}
+pre .c{ color:#8d8da8; }
+p code, td code, li code{
+  background:var(--line-2); border:1px solid var(--line); border-radius:4px;
+  padding:.05em .35em; font-size:8.6pt;
+}
+
+/* ---------- tables ---------- */
+table{ width:100%; border-collapse:collapse; margin:.6em 0 1.3em; font-size:9.5pt; page-break-inside:auto; }
+th{ text-align:right; font-weight:600; font-size:9pt; color:var(--ink-3); padding:0 10px .55em; border-bottom:1.5px solid var(--line); }
+td{ padding:.72em 10px; border-bottom:1px solid var(--line-2); vertical-align:top; color:var(--ink-2); }
+td:first-child{ color:var(--ink); font-weight:500; }
+tr{ page-break-inside:avoid; }
+
+/* ---------- callouts ---------- */
+.note{ border-radius:8px; padding:12px 14px; margin:1.1em 0; font-size:9.7pt; page-break-inside:avoid; border:1px solid; }
+.note .lbl{ font-weight:700; font-size:8.8pt; letter-spacing:.06em; display:block; margin-bottom:.3em; }
+.note p:last-child{ margin-bottom:0; }
+.note.warn{ background:var(--warn-soft); border-color:var(--warn-line); }
+.note.warn .lbl{ color:var(--warn); }
+.note.stop{ background:var(--stop-soft); border-color:var(--stop-line); }
+.note.stop .lbl{ color:var(--stop); }
+.note.good{ background:var(--good-soft); border-color:var(--good-line); }
+.note.good .lbl{ color:var(--good); }
+.note.info{ background:var(--brand-soft); border-color:var(--brand-line); }
+.note.info .lbl{ color:var(--brand); }
+
+/* ---------- architecture ---------- */
+.arch{ display:flex; gap:9px; margin:1em 0 1.6em; page-break-inside:avoid; }
+.arch .box{ flex:1; border:1px solid var(--line); border-radius:9px; padding:12px 13px; background:var(--paper); }
+.arch .box .cap{ font-size:8.4pt; color:var(--brand); font-weight:700; letter-spacing:.06em; margin-bottom:.35em; }
+.arch .box .nm{ font-weight:600; font-size:10.4pt; margin-bottom:.3em; }
+.arch .box .ds{ font-size:8.9pt; color:var(--ink-3); line-height:1.7; }
+.arch .box .pth{ font-family:"DejaVu Sans Mono", monospace; direction:ltr; text-align:left; font-size:7.6pt; color:var(--ink-3); margin-top:.5em; padding-top:.5em; border-top:1px dashed var(--line); }
+
+/* ---------- symptom cards ---------- */
+.sym{ border:1px solid var(--line); border-right:3px solid var(--brand); border-radius:0 8px 8px 0; padding:11px 13px; margin-bottom:.9em; page-break-inside:avoid; }
+.sym .s{ font-family:"DejaVu Sans Mono", monospace; direction:ltr; text-align:left; font-size:8.3pt; color:var(--stop); font-weight:600; margin-bottom:.45em; word-break:break-word; }
+.sym .s.fa{ font-family:Vazirmatn, sans-serif; direction:rtl; text-align:right; font-size:9.6pt; }
+.sym .w{ font-size:9.4pt; color:var(--ink-2); margin:0; }
+.sym .w b{ color:var(--ink); font-weight:600; }
+
+/* ---------- checklist ---------- */
+.check{ border:1px solid var(--line); border-radius:9px; padding:6px 15px; background:var(--paper); page-break-inside:avoid; }
+.check .row{ display:flex; gap:10px; align-items:flex-start; padding:.52em 0; border-bottom:1px solid var(--line-2); font-size:9.7pt; }
+.check .row:last-child{ border-bottom:0; }
+.check .bx{ flex:0 0 13px; height:13px; border:1.5px solid var(--ink-3); border-radius:3px; margin-top:4px; }
+.check .g{ font-size:8.4pt; font-weight:700; color:var(--brand); letter-spacing:.06em; padding:1em 0 .3em; }
+
+ul{ margin:.4em 0 1em; padding-right:1.1em; }
+li{ margin-bottom:.4em; color:var(--ink-2); }
+.foot{ margin-top:1.5em; padding-top:.9em; page-break-before:avoid; border-top:1px solid var(--line); font-size:8.6pt; color:var(--ink-3); }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="kicker">جیم‌لیک — سامانه‌ی مدیریت باشگاه</div>
+  <h1>راهنمای تغییر و استقرار</h1>
+  <div class="sub">از نوشتن کد تا زنده شدن روی سایت</div>
+  <div class="rule"></div>
+  <div class="lede">
+    این سند همه‌ی چیزی است که برای اضافه کردن یک بخش جدید به جیم‌لیک لازم دارید:
+    ترتیب کارها، دستورهایی که می‌زنید، چیزهایی که هیچ‌وقت نباید دست بخورند،
+    و کاری که هنگام خراب شدن هر لایه باید انجام دهید.
+    هر هشداری که در آن می‌بینید یک بار روی همین هاست واقعاً اتفاق افتاده است.
+  </div>
+  <div class="meta">
+    <div><b>سایت</b>gymlic-panel.ir</div>
+    <div><b>API</b>api.gymlic-panel.ir</div>
+    <div><b>معماری</b>Next.js استاتیک · PHP 8 · MySQL</div>
+  </div>
+</div>
+
+<!-- ============ 1 ============ -->
+<section>
+  <div class="h2wrap">
+    <span class="num">بخش ۱</span>
+    <h2>معماری در یک نگاه</h2>
+    <p>سه تکه‌ی مستقل که هر کدام مسیر به‌روزرسانی خودش را دارد.</p>
+  </div>
+
+  <div class="arch">
+    <div class="box">
+      <div class="cap">لایه ۱</div>
+      <div class="nm">دیتابیس</div>
+      <div class="ds">جدول‌ها و داده‌ها. تنها چیزی که بازتولیدشدنی نیست.</div>
+      <div class="pth">phpMyAdmin</div>
+    </div>
+    <div class="box">
+      <div class="cap">لایه ۲</div>
+      <div class="nm">بک‌اند</div>
+      <div class="ds">PHP خام، بدون Composer. فایل‌ها همان‌طور که هستند اجرا می‌شوند.</div>
+      <div class="pth">api.gymlic-panel.ir</div>
+    </div>
+    <div class="box">
+      <div class="cap">لایه ۳</div>
+      <div class="nm">فرانت</div>
+      <div class="ds">خروجی استاتیک Next.js. روی هاست هیچ کدی اجرا نمی‌شود.</div>
+      <div class="pth">gymlic-panel.ir</div>
+    </div>
+  </div>
+
+  <h3>چرا فرانت بیلد می‌خواهد و بک‌اند نه</h3>
+  <p>
+    سرور فایل‌های PHP را مستقیم می‌خواند؛ آنچه آپلود می‌کنید همان است که اجرا می‌شود.
+    ولی مرورگر فایل‌های <code>.tsx</code> را نمی‌فهمد — باید اول به HTML و JavaScript ساده
+    تبدیل شوند. این کار را <code>npm run build</code> انجام می‌دهد و خروجی‌اش در پوشه‌ی
+    <code>out/</code> می‌نشیند. <b>آنچه روی هاست می‌رود <code>out/</code> است، نه کد اصلی.</b>
+    چون هاست اشتراکی Node ندارد، این تبدیل روی سیستم شما انجام می‌شود.
+  </p>
+
+  <div class="note info">
+    <span class="lbl">یک‌بار برای همیشه</span>
+    <p>
+      برای بیلد، کتابخانه‌ها (React، Next، Tailwind و…) لازم‌اند. این‌ها در گیت نیستند و با
+      <code>npm install</code> دانلود می‌شوند. فقط وقتی دوباره لازم است که
+      <code>package.json</code> عوض شود.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section class="break">
+  <div class="h2wrap">
+    <span class="num">بخش ۲</span>
+    <h2>چرخه‌ی یک فیچر</h2>
+    <p>پنج قدم، به همین ترتیب. مثال: اضافه کردن بخش خرید اشتراک.</p>
+  </div>
+
+  <div class="step">
+    <div class="n">۱</div>
+    <div class="body">
+      <div class="t">کد و Pull Request</div>
+      <p>
+        تغییرات روی یک برنچ نوشته و در یک PR مرور می‌شوند. اگر فیچر تغییر دیتابیس لازم دارد،
+        دستور <code>ALTER</code>/<code>CREATE</code> دقیقش در توضیح همان PR نوشته می‌شود —
+        از روی کد حدس نزنید.
+      </p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">۲</div>
+    <div class="body">
+      <div class="t">merge و دریافت روی سیستم خودتان</div>
+<pre>git pull</pre>
+      <p>اگر در آن PR کتابخانه‌ای اضافه شده بود (یعنی <code>package.json</code> عوض شده):</p>
+<pre>npm install</pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">۳</div>
+    <div class="body">
+      <div class="t">دیتابیس — اول از همه، و دستی</div>
+      <p>
+        اسکریپت استقرار هیچ‌وقت دیتابیس را لمس نمی‌کند. <b>اول بک‌آپ بگیرید</b>
+        (بخش ۵)، بعد دستور SQL را در phpMyAdmin ← تب <b>SQL</b> اجرا کنید.
+      </p>
+      <div class="note stop">
+        <span class="lbl">هرگز</span>
+        <p>
+          <code>schema/schema.sql</code> کامل را دوباره ایمپورت نکنید. روی جدول‌های موجود خطا
+          می‌دهد و هیچ تغییری هم اعمال نمی‌کند. فقط همان دستور جدید را اجرا کنید.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">۴</div>
+    <div class="body">
+      <div class="t">استقرار</div>
+<pre>deploy\deploy.bat all</pre>
+      <p>
+        خودش ترتیب درست را رعایت می‌کند: بیلد، بعد بک‌اند، بعد فرانت. اگر بیلد خطا بدهد،
+        هیچ چیزی آپلود نمی‌شود.
+      </p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">۵</div>
+    <div class="body">
+      <div class="t">تست</div>
+<pre>https://api.gymlic-panel.ir/health   <span class="c">→ {"ok":true}</span>
+https://gymlic-panel.ir              <span class="c">→ Ctrl+F5</span></pre>
+      <p>بعد خودِ فیچر جدید را در سایت امتحان کنید، نه فقط بالا آمدن صفحه را.</p>
+    </div>
+  </div>
+
+  <h3>چرا این ترتیب</h3>
+  <p>
+    هر لایه به لایه‌ی زیرش تکیه می‌کند. اگر صفحه‌ی جدید زودتر از اندپوینتش بالا برود،
+    چند ثانیه‌ای روی سایت زنده است در حالی که پشتش چیزی نیست و هر کس بازش کند خطا می‌گیرد.
+    برعکسش بی‌ضرر است: اندپوینت جدید تا آمدن فرانت فقط بلااستفاده می‌ماند. جدولی هم که
+    ساخته نشده باشد یعنی اندپوینت تازه‌رسیده در همان اولین درخواست می‌شکند.
+  </p>
+</section>
+
+<!-- ============ 3 ============ -->
+<section class="break">
+  <div class="h2wrap">
+    <span class="num">بخش ۳</span>
+    <h2>دستورها و دامنه‌ی هر کدام</h2>
+    <p>سه حالت اسکریپت، و اینکه هر کدام دقیقاً چه می‌کند.</p>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:34%">دستور</th><th>چه می‌کند</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>deploy\deploy.bat</code></td>
+        <td>فرانت را بیلد و آپلود می‌کند. <b>فایل‌های اضافه را پاک می‌کند.</b></td>
+      </tr>
+      <tr>
+        <td><code>deploy\deploy.bat api</code></td>
+        <td>فقط فایل‌های PHP. بیلد نمی‌گیرد و هیچ‌وقت چیزی پاک نمی‌کند.</td>
+      </tr>
+      <tr>
+        <td><code>deploy\deploy.bat all</code></td>
+        <td>بیلد ← بک‌اند ← فرانت، به همین ترتیب.</td>
+      </tr>
+      <tr>
+        <td><code>deploy\deploy.bat all -y</code></td>
+        <td>همان، بدون پرسیدن تأیید.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>چه چیزی محافظت شده است</h3>
+  <table>
+    <thead><tr><th style="width:38%">فایل</th><th>چرا</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>config.php</code></td>
+        <td>رمز واقعی دیتابیس داخلش است و نسخه‌ی گیت <code>CHANGE_ME</code> دارد. در ماسک است و هیچ‌وقت آپلود نمی‌شود.</td>
+      </tr>
+      <tr>
+        <td><code>public/uploads/</code></td>
+        <td>آواتارها و لوگوها. آپلود بک‌اند اصلاً حذف نمی‌کند، پس امن است.</td>
+      </tr>
+      <tr>
+        <td><code>out/.htaccess</code></td>
+        <td>اگر بیلد نسازدش، اسکریپت متوقف می‌شود — بدون آن لینک‌های دعوت <code>/join/</code> می‌شکنند.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note warn">
+    <span class="lbl">آپلود فرانت حذف می‌کند</span>
+    <p>
+      هر چیزی که در <code>out/</code> نباشد از <code>public_html</code> پاک می‌شود — نه فقط
+      فایل‌های بیلد قبلی. گزینه‌ی Compress پنل، فایل zip را <b>داخل همان پوشه</b> می‌سازد،
+      پس بک‌آپی که آنجا بگیرید با اولین استقرار بعدی از بین می‌رود. بک‌آپ را دانلود کنید
+      یا بیرون از <code>public_html</code> بسازید.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section class="break">
+  <div class="h2wrap">
+    <span class="num">بخش ۴</span>
+    <h2>نقشه‌ی فایل‌ها روی هاست</h2>
+    <p>وقتی لازم شد دستی سراغ چیزی بروید، اینجا را نگاه کنید.</p>
+  </div>
+
+<pre>/domains/gymlic-panel.ir/public_html/     <span class="c">← سایت (خروجی بیلد)</span>
+  index.html, _next/, login/, ...         <span class="c">همه ساخته‌ی npm run build</span>
+  .htaccess                               <span class="c">مسیریابی /join/ و کش</span>
+
+/domains/api.gymlic-panel.ir/public_html/ <span class="c">← API</span>
+  .htaccess                               <span class="c">هر درخواست را به public/index.php می‌برد</span>
+  config.php                              <span class="c">رمز دیتابیس — فقط اینجا</span>
+  public/index.php                        <span class="c">روتر و فهرست اندپوینت‌ها</span>
+  public/uploads/                         <span class="c">آواتارها و لوگوها</span>
+  src/                                    <span class="c">کنترلرها و کلاس‌ها</span>
+  schema/                                 <span class="c">فقط مرجع — اجرا نمی‌شود</span></pre>
+
+  <div class="note info">
+    <span class="lbl">قاعده‌ی طلایی چیدمان</span>
+    <p>
+      <code>index.php</code> انتظار دارد <code>config.php</code> و <code>src/</code>
+      <b>کنار</b> پوشه‌ی <code>public/</code> باشند، یعنی یک سطح بالاتر از خودش. اگر
+      <code>REMOTE_API</code> به پوشه‌ای با چیدمان دیگر اشاره کند، آپلود کنارش می‌نشیند و
+      API با خطای ۵۰۰ می‌افتد چون <code>config.php</code> را پیدا نمی‌کند.
+    </p>
+  </div>
+
+  <h3>فایل تنظیمات استقرار</h3>
+  <p>
+    <code>deploy\deploy.config.bat</code> روی سیستم شماست و در گیت نیست. پنج مقدار دارد:
+  </p>
+<pre>set "WINSCP_COM=E:\PROGRAMS\WinSCP\WinSCP.com"
+set "SESSION=gymlic-deploy"
+set "REMOTE_FRONT=/domains/gymlic-panel.ir/public_html"
+set "REMOTE_API=/domains/api.gymlic-panel.ir/public_html"
+set "API_URL=https://api.gymlic-panel.ir"</pre>
+  <p>
+    رمز FTP اینجا نیست — در خود WinSCP ذخیره شده و اسکریپت با نام سشن صدایش می‌زند.
+  </p>
+</section>
+
+<!-- ============ 5 ============ -->
+<section class="break">
+  <div class="h2wrap">
+    <span class="num">بخش ۵</span>
+    <h2>بک‌آپ</h2>
+    <p>بیشتر پروژه در گیت است. فقط سه چیز غیرقابل‌بازیابی‌اند.</p>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:26%">چه چیزی</th><th style="width:38%">چطور</th><th>کِی</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>دیتابیس</td>
+        <td>phpMyAdmin ← Export ← Custom ← SQL ← zipped</td>
+        <td>قبل از هر تغییر اسکیما، و هفتگی وقتی کاربر واقعی داشتید</td>
+      </tr>
+      <tr>
+        <td><code>config.php</code></td>
+        <td>با WinSCP دانلودش کنید</td>
+        <td>یک‌بار، و بعد از هر تغییر رمز دیتابیس</td>
+      </tr>
+      <tr>
+        <td><code>public/uploads/</code></td>
+        <td>کل پوشه را با WinSCP بکشید روی سیستم</td>
+        <td>وقتی کاربران شروع به آپلود عکس کردند</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>چیزهایی که لازم نیست</h3>
+  <ul>
+    <li>کد PHP بک‌اند و کد فرانت — در گیت‌هاب هستند</li>
+    <li><code>schema.sql</code> و <code>seed.sql</code> — در گیت‌هاب هستند</li>
+    <li>محتویات <code>public_html</code> سایت — با یک بیلد دوباره ساخته می‌شود</li>
+  </ul>
+
+  <div class="note warn">
+    <span class="lbl">بک‌آپ روی همان هاست بک‌آپ نیست</span>
+    <p>
+      فایل خروجی را دانلود کنید. اگر روی همان سرور بماند و سرور مشکل بخورد، بک‌آپ هم با آن می‌رود.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section class="break">
+  <div class="h2wrap">
+    <span class="num">بخش ۶</span>
+    <h2>وقتی چیزی خراب می‌شود</h2>
+    <p>علامت را پیدا کنید، علت را حدس نزنید. هر کدام از این‌ها یک بار واقعاً رخ داده است.</p>
+  </div>
+
+  <h3>برگرداندن یک تغییر</h3>
+  <table>
+    <thead><tr><th style="width:24%">چه لایه‌ای</th><th>چه کاری</th></tr></thead>
+    <tbody>
+      <tr><td>فرانت</td><td>PR را در گیت‌هاب revert کنید، <code>git pull</code>، بعد <code>deploy\deploy.bat</code></td></tr>
+      <tr><td>بک‌اند</td><td>همان، با <code>deploy\deploy.bat api</code></td></tr>
+      <tr><td>دیتابیس</td><td>بک‌آپ را در phpMyAdmin ← Import برگردانید. راه دیگری ندارد.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>دیدن خطای واقعی پشت صفحه‌ی سفید ۵۰۰</h3>
+  <p>
+    صفحه‌ی ۵۰۰ عمداً جزئیات را پنهان می‌کند. کنار <code>public/index.php</code> فایلی به نام
+    <code>debug.php</code> بسازید:
+  </p>
+<pre>&lt;?php
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+require __DIR__ . '/index.php';</pre>
+  <p>
+    بعد <code>&lt;API&gt;/public/debug.php</code> را باز کنید تا پیام واقعی با نام فایل و
+    شماره‌ی خط را ببینید.
+  </p>
+  <div class="note stop">
+    <span class="lbl">بعد از عیب‌یابی پاکش کنید</span>
+    <p>این فایل مسیر کامل فایل‌های سرور را به هر بازدیدکننده‌ای نشان می‌دهد.</p>
+  </div>
+
+  <h3>علامت‌های شناخته‌شده</h3>
+
+  <div class="sym">
+    <div class="s">'cp' is not recognized as an internal or external command</div>
+    <p class="w">دستور یونیکسی در اسکریپت بیلد. <b>در خود پروژه اصلاح شده</b> — اگر دیدیدش یعنی نسخه‌ی قدیمی دارید؛ <code>git pull</code> بزنید.</p>
+  </div>
+
+  <div class="sym">
+    <div class="s">\WinSCP\WinSCP.com was unexpected at this time</div>
+    <p class="w">پرانتز موجود در مسیر WinSCP. در اسکریپت اصلاح شده؛ اگر برگشت، مسیر را بدون پرانتز بنویسید — مثلاً <code>C:\PROGRA~2\...</code> به‌جای <code>Program Files (x86)</code>.</p>
+  </div>
+
+  <div class="sym">
+    <div class="s">Cannot open site folder or workspace</div>
+    <p class="w">WinSCP در تشخیص نام سایت به بزرگی و کوچکی حروف حساس نیست. اگر هم‌زمان سایتی به نام <code>gymlic</code> و پوشه‌ای به نام <code>Gymlic</code> داشته باشید، به پوشه می‌خورد. <b>نام سایت را یکتا کنید</b> و <code>SESSION</code> را به‌روز کنید.</p>
+  </div>
+
+  <div class="sym">
+    <div class="s">These files have Windows line endings</div>
+    <p class="w">محافظ اسکریپت جلوی آپلود را گرفته. درخت کاری قبل از قوانین خط‌پایان بیرون کشیده شده. از ریشه‌ی پروژه: <code>git rm --cached -r .</code> و بعد <code>git reset --hard</code>.</p>
+  </div>
+
+  <div class="sym">
+    <div class="s">Your local changes would be overwritten by merge</div>
+    <p class="w">روی فایل‌هایی که دست نزده‌اید. <code>reset --hard</code> تنهایی حلش نمی‌کند چون تناقض در خود commit است. به نسخه‌ی ریموت reset کنید: <code>git fetch origin</code> و بعد <code>git reset --hard origin/&lt;branch&gt;</code>.</p>
+  </div>
+
+  <div class="sym">
+    <div class="s">No such file or directory: .../public_html</div>
+    <p class="w">پوشه‌ی مقصد روی هاست وجود ندارد. سراغ بخش ۷ بروید.</p>
+  </div>
+
+  <div class="sym">
+    <div class="s fa">خطای ۵۰۳ بعد از چند بار ۵۰۰</div>
+    <p class="w">LiteSpeed برنامه‌ای را که پشت سر هم خطا داده موقتاً مسدود می‌کند. یکی دو دقیقه صبر کنید؛ خودش آزاد می‌شود و خطای واقعی دوباره ظاهر می‌شود.</p>
+  </div>
+
+  <div class="sym">
+    <div class="s fa">سایت بالا می‌آید ولی «ارتباط با سرور برقرار نشد»</div>
+    <p class="w">فرانت سالم است و API جواب نمی‌دهد. <code>&lt;API&gt;/health</code> را باز کنید — مشکل آنجاست، نه در فرانت.</p>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section class="break">
+  <div class="h2wrap">
+    <span class="num">بخش ۷</span>
+    <h2>بازیابی کامل بک‌اند</h2>
+    <p>اگر فایل‌های API به هر دلیلی از بین رفتند. دیتابیس جداست و دست نمی‌خورد.</p>
+  </div>
+
+  <div class="step">
+    <div class="n">۱</div>
+    <div class="body">
+      <div class="t">پوشه‌ی مقصد را بسازید</div>
+      <p>
+        در WinSCP داخل <code>/domains/api.gymlic-panel.ir/</code> پوشه‌ای به نام
+        <code>public_html</code> با دسترسی <code>755</code> بسازید. اگر کل پوشه‌ی دامنه نیست،
+        اول دامنه را در DirectAdmin ← Domain Setup دوباره اضافه کنید و گواهی SSL را هم
+        دوباره صادر کنید.
+      </p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">۲</div>
+    <div class="body">
+      <div class="t">فایل‌ها را از گیت برگردانید</div>
+<pre>deploy\deploy.bat api</pre>
+      <p>همه‌ی PHP، <code>.htaccess</code>، <code>schema/</code> و پوشه‌ی <code>public/uploads/</code> ساخته می‌شوند.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">۳</div>
+    <div class="body">
+      <div class="t"><code>config.php</code> را دستی بسازید</div>
+      <p>
+        تنها فایلی که از گیت نمی‌آید. در WinSCP راست‌کلیک ← New ← File با نام
+        <code>config.php</code> در ریشه‌ی <code>public_html</code>:
+      </p>
+<pre>&lt;?php
+declare(strict_types=1);
+
+return [
+    'db' =&gt; [
+        'host'    =&gt; 'localhost',
+        'name'    =&gt; 'gymlicpa_____',   <span class="c">// MySQL Management</span>
+        'user'    =&gt; 'gymlicpa_____',   <span class="c">// MySQL Management</span>
+        'pass'    =&gt; '_____________',   <span class="c">// رمز همان کاربر</span>
+        'charset' =&gt; 'utf8mb4',
+    ],
+
+    'cors_origins' =&gt; ['https://gymlic-panel.ir'],
+
+    'session_ttl_seconds' =&gt; 60 * 60 * 24 * 30,
+
+    'uploads' =&gt; [
+        'dir'        =&gt; __DIR__ . '/public/uploads',
+        'public_url' =&gt; '/uploads',
+        'max_bytes'  =&gt; 8 * 1024 * 1024,
+    ],
+];</pre>
+      <p>
+        نام دیتابیس و کاربر را از DirectAdmin ← MySQL Management بردارید. اگر رمز را به یاد
+        ندارید، همان‌جا عوضش کنید — جای دیگری استفاده نمی‌شود.
+      </p>
+      <div class="note warn">
+        <span class="lbl">دقت در CORS</span>
+        <p>
+          <code>cors_origins</code> باید دقیقاً دامنه‌ی سایت باشد، بدون اسلش پایانی. اگر فرق کند،
+          مرورگر همه‌ی درخواست‌های فرانت را بلاک می‌کند.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">۴</div>
+    <div class="body">
+      <div class="t">تأیید</div>
+<pre>https://api.gymlic-panel.ir/health</pre>
+      <table>
+        <thead><tr><th style="width:42%">جواب</th><th>یعنی</th></tr></thead>
+        <tbody>
+          <tr><td><code>"ok":true</code></td><td>تمام است</td></tr>
+          <tr><td><code>"database":"unavailable"</code></td><td>یکی از سه مقدار دیتابیس غلط است</td></tr>
+          <tr><td><code>"schema":"missing"</code></td><td>دیتابیس خالی است — <code>schema.sql</code> را ایمپورت کنید</td></tr>
+          <tr><td>خطای ۴۰۴</td><td><code>.htaccess</code> یا <code>public/index.php</code> نرسیده</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note good">
+    <span class="lbl">آنچه این یعنی</span>
+    <p>
+      کل بک‌اند در چند دقیقه از صفر برمی‌گردد. تنها چیزی که از گیت نمی‌آید
+      <code>config.php</code> و محتویات <code>uploads/</code> است — و به همین دلیل
+      همان دو تا در فهرست بک‌آپ بخش ۵ هستند.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section class="break">
+  <div class="h2wrap">
+    <span class="num">بخش ۸</span>
+    <h2>چک‌لیست</h2>
+    <p>برای هر بار که یک بخش جدید اضافه می‌کنید.</p>
+  </div>
+
+  <div class="check">
+    <div class="g">پیش از شروع</div>
+    <div class="row"><div class="bx"></div><div>PR را خوانده‌ام و می‌دانم کدام لایه‌ها عوض می‌شوند</div></div>
+    <div class="row"><div class="bx"></div><div>اگر تغییر دیتابیس دارد، دستور SQL را در توضیح PR دارم</div></div>
+
+    <div class="g">آماده‌سازی</div>
+    <div class="row"><div class="bx"></div><div>PR را merge کردم</div></div>
+    <div class="row"><div class="bx"></div><div><span class="mono">git pull</span> زدم</div></div>
+    <div class="row"><div class="bx"></div><div>اگر <span class="mono">package.json</span> عوض شده بود، <span class="mono">npm install</span> زدم</div></div>
+
+    <div class="g">دیتابیس — فقط اگر لازم است</div>
+    <div class="row"><div class="bx"></div><div>از دیتابیس Export گرفتم و فایل را <b>دانلود</b> کردم</div></div>
+    <div class="row"><div class="bx"></div><div>فقط دستور جدید را در تب SQL اجرا کردم، نه کل <span class="mono">schema.sql</span></div></div>
+
+    <div class="g">استقرار</div>
+    <div class="row"><div class="bx"></div><div>مسیرهایی که اسکریپت چاپ کرد را خواندم و درست بودند</div></div>
+    <div class="row"><div class="bx"></div><div><span class="mono">deploy\deploy.bat all</span> بدون خطا تمام شد</div></div>
+
+    <div class="g">تأیید</div>
+    <div class="row"><div class="bx"></div><div><span class="mono">/health</span> جوابِ <span class="mono">{"ok":true}</span> داد</div></div>
+    <div class="row"><div class="bx"></div><div>سایت را با <span class="mono">Ctrl+F5</span> باز کردم و وارد شدم</div></div>
+    <div class="row"><div class="bx"></div><div>خودِ فیچر جدید را امتحان کردم، نه فقط بالا آمدن صفحه</div></div>
+  </div>
+
+  <h3>وقتی کاربر واقعی داشتید</h3>
+  <p>
+    تا وقتی سایت کاربر واقعی ندارد، تست مستقیم روی نسخه‌ی زنده اشکالی ندارد. بعد از آن
+    ارزش دارد یک ساب‌دامین جدا با دیتابیس مستقل بسازید و اول آنجا مستقر کنید — یک
+    <code>deploy.config.bat</code> دوم با مسیرها و <code>API_URL</code> آن محیط کافی است.
+    از آن به بعد استقرار روی نسخه‌ی زنده فقط بعد از سبز شدن نسخه‌ی تست انجام می‌شود.
+  </p>
+
+  <div class="foot">
+    راهنمای استقرار جیم‌لیک · نسخه‌ی کامل و به‌روز این متن در <span class="mono">README.md</span> مخزن است.
+  </div>
+</section>
+
+</body>
+</html>

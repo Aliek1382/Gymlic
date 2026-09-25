@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack && node deploy/copy-assets.mjs",
     "lint": "eslint",
-    "preview": "npx --yes serve out"
+    "preview": "npx --yes serve out",
+    "docs:pdf": "node docs/deploy-guide/build.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
