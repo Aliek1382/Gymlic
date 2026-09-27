@@ -10,6 +10,7 @@
 import { toAsciiDigits, toPersianDigits } from "@/lib/persian";
 import { isHeadingLine } from "./workout-plan-text";
 import { splitWeekdayHeading } from "./workout-plan-weekday";
+import type { WorkoutPlanDay } from "../types/workout-plan-builder-types";
 
 export type PlanTechnique = "normal" | "superset" | "triset" | "dropset";
 
@@ -36,6 +37,11 @@ export interface ParsedExerciseRow {
   // picked one at all. It rides on the row rather than the day heading so
   // that picking the same day twice always lands in the same block.
   muscleGroup: string | null;
+  // Only ever set for a row read off the structured builder tables — the
+  // free-text grammar above has no notation for a weight, so a row parsed
+  // from `description` always leaves this undefined.
+  weightKg?: number | null;
+  note?: string | null;
 }
 
 export interface ParsedTextRow {
@@ -377,4 +383,39 @@ export function sectionMuscleGroups(section: ParsedSection): string[] {
     if (!groups.includes(row.muscleGroup)) groups.push(row.muscleGroup);
   }
   return groups;
+}
+
+function formatRestSeconds(seconds: number): string {
+  if (seconds < 60) return `${toPersianDigits(seconds)} ثانیه`;
+  const minutes = Math.round(seconds / 60);
+  return `${toPersianDigits(minutes)} دقیقه`;
+}
+
+// The structured builder's own read model — workout_plan_days joined with
+// workout_plan_exercises — mapped onto the exact same ParsedSection shape
+// the free-text grammar above produces, so PlanSections and PlanPrintArea
+// render a structured plan through the one set of row components instead of
+// a second parallel table.
+export function structuredDaysToSections(days: WorkoutPlanDay[]): ParsedSection[] {
+  return [...days]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((day) => ({
+      heading: day.dayName?.trim() || `هفته ${toPersianDigits(day.weekNumber)} — روز ${toPersianDigits(day.dayNumber)}`,
+      rows: [...day.exercises]
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((exercise): ParsedExerciseRow => ({
+          kind: "exercise",
+          technique: "normal",
+          moves: [{ name: exercise.exerciseName, reps: exercise.reps }],
+          sets: exercise.sets !== null ? String(exercise.sets) : null,
+          drops: null,
+          rest: {
+            betweenSets: exercise.restSeconds !== null ? formatRestSeconds(exercise.restSeconds) : null,
+            betweenExercises: null,
+          },
+          muscleGroup: exercise.muscleGroup,
+          weightKg: exercise.weightKg,
+          note: exercise.note,
+        })),
+    }));
 }

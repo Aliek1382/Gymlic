@@ -208,6 +208,10 @@ CREATE TABLE workout_assignments (
   description    TEXT NULL,
   status         ENUM('active','completed','cancelled','draft') NOT NULL DEFAULT 'active',
   is_template    TINYINT(1) NOT NULL DEFAULT 0,
+  -- 'structured' once a trainer builds this plan from workout_plan_days
+  -- instead of typing description free-text; the two are never mixed on one
+  -- assignment (see workout_plan_days below).
+  builder_mode   ENUM('text','structured') NOT NULL DEFAULT 'text',
   assigned_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_wa_club (club_id),
@@ -358,6 +362,44 @@ CREATE TABLE exercise_usage (
   KEY idx_exercise_usage_trainer (trainer_id),
   CONSTRAINT fk_exercise_usage_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_exercise_usage_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- workout_plan_days / workout_plan_exercises: the structured builder behind
+-- workout_assignments.builder_mode = 'structured'. A structured assignment's
+-- description is left as-is (usually NULL) and the trainer/athlete-facing
+-- program is read from these tables instead; a 'text' assignment has no rows
+-- here at all. The two modes are never mixed on one assignment.
+-- =========================================================================
+CREATE TABLE workout_plan_days (
+  id            CHAR(36) NOT NULL PRIMARY KEY,
+  assignment_id CHAR(36) NOT NULL,
+  week_number   INT NOT NULL DEFAULT 1,
+  day_number    INT NOT NULL,
+  day_name      VARCHAR(100) NULL,
+  sort_order    INT NOT NULL DEFAULT 0,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_wpd_assignment (assignment_id, week_number, day_number),
+  CONSTRAINT fk_wpd_assignment FOREIGN KEY (assignment_id) REFERENCES workout_assignments(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE workout_plan_exercises (
+  id             CHAR(36) NOT NULL PRIMARY KEY,
+  day_id         CHAR(36) NOT NULL,
+  exercise_id    CHAR(36) NOT NULL,
+  sets           INT NULL,
+  reps           VARCHAR(50) NULL,
+  weight_kg      DECIMAL(6,2) NULL,
+  rest_seconds   INT NULL,
+  note           VARCHAR(500) NULL,
+  sort_order     INT NOT NULL DEFAULT 0,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_wpe_day (day_id, sort_order),
+  KEY idx_wpe_exercise (exercise_id),
+  CONSTRAINT fk_wpe_day FOREIGN KEY (day_id) REFERENCES workout_plan_days(id) ON DELETE CASCADE,
+  CONSTRAINT fk_wpe_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================

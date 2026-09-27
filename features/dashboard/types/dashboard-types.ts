@@ -112,6 +112,9 @@ export interface AthletePlanSummary {
   title: string;
   description: string | null;
   assignedAt: string;
+  // Only meaningfully "structured" for the workout card; the nutrition card
+  // always reads "text" since nutrition plans never gained the builder.
+  builderMode: "text" | "structured";
 }
 
 export interface AthleteDashboardData {

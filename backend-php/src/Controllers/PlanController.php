@@ -34,7 +34,7 @@ final class PlanController
 
         $column = $athleteId !== null ? 'athlete_id' : 'invitation_id';
         $stmt = Database::connection()->prepare(
-            "SELECT " . self::COLUMNS . " FROM {$table}
+            "SELECT " . self::columns($params['kind']) . " FROM {$table}
              WHERE trainer_id = :trainer_id AND {$column} = :target AND is_template = 0
              ORDER BY assigned_at DESC"
         );
@@ -50,7 +50,7 @@ final class PlanController
         $table = self::table($params['kind']);
 
         $stmt = Database::connection()->prepare(
-            "SELECT " . self::COLUMNS . " FROM {$table}
+            "SELECT " . self::columns($params['kind']) . " FROM {$table}
              WHERE athlete_id = :athlete_id AND status <> 'draft' AND is_template = 0
              ORDER BY assigned_at DESC"
         );
@@ -250,6 +250,13 @@ final class PlanController
         }
 
         Response::ok(['ok' => true]);
+    }
+
+    /** workout_assignments carries builder_mode; nutrition_assignments (out of this
+     *  feature's scope) never gained the column, so it's added only for 'workout'. */
+    private static function columns(string $kind): string
+    {
+        return $kind === 'workout' ? self::COLUMNS . ', builder_mode' : self::COLUMNS;
     }
 
     private static function table(string $kind): string

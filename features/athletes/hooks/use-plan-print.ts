@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PlanKind } from "../types/athlete-types";
+import type { WorkoutPlanDay } from "../types/workout-plan-builder-types";
 
 export interface PrintablePlan {
   kind: PlanKind;
@@ -13,6 +14,10 @@ export interface PrintablePlan {
   athleteAvatarUrl?: string | null;
   trainerName?: string;
   trainerAvatarUrl?: string | null;
+  // Workout-only: when the plan is structured, the days already fetched for
+  // on-screen display are handed straight to the sheet instead of `description`.
+  builderMode?: "text" | "structured";
+  structuredDays?: WorkoutPlanDay[];
 }
 
 // Avatars are fetched from the API's uploads folder, so they can still be in

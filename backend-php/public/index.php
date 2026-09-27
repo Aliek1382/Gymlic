@@ -33,6 +33,7 @@ use Gymlic\Controllers\NotificationController;
 use Gymlic\Controllers\ProfileController;
 use Gymlic\Controllers\ProgressController;
 use Gymlic\Controllers\UploadController;
+use Gymlic\Controllers\WorkoutPlanBuilderController;
 use Gymlic\Response;
 use Gymlic\Router;
 
@@ -44,7 +45,7 @@ if (in_array($origin, $config['cors_origins'], true) || in_array('*', $config['c
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Vary: Origin');
 }
-header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Max-Age: 86400');
 
@@ -115,6 +116,16 @@ $router->post('/plans/{kind}', fn (array $p) => PlanController::save($p));
 $router->get('/plans/{kind}/{id}', fn (array $p) => PlanController::get($p));
 $router->post('/plans/{kind}/{id}/complete', fn (array $p) => PlanController::complete($p));
 $router->delete('/plans/{kind}/{id}', fn (array $p) => PlanController::remove($p));
+
+$router->get('/plans/workout/{id}/days', fn (array $p) => WorkoutPlanBuilderController::listDays($p));
+$router->post('/plans/workout/{id}/days', fn (array $p) => WorkoutPlanBuilderController::createDay($p));
+$router->put('/plans/workout/{id}/days/{dayId}', fn (array $p) => WorkoutPlanBuilderController::updateDay($p));
+$router->delete('/plans/workout/{id}/days/{dayId}', fn (array $p) => WorkoutPlanBuilderController::deleteDay($p));
+$router->post('/plans/workout/{id}/days/{dayId}/exercises', fn (array $p) => WorkoutPlanBuilderController::addExercise($p));
+$router->patch('/plans/workout/{id}/days/{dayId}/exercises/{exId}', fn (array $p) => WorkoutPlanBuilderController::updateExercise($p));
+$router->delete('/plans/workout/{id}/days/{dayId}/exercises/{exId}', fn (array $p) => WorkoutPlanBuilderController::deleteExercise($p));
+$router->post('/plans/workout/{id}/days/{dayId}/copy', fn (array $p) => WorkoutPlanBuilderController::copyDay($p));
+$router->post('/plans/workout/{id}/weeks/{weekNumber}/copy', fn (array $p) => WorkoutPlanBuilderController::copyWeek($p));
 
 $router->get('/workout-day-logs', fn () => WorkoutLogController::list());
 $router->post('/workout-day-logs', fn () => WorkoutLogController::create());
