@@ -33,6 +33,7 @@ import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind, PlanTarget } from "../types/athlete-types";
 import { NutritionDayBuilder } from "./nutrition-day-builder";
+import { StructuredWorkoutBuilder } from "./structured-workout-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
 const KIND_LABEL: Record<PlanKind, { title: string; icon: typeof Dumbbell }> = {
@@ -52,6 +53,12 @@ export function PlanDialog({
   const [open, setOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  // Workout-only choice, made once per plan: "structured" builds it from
+  // workout_plan_days (no free text at all); "text" is the classic
+  // description box. A resumed draft always keeps whichever mode it was
+  // started in — the two are never mixed on one assignment.
+  const [builderMode, setBuilderMode] = useState<"text" | "structured">("text");
+  const [creatingStructuredDraft, setCreatingStructuredDraft] = useState(false);
   const plans = usePlans(kind, target, open);
   const savePlan = useSavePlan(kind, target);
   const templates = useTemplates(kind, open);
@@ -78,16 +85,38 @@ export function PlanDialog({
     if (draft) {
       form.reset({ title: draft.title, description: draft.description ?? "" });
       setDraftId(draft.id);
+      setBuilderMode(draft.builderMode);
     }
     setHydrated(true);
   }, [open, hydrated, plans.isLoading, plans.data, form]);
+
+  async function handleStartStructuredDraft() {
+    const title = form.getValues("title");
+    if (!title.trim()) {
+      toast.error("قبل از شروع برنامه ساختاریافته، عنوان را وارد کنید.");
+      return;
+    }
+    setCreatingStructuredDraft(true);
+    try {
+      const result = await savePlan.mutateAsync({
+        title,
+        description: null,
+        status: "draft",
+      });
+      setDraftId(result.id);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "شروع برنامه ساختاریافته با خطا مواجه شد."));
+    } finally {
+      setCreatingStructuredDraft(false);
+    }
+  }
 
   async function onSubmit(values: PlanFormValues, status: "active" | "draft") {
     try {
       const result = await savePlan.mutateAsync({
         id: draftId ?? undefined,
         title: values.title,
-        description: values.description || null,
+        description: builderMode === "structured" ? null : values.description || null,
         status,
       });
 
@@ -147,6 +176,7 @@ export function PlanDialog({
     if (!next) {
       setHydrated(false);
       setDraftId(null);
+      setBuilderMode("text");
       form.reset({ title: "", description: "" });
     }
   }
@@ -220,59 +250,106 @@ export function PlanDialog({
             )}
           </div>
 
-          {kind === "workout" ? (
+          {kind === "workout" && !draftId && (
+            <div className="space-y-1.5">
+              <Label>روش ساخت برنامه</Label>
+              <div className="flex gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={builderMode === "text" ? "default" : "outline"}
+                  onClick={() => setBuilderMode("text")}
+                >
+                  نوشتن متنی
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={builderMode === "structured" ? "default" : "outline"}
+                  onClick={() => setBuilderMode("structured")}
+                >
+                  ساخت ساختاریافته (روز به روز)
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {kind === "workout" && builderMode === "structured" ? (
+            draftId ? (
+              <StructuredWorkoutBuilder assignmentId={draftId} />
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={creatingStructuredDraft}
+                onClick={handleStartStructuredDraft}
+              >
+                {creatingStructuredDraft && <Loader2 className="animate-spin" />}
+                شروع ساخت برنامه ساختاریافته
+              </Button>
+            )
+          ) : kind === "workout" ? (
             <WorkoutDayBuilder onInsertLine={handleInsertLine} />
           ) : (
             <NutritionDayBuilder onInsertLine={handleInsertLine} />
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor={`${kind}-description`}>توضیحات (اختیاری)</Label>
-            <textarea
-              id={`${kind}-description`}
-              rows={5}
-              placeholder={PLAN_DESCRIPTION_PLACEHOLDER[kind]}
-              className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
-              {...form.register("description")}
-            />
-            {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
-          </div>
+          {!(kind === "workout" && builderMode === "structured") && (
+            <div className="space-y-2">
+              <Label htmlFor={`${kind}-description`}>توضیحات (اختیاری)</Label>
+              <textarea
+                id={`${kind}-description`}
+                rows={5}
+                placeholder={PLAN_DESCRIPTION_PLACEHOLDER[kind]}
+                className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                {...form.register("description")}
+              />
+              {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               type="submit"
               className="flex-1"
-              disabled={savePlan.isPending}
+              disabled={
+                savePlan.isPending || (kind === "workout" && builderMode === "structured" && !draftId)
+              }
             >
               {savePlan.isPending && <Loader2 className="animate-spin" />}
               ثبت نهایی برنامه
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              disabled={savePlan.isPending}
-              onClick={form.handleSubmit((values) => onSubmit(values, "draft"))}
-            >
-              بعداً بقیه‌اش را می‌نویسم
-            </Button>
+            {!(kind === "workout" && builderMode === "structured") && (
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                disabled={savePlan.isPending}
+                onClick={form.handleSubmit((values) => onSubmit(values, "draft"))}
+              >
+                بعداً بقیه‌اش را می‌نویسم
+              </Button>
+            )}
           </div>
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="w-full text-muted-foreground"
-            disabled={saveTemplate.isPending}
-            onClick={handleSaveAsTemplate}
-          >
-            {saveTemplate.isPending ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Bookmark />
-            )}
-            ذخیره به‌عنوان قالب
-          </Button>
+          {!(kind === "workout" && builderMode === "structured") && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              disabled={saveTemplate.isPending}
+              onClick={handleSaveAsTemplate}
+            >
+              {saveTemplate.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Bookmark />
+              )}
+              ذخیره به‌عنوان قالب
+            </Button>
+          )}
         </form>
 
         <div className="space-y-2 border-t border-border pt-4">

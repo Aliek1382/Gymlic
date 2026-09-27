@@ -12,6 +12,7 @@ import {
   hasExerciseRows,
   parsePlanDescription,
   sectionMuscleGroups,
+  structuredDaysToSections,
   techniqueLabel,
   type ParsedExerciseRow,
   type ParsedSection,
@@ -137,8 +138,16 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
             )}
             {move.name}
           </p>
-          {row.rest.betweenExercises && (
-            <RowNote>استراحت تا حرکت بعد: {row.rest.betweenExercises}</RowNote>
+          {(row.rest.betweenExercises || row.weightKg != null || row.note) && (
+            <RowNote>
+              {[
+                row.rest.betweenExercises && `استراحت تا حرکت بعد: ${row.rest.betweenExercises}`,
+                row.weightKg != null && `وزن: ${toPersianDigits(row.weightKg)} کیلوگرم`,
+                row.note,
+              ]
+                .filter(Boolean)
+                .join(" • ")}
+            </RowNote>
           )}
         </div>
         <span className="text-center text-[9pt] font-bold text-[#3b5bfb]">
@@ -185,12 +194,17 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
             )
             .join(" + ")}
         </p>
-        {(row.rest.betweenSets || row.rest.betweenExercises) && (
+        {(row.rest.betweenSets ||
+          row.rest.betweenExercises ||
+          row.weightKg != null ||
+          row.note) && (
           <RowNote>
             {[
               row.rest.betweenSets && `استراحت بین ست‌ها: ${row.rest.betweenSets}`,
               row.rest.betweenExercises &&
                 `استراحت تا حرکت بعد: ${row.rest.betweenExercises}`,
+              row.weightKg != null && `وزن: ${toPersianDigits(row.weightKg)} کیلوگرم`,
+              row.note,
             ]
               .filter(Boolean)
               .join(" • ")}
@@ -350,12 +364,16 @@ export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
   // Each plan kind parses to its own shape — day blocks of exercises, or
   // meal blocks of foods — so the sheet's body is built here rather than
   // rendered from one shared section list.
+  const workoutSections =
+    plan.builderMode === "structured"
+      ? structuredDaysToSections(plan.structuredDays ?? [])
+      : parsePlanDescription(plan.description);
   const body =
     plan.kind === "nutrition"
       ? parseNutritionDescription(plan.description).map((section, index) => (
           <NutritionSection key={index} section={section} />
         ))
-      : parsePlanDescription(plan.description).map((section, index) => (
+      : workoutSections.map((section, index) => (
           <WorkoutSection key={index} section={section} />
         ));
   const assignedLabel = formatPersianDate(new Date(plan.assignedAt));

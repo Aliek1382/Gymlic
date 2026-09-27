@@ -148,6 +148,10 @@ export interface PlanEntry {
   description: string | null;
   status: "active" | "completed" | "cancelled" | "draft";
   assignedAt: string;
+  // Only ever "structured" for a workout plan built with the day/exercise
+  // builder — nutrition plans (and every workout plan written before it
+  // existed) are "text", read straight from `description`.
+  builderMode: "text" | "structured";
 }
 
 interface PlanRow {
@@ -156,6 +160,7 @@ interface PlanRow {
   description: string | null;
   status: PlanEntry["status"];
   assigned_at: string;
+  builder_mode?: "text" | "structured";
 }
 
 function toPlanEntry(row: PlanRow): PlanEntry {
@@ -165,6 +170,7 @@ function toPlanEntry(row: PlanRow): PlanEntry {
     description: row.description,
     status: row.status,
     assignedAt: row.assigned_at,
+    builderMode: row.builder_mode ?? "text",
   };
 }
 

@@ -6,6 +6,7 @@ interface PlanRow {
   title: string;
   description: string | null;
   assigned_at: string;
+  builder_mode?: "text" | "structured";
 }
 
 function mapPlan(row: PlanRow | null): AthletePlanSummary | null {
@@ -16,6 +17,7 @@ function mapPlan(row: PlanRow | null): AthletePlanSummary | null {
     title: row.title,
     description: row.description,
     assignedAt: row.assigned_at,
+    builderMode: row.builder_mode ?? "text",
   };
 }
 

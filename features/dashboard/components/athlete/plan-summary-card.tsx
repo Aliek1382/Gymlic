@@ -53,6 +53,7 @@ export function PlanSummaryCard({
               kind={planKind}
               isActivePlan
               dayLogging={planKind === "workout"}
+              builderMode={plan.builderMode}
             />
           </div>
         )}

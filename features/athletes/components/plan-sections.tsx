@@ -16,12 +16,14 @@ import {
   hasExerciseRows,
   parsePlanDescription,
   sectionMuscleGroups,
+  structuredDaysToSections,
   techniqueLabel,
   type ParsedExerciseRow,
   type ParsedSection,
   type PlanTechnique,
 } from "../utils/workout-plan-parse";
 import { getTodayWeekday, headingWeekday } from "../utils/workout-plan-weekday";
+import { useWorkoutPlanDays } from "../hooks/use-workout-plan-days";
 import type { Weekday } from "../utils/workout-plan-text";
 import type { PlanKind } from "../types/athlete-types";
 
@@ -64,6 +66,8 @@ function restLine(row: ParsedExerciseRow): string | null {
   const parts = [
     row.rest.betweenSets && `استراحت بین ست‌ها: ${row.rest.betweenSets}`,
     row.rest.betweenExercises && `استراحت تا حرکت بعد: ${row.rest.betweenExercises}`,
+    row.weightKg != null && `وزن: ${toPersianDigits(row.weightKg)} کیلوگرم`,
+    row.note && row.note,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(" • ") : null;
 }
@@ -237,13 +241,19 @@ function WorkoutPlanSections({
   description,
   isActivePlan,
   dayLogging,
+  builderMode = "text",
 }: {
   planId: string;
   description: string | null;
   isActivePlan: boolean;
   dayLogging: boolean;
+  builderMode?: "text" | "structured";
 }) {
-  const sections = parsePlanDescription(description);
+  const structuredDays = useWorkoutPlanDays(builderMode === "structured" ? planId : null);
+  const sections =
+    builderMode === "structured"
+      ? structuredDaysToSections(structuredDays.data ?? [])
+      : parsePlanDescription(description);
   // A plan grouped by muscle group has no day to match against, so "today"
   // is only claimed once at least one heading names a weekday.
   const hasWeekdayHeadings = sections.some(
@@ -255,6 +265,9 @@ function WorkoutPlanSections({
   const dayLogs = useWorkoutDayLogs(ticksEnabled);
   const toggleDay = useToggleWorkoutDay(planId);
 
+  if (builderMode === "structured" && structuredDays.isLoading) {
+    return <p className="text-sm text-muted-foreground">در حال بارگذاری برنامه...</p>;
+  }
   if (sections.length === 0) return null;
 
   // Only headed sections are tickable — the heading is the day_key.
@@ -332,6 +345,7 @@ export function PlanSections({
   kind = "workout",
   isActivePlan = false,
   dayLogging = false,
+  builderMode = "text",
 }: {
   planId: string;
   description: string | null;
@@ -342,6 +356,9 @@ export function PlanSections({
   isActivePlan?: boolean;
   // Ticking is workout-only; workout_day_logs references workout_assignments.
   dayLogging?: boolean;
+  // Workout-only: "structured" reads the plan from workout_plan_days /
+  // workout_plan_exercises instead of parsing `description`.
+  builderMode?: "text" | "structured";
 }) {
   if (kind === "nutrition") {
     return <NutritionPlanSections description={description} />;
@@ -353,6 +370,7 @@ export function PlanSections({
       description={description}
       isActivePlan={isActivePlan}
       dayLogging={dayLogging}
+      builderMode={builderMode}
     />
   );
 }

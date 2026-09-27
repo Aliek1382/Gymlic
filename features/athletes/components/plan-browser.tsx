@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Apple,
   CheckCircle2,
@@ -48,14 +49,18 @@ import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlanPrint } from "../hooks/use-plan-print";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
+import { workoutPlanDaysKey } from "../hooks/use-workout-plan-days";
 import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
+import type { WorkoutPlanDay } from "../types/workout-plan-builder-types";
 import { NutritionFormatHint } from "./nutrition-format-hint";
 import { PlanComments } from "./plan-comments";
 import { PlanFormatHint } from "./plan-format-hint";
 import { PlanPrintArea } from "./plan-print-area";
+import { PlanSections } from "./plan-sections";
+import { StructuredWorkoutBuilder } from "./structured-workout-builder";
 import { NutritionDayBuilder } from "./nutrition-day-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
@@ -129,6 +134,7 @@ export function PlanBrowser({
     athleteId: selectedAthlete?.id ?? "",
   });
   const { plan: printingPlan, printPlan } = usePlanPrint();
+  const queryClient = useQueryClient();
 
   // The most recently assigned plan that's actually in effect (not a draft,
   // not already completed/cancelled) — highlighted as what the athlete
@@ -174,7 +180,13 @@ export function PlanBrowser({
       await savePlan.mutateAsync({
         id: editingPlan.id,
         title: values.title,
-        description: values.description || null,
+        // A structured plan's body lives in workout_plan_days, not
+        // description — the form's description field isn't rendered for it,
+        // so its (empty) value is never what should be written back.
+        description:
+          editingPlan.builderMode === "structured"
+            ? editingPlan.description
+            : values.description || null,
         status: editingPlan.status === "draft" ? "draft" : "active",
       });
       toast.success("تغییرات ذخیره شد.");
@@ -287,9 +299,12 @@ export function PlanBrowser({
                   {formatPersianDate(new Date(selectedPlan.assignedAt))}
                 </DialogDescription>
               </DialogHeader>
-              <p className="whitespace-pre-line text-sm text-foreground">
-                {selectedPlan.description || "توضیحاتی برای این برنامه ثبت نشده است."}
-              </p>
+              <PlanSections
+                planId={selectedPlan.id}
+                description={selectedPlan.description}
+                kind={kind}
+                builderMode={selectedPlan.builderMode}
+              />
               <Button
                 type="button"
                 size="sm"
@@ -306,6 +321,10 @@ export function PlanBrowser({
                     athleteAvatarUrl: selectedAthlete?.avatarUrl,
                     trainerName: trainerName ?? undefined,
                     trainerAvatarUrl,
+                    builderMode: selectedPlan.builderMode,
+                    structuredDays: queryClient.getQueryData<WorkoutPlanDay[]>(
+                      workoutPlanDaysKey(selectedPlan.id)
+                    ),
                   })
                 }
               >
@@ -359,30 +378,37 @@ export function PlanBrowser({
                   )}
                 </div>
 
-                {kind === "workout" ? (
+                {editingPlan.builderMode === "structured" ? (
+                  // Everything below the title autosaves through
+                  // WorkoutPlanBuilderController — there's nothing else for
+                  // this form's submit to do.
+                  <StructuredWorkoutBuilder assignmentId={editingPlan.id} />
+                ) : kind === "workout" ? (
                   <WorkoutDayBuilder onInsertLine={handleInsertLine} />
                 ) : (
                   <NutritionDayBuilder onInsertLine={handleInsertLine} />
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-plan-description">
-                    توضیحات (اختیاری)
-                  </Label>
-                  <textarea
-                    id="edit-plan-description"
-                    rows={6}
-                    className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
-                    {...editForm.register("description")}
-                  />
-                  {kind === "workout" && (
-                    <p className="text-xs text-muted-foreground">
-                      اگر درمورد سیستم انجام دادن حرکات توضیحی دارید اضافه
-                      کنید، مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
-                    </p>
-                  )}
-                  {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
-                </div>
+                {editingPlan.builderMode !== "structured" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plan-description">
+                      توضیحات (اختیاری)
+                    </Label>
+                    <textarea
+                      id="edit-plan-description"
+                      rows={6}
+                      className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                      {...editForm.register("description")}
+                    />
+                    {kind === "workout" && (
+                      <p className="text-xs text-muted-foreground">
+                        اگر درمورد سیستم انجام دادن حرکات توضیحی دارید اضافه
+                        کنید، مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
+                      </p>
+                    )}
+                    {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
+                  </div>
+                )}
 
                 <Button
                   type="submit"
@@ -390,7 +416,9 @@ export function PlanBrowser({
                   disabled={savePlan.isPending}
                 >
                   {savePlan.isPending && <Loader2 className="animate-spin" />}
-                  ذخیره تغییرات
+                  {editingPlan.builderMode === "structured"
+                    ? "ذخیره عنوان"
+                    : "ذخیره تغییرات"}
                 </Button>
               </form>
             </DialogContent>

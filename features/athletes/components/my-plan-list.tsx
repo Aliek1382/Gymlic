@@ -1,6 +1,7 @@
 "use client";
 
 import { Apple, CheckCircle2, Download, Dumbbell } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
@@ -15,10 +16,12 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
 import { usePlanPrint } from "../hooks/use-plan-print";
+import { workoutPlanDaysKey } from "../hooks/use-workout-plan-days";
 import { PlanComments } from "./plan-comments";
 import { PlanPrintArea } from "./plan-print-area";
 import { PlanSections } from "./plan-sections";
 import type { PlanKind } from "../types/athlete-types";
+import type { WorkoutPlanDay } from "../types/workout-plan-builder-types";
 
 // Icon components can't cross the Server -> Client Component boundary as a
 // prop (only serializable values can), so it's picked here from `kind`
@@ -49,6 +52,7 @@ export function MyPlanList({
   const plans = useMyPlans(kind);
   const completePlan = useCompletePlan(kind);
   const { plan: printingPlan, printPlan } = usePlanPrint();
+  const queryClient = useQueryClient();
 
   async function handleComplete(planId: string) {
     try {
@@ -110,6 +114,7 @@ export function MyPlanList({
               kind={kind}
               isActivePlan={plan.id === latestPlanId}
               dayLogging={kind === "workout"}
+              builderMode={plan.builderMode}
             />
             <div className="flex flex-wrap items-center gap-2">
               {plan.id === latestPlanId && (
@@ -143,6 +148,10 @@ export function MyPlanList({
                     athleteAvatarUrl,
                     trainerName: trainerName ?? undefined,
                     trainerAvatarUrl,
+                    builderMode: plan.builderMode,
+                    structuredDays: queryClient.getQueryData<WorkoutPlanDay[]>(
+                      workoutPlanDaysKey(plan.id)
+                    ),
                   })
                 }
               >
