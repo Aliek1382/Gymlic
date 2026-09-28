@@ -291,7 +291,9 @@ export function PlanBrowser({
           onOpenChange={(open) => !open && setSelectedPlan(null)}
         >
           {selectedPlan && (
-            <DialogContent>
+            <DialogContent
+              className={selectedPlan.builderMode === "structured" ? "sm:max-w-2xl" : undefined}
+            >
               <DialogHeader>
                 <DialogTitle>{selectedPlan.title}</DialogTitle>
                 <DialogDescription>
@@ -351,7 +353,9 @@ export function PlanBrowser({
           onOpenChange={(open) => !open && setEditingPlan(null)}
         >
           {editingPlan && (
-            <DialogContent>
+            <DialogContent
+              className={editingPlan.builderMode === "structured" ? "sm:max-w-2xl" : undefined}
+            >
               <DialogHeader>
                 <DialogTitle>ویرایش برنامه</DialogTitle>
                 <DialogDescription>

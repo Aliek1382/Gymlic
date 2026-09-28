@@ -188,7 +188,9 @@ export function PlanDialog({
         {kindTitle}
       </Button>
 
-      <DialogContent>
+      <DialogContent
+        className={kind === "workout" && builderMode === "structured" ? "sm:max-w-2xl" : undefined}
+      >
         <DialogHeader>
           <DialogTitle>
             {kindTitle} — {athleteName}
