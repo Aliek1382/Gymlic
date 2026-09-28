@@ -147,6 +147,15 @@ export function PlanBrowser({
     resolver: zodResolver(planSchema),
     defaultValues: { title: "", description: "" },
   });
+  // Which UI is showing for this edit session. Starts from the plan's saved
+  // builder_mode, but — for a plan that's still "text" — a trainer can flip
+  // it to "structured" mid-edit (and back) without losing anything: text
+  // mode's two variants share one description field, and a structured
+  // plan's days live in the database, not here. Once the plan is genuinely
+  // "structured" on the server (it already has rows), it stays that way —
+  // this session can't switch it back to text.
+  const [editBuilderMode, setEditBuilderMode] = useState<"text" | "structured">("text");
+  const [editTextMode, setEditTextMode] = useState<"picker" | "manual">("picker");
 
   useEffect(() => {
     if (editingPlan) {
@@ -154,6 +163,8 @@ export function PlanBrowser({
         title: editingPlan.title,
         description: editingPlan.description ?? "",
       });
+      setEditBuilderMode(editingPlan.builderMode);
+      setEditTextMode("picker");
     }
   }, [editingPlan, editForm]);
 
@@ -184,7 +195,7 @@ export function PlanBrowser({
         // description — the form's description field isn't rendered for it,
         // so its (empty) value is never what should be written back.
         description:
-          editingPlan.builderMode === "structured"
+          editBuilderMode === "structured"
             ? editingPlan.description
             : values.description || null,
         status: editingPlan.status === "draft" ? "draft" : "active",
@@ -354,7 +365,7 @@ export function PlanBrowser({
         >
           {editingPlan && (
             <DialogContent
-              className={editingPlan.builderMode === "structured" ? "sm:max-w-2xl" : undefined}
+              className={editBuilderMode === "structured" ? "sm:max-w-2xl" : undefined}
             >
               <DialogHeader>
                 <DialogTitle>ویرایش برنامه</DialogTitle>
@@ -382,36 +393,89 @@ export function PlanBrowser({
                   )}
                 </div>
 
-                {editingPlan.builderMode === "structured" ? (
+                {/* Once the plan is genuinely structured on the server (it
+                    already has rows), there's no going back to text for it —
+                    the toggle only shows while it's still "text". */}
+                {kind === "workout" && editingPlan.builderMode === "text" && (
+                  <div className="space-y-1.5">
+                    <Label>روش نوشتن برنامه</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          editBuilderMode === "text" && editTextMode === "picker"
+                            ? "default"
+                            : "outline"
+                        }
+                        onClick={() => {
+                          setEditBuilderMode("text");
+                          setEditTextMode("picker");
+                        }}
+                      >
+                        نوشتن با انتخاب‌گر
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          editBuilderMode === "text" && editTextMode === "manual"
+                            ? "default"
+                            : "outline"
+                        }
+                        onClick={() => {
+                          setEditBuilderMode("text");
+                          setEditTextMode("manual");
+                        }}
+                      >
+                        تایپ دستی
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={editBuilderMode === "structured" ? "default" : "outline"}
+                        onClick={() => setEditBuilderMode("structured")}
+                      >
+                        ساخت ساختاریافته (روز به روز)
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {editBuilderMode === "structured" ? (
                   // Everything below the title autosaves through
                   // WorkoutPlanBuilderController — there's nothing else for
                   // this form's submit to do.
                   <StructuredWorkoutBuilder assignmentId={editingPlan.id} />
-                ) : kind === "workout" ? (
-                  <WorkoutDayBuilder onInsertLine={handleInsertLine} />
                 ) : (
-                  <NutritionDayBuilder onInsertLine={handleInsertLine} />
-                )}
-
-                {editingPlan.builderMode !== "structured" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plan-description">
-                      توضیحات (اختیاری)
-                    </Label>
-                    <textarea
-                      id="edit-plan-description"
-                      rows={6}
-                      className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
-                      {...editForm.register("description")}
-                    />
-                    {kind === "workout" && (
-                      <p className="text-xs text-muted-foreground">
-                        اگر درمورد سیستم انجام دادن حرکات توضیحی دارید اضافه
-                        کنید، مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
-                      </p>
+                  <>
+                    {kind === "workout" && editTextMode === "picker" && (
+                      <WorkoutDayBuilder onInsertLine={handleInsertLine} />
                     )}
-                    {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
-                  </div>
+                    {kind === "nutrition" && (
+                      <NutritionDayBuilder onInsertLine={handleInsertLine} />
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-plan-description">
+                        توضیحات (اختیاری)
+                      </Label>
+                      <textarea
+                        id="edit-plan-description"
+                        rows={6}
+                        className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                        {...editForm.register("description")}
+                      />
+                      {kind === "workout" && (
+                        <p className="text-xs text-muted-foreground">
+                          اگر درمورد سیستم انجام دادن حرکات توضیحی دارید اضافه
+                          کنید، مثل انجام حرکت به شکل سوپر ست یا دراپ ست و ...
+                        </p>
+                      )}
+                      {kind === "workout" && editTextMode === "manual" && <PlanFormatHint />}
+                      {kind === "nutrition" && <NutritionFormatHint />}
+                    </div>
+                  </>
                 )}
 
                 <Button
@@ -420,9 +484,7 @@ export function PlanBrowser({
                   disabled={savePlan.isPending}
                 >
                   {savePlan.isPending && <Loader2 className="animate-spin" />}
-                  {editingPlan.builderMode === "structured"
-                    ? "ذخیره عنوان"
-                    : "ذخیره تغییرات"}
+                  {editBuilderMode === "structured" ? "ذخیره عنوان" : "ذخیره تغییرات"}
                 </Button>
               </form>
             </DialogContent>
