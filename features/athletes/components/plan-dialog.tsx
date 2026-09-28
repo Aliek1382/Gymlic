@@ -53,11 +53,18 @@ export function PlanDialog({
   const [open, setOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  // Workout-only choice, made once per plan: "structured" builds it from
-  // workout_plan_days (no free text at all); "text" is the classic
-  // description box. A resumed draft always keeps whichever mode it was
-  // started in — the two are never mixed on one assignment.
+  // Workout-only: "structured" builds the plan from workout_plan_days (no
+  // free text at all); "text" is the classic description box, written either
+  // through the picker or typed by hand. This only tracks which UI is
+  // showing right now — a trainer can flip between all three at any point
+  // while drafting and nothing already written is lost, since picker/manual
+  // both edit the same description field and a structured draft's rows live
+  // in the database, not in this component's state. The only one-way part is
+  // the server's: once the assignment actually has structured rows in it,
+  // its builder_mode is 'structured' for good (see the compatibility rule in
+  // PlanController) — the two are never mixed on one assignment.
   const [builderMode, setBuilderMode] = useState<"text" | "structured">("text");
+  const [textMode, setTextMode] = useState<"picker" | "manual">("picker");
   const [creatingStructuredDraft, setCreatingStructuredDraft] = useState(false);
   const plans = usePlans(kind, target, open);
   const savePlan = useSavePlan(kind, target);
@@ -177,6 +184,7 @@ export function PlanDialog({
       setHydrated(false);
       setDraftId(null);
       setBuilderMode("text");
+      setTextMode("picker");
       form.reset({ title: "", description: "" });
     }
   }
@@ -252,17 +260,31 @@ export function PlanDialog({
             )}
           </div>
 
-          {kind === "workout" && !draftId && (
+          {kind === "workout" && (
             <div className="space-y-1.5">
-              <Label>روش ساخت برنامه</Label>
-              <div className="flex gap-1.5">
+              <Label>روش نوشتن برنامه</Label>
+              <div className="flex flex-wrap gap-1.5">
                 <Button
                   type="button"
                   size="sm"
-                  variant={builderMode === "text" ? "default" : "outline"}
-                  onClick={() => setBuilderMode("text")}
+                  variant={builderMode === "text" && textMode === "picker" ? "default" : "outline"}
+                  onClick={() => {
+                    setBuilderMode("text");
+                    setTextMode("picker");
+                  }}
                 >
-                  نوشتن متنی
+                  نوشتن با انتخاب‌گر
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={builderMode === "text" && textMode === "manual" ? "default" : "outline"}
+                  onClick={() => {
+                    setBuilderMode("text");
+                    setTextMode("manual");
+                  }}
+                >
+                  تایپ دستی
                 </Button>
                 <Button
                   type="button"
@@ -291,24 +313,26 @@ export function PlanDialog({
                 شروع ساخت برنامه ساختاریافته
               </Button>
             )
-          ) : kind === "workout" ? (
-            <WorkoutDayBuilder onInsertLine={handleInsertLine} />
           ) : (
-            <NutritionDayBuilder onInsertLine={handleInsertLine} />
-          )}
+            <>
+              {kind === "workout" && textMode === "picker" && (
+                <WorkoutDayBuilder onInsertLine={handleInsertLine} />
+              )}
+              {kind === "nutrition" && <NutritionDayBuilder onInsertLine={handleInsertLine} />}
 
-          {!(kind === "workout" && builderMode === "structured") && (
-            <div className="space-y-2">
-              <Label htmlFor={`${kind}-description`}>توضیحات (اختیاری)</Label>
-              <textarea
-                id={`${kind}-description`}
-                rows={5}
-                placeholder={PLAN_DESCRIPTION_PLACEHOLDER[kind]}
-                className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
-                {...form.register("description")}
-              />
-              {kind === "workout" ? <PlanFormatHint /> : <NutritionFormatHint />}
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor={`${kind}-description`}>توضیحات (اختیاری)</Label>
+                <textarea
+                  id={`${kind}-description`}
+                  rows={5}
+                  placeholder={PLAN_DESCRIPTION_PLACEHOLDER[kind]}
+                  className="w-full rounded-xl border border-input bg-transparent px-4 py-2 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                  {...form.register("description")}
+                />
+                {kind === "workout" && textMode === "manual" && <PlanFormatHint />}
+                {kind === "nutrition" && <NutritionFormatHint />}
+              </div>
+            </>
           )}
 
           <div className="flex flex-col gap-2 sm:flex-row">
