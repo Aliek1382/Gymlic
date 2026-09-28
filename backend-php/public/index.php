@@ -16,6 +16,7 @@ spl_autoload_register(static function (string $class): void {
 use Gymlic\Controllers\AthleteController;
 use Gymlic\Controllers\AdminController;
 use Gymlic\Controllers\AuthController;
+use Gymlic\Controllers\CalendarController;
 use Gymlic\Controllers\DashboardController;
 use Gymlic\Controllers\EarningsController;
 use Gymlic\Controllers\ReportController;
@@ -120,6 +121,11 @@ $router->get('/session-packages', fn () => SessionPackageController::list());
 $router->get('/session-packages/mine', fn () => SessionPackageController::listMine());
 $router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
 $router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
+
+$router->get('/calendar/events', fn () => CalendarController::list());
+$router->post('/calendar/events', fn () => CalendarController::create());
+$router->patch('/calendar/events/{id}', fn (array $p) => CalendarController::update($p));
+$router->delete('/calendar/events/{id}', fn (array $p) => CalendarController::remove($p));
 
 $router->get('/plans/{kind}', fn (array $p) => PlanController::list($p));
 $router->get('/plans/{kind}/mine', fn (array $p) => PlanController::listMine($p));

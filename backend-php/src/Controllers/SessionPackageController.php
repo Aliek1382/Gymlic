@@ -245,6 +245,9 @@ final class SessionPackageController
                        )"
                 )->execute(['id' => $package['id'], 'package_id' => $package['id']]);
             }
+
+            // Same transaction, so the calendar never shows a session the table no longer agrees with.
+            CalendarController::syncSessionEvent($session['id']);
             $pdo->commit();
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
