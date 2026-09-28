@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
+import { LockedPlanCard } from "@/features/invoices/components/locked-plan-card";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
@@ -108,14 +109,18 @@ export function MyPlanList({
                 {formatPersianDate(new Date(plan.assignedAt))}
               </p>
             </div>
-            <PlanSections
-              planId={plan.id}
-              description={plan.description}
-              kind={kind}
-              isActivePlan={plan.id === latestPlanId}
-              dayLogging={kind === "workout"}
-              builderMode={plan.builderMode}
-            />
+            {plan.locked && plan.invoice ? (
+              <LockedPlanCard invoice={plan.invoice} />
+            ) : (
+              <PlanSections
+                planId={plan.id}
+                description={plan.description}
+                kind={kind}
+                isActivePlan={plan.id === latestPlanId}
+                dayLogging={kind === "workout"}
+                builderMode={plan.builderMode}
+              />
+            )}
             <div className="flex flex-wrap items-center gap-2">
               {plan.id === latestPlanId && (
                 <Badge variant="info">آخرین برنامه</Badge>
@@ -123,7 +128,8 @@ export function MyPlanList({
               {plan.status === "completed" && (
                 <Badge variant="success">تکمیل‌شده</Badge>
               )}
-              {plan.status === "active" && (
+              {plan.locked && <Badge variant="warning">قفل تا پرداخت</Badge>}
+              {plan.status === "active" && !plan.locked && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -134,6 +140,7 @@ export function MyPlanList({
                   این برنامه تمام شد
                 </Button>
               )}
+              {!plan.locked && (
               <Button
                 size="sm"
                 variant="outline"
@@ -158,6 +165,7 @@ export function MyPlanList({
                 <Download />
                 دانلود PDF
               </Button>
+              )}
             </div>
             <CollapsibleSection title="گفتگو درباره این برنامه">
               <PlanComments

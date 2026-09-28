@@ -115,6 +115,8 @@ export interface AthletePlanSummary {
   // Only meaningfully "structured" for the workout card; the nutrition card
   // always reads "text" since nutrition plans never gained the builder.
   builderMode: "text" | "structured";
+  // A pending invoice withholds the plan's content; only the amount is sent.
+  invoice: { id: string; number: string; amountToman: number } | null;
 }
 
 export interface AthleteDashboardData {

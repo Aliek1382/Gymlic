@@ -4,6 +4,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { formatPersianDate } from "@/lib/persian";
 import { PlanSections } from "@/features/athletes";
 import type { PlanKind } from "@/features/athletes";
+import { LockedPlanCard } from "@/features/invoices/components/locked-plan-card";
 import { EmptyState } from "../shared/empty-state";
 import type { AthletePlanSummary } from "../../types/dashboard-types";
 
@@ -47,14 +48,18 @@ export function PlanSummaryCard({
                 </p>
               </div>
             </div>
-            <PlanSections
-              planId={plan.id}
-              description={plan.description}
-              kind={planKind}
-              isActivePlan
-              dayLogging={planKind === "workout"}
-              builderMode={plan.builderMode}
-            />
+            {plan.invoice ? (
+              <LockedPlanCard invoice={plan.invoice} />
+            ) : (
+              <PlanSections
+                planId={plan.id}
+                description={plan.description}
+                kind={planKind}
+                isActivePlan
+                dayLogging={planKind === "workout"}
+                builderMode={plan.builderMode}
+              />
+            )}
           </div>
         )}
       </div>

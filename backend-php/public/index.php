@@ -24,6 +24,7 @@ use Gymlic\Controllers\ClubController;
 use Gymlic\Controllers\LibraryController;
 use Gymlic\Controllers\MemberController;
 use Gymlic\Controllers\MessageController;
+use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
@@ -106,6 +107,12 @@ $router->get('/athlete-invites', fn () => AthleteController::listInvites());
 $router->post('/athlete-invites', fn () => AthleteController::createInvite());
 $router->post('/athlete-invites/{id}/revoke', fn (array $p) => AthleteController::revokeInvite($p));
 $router->get('/trainer/club', fn () => AthleteController::club());
+
+$router->post('/invoices', fn () => InvoiceController::create());
+$router->get('/invoices', fn () => InvoiceController::list());
+$router->get('/invoices/mine', fn () => InvoiceController::listMine());
+$router->patch('/invoices/{id}/mark-paid', fn (array $p) => InvoiceController::markPaid($p));
+$router->patch('/invoices/{id}/cancel', fn (array $p) => InvoiceController::cancel($p));
 
 $router->get('/plans/{kind}', fn (array $p) => PlanController::list($p));
 $router->get('/plans/{kind}/mine', fn (array $p) => PlanController::listMine($p));

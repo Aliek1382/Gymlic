@@ -30,7 +30,8 @@ final class DashboardController
                  ORDER BY assigned_at DESC LIMIT 1"
             );
             $stmt->execute(['athlete_id' => $user['id']]);
-            $payload[$key] = $stmt->fetch() ?: null;
+            $row = $stmt->fetch() ?: null;
+            $payload[$key] = $row === null ? null : PlanController::lockForAthlete($kind, [$row])[0];
         }
 
         Response::ok($payload);
