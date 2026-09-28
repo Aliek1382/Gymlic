@@ -1,4 +1,4 @@
-export type InvoiceItemType = "workout_plan" | "nutrition_plan";
+export type InvoiceItemType = "workout_plan" | "nutrition_plan" | "session_package";
 export type InvoiceStatus = "pending" | "paid" | "cancelled";
 // 'online' is reserved for a future payment gateway; nothing writes it yet.
 export type InvoicePaymentMethod = "cash" | "card_transfer" | "online";

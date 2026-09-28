@@ -13,9 +13,11 @@ use Gymlic\Validate;
 
 /**
  * A trainer's bill to one athlete for one plan (workout_assignments /
- * nutrition_assignments). item_id is polymorphic across those two tables, so
- * there is no FK on it — ownership is checked here instead. A pending invoice
- * locks the plan's content for the athlete (see PlanController).
+ * nutrition_assignments) or one session package (session_packages). item_id is
+ * polymorphic across those tables, so there is no FK on it — ownership is
+ * checked here instead. A pending invoice locks a plan's content for the
+ * athlete (see PlanController); settling a session_package invoice activates
+ * the package (see SessionPackageController::activate).
  *
  * Not to be confused with payment_requests (an athlete paying their club),
  * revenue_entries (the club's manual ledger) or plans (Gymlic's own pricing).
@@ -84,19 +86,8 @@ final class InvoiceController
                  WHERE id = :id AND status = 'cancelled'"
             )->execute(['amount' => $amount, 'id' => $id]);
         } else {
-            $id = Uuid::v4();
             try {
-                $pdo->prepare(
-                    "INSERT INTO invoices (id, trainer_id, athlete_id, item_type, item_id, amount_toman)
-                     VALUES (:id, :trainer_id, :athlete_id, :item_type, :item_id, :amount)"
-                )->execute([
-                    'id'         => $id,
-                    'trainer_id' => $user['id'],
-                    'athlete_id' => $plan['athlete_id'],
-                    'item_type'  => $itemType,
-                    'item_id'    => $itemId,
-                    'amount'     => $amount,
-                ]);
+                $id = self::issue($user['id'], $plan['athlete_id'], $itemType, $itemId, $amount);
             } catch (\PDOException $e) {
                 // Two clicks racing past the check above.
                 if ($e->getCode() === '23000') {
@@ -166,28 +157,48 @@ final class InvoiceController
         }
 
         $pdo = Database::connection();
-        $stmt = $pdo->prepare(
-            "UPDATE invoices SET status = 'paid', payment_method = :method, note = :note, paid_at = NOW()
-             WHERE id = :id AND status = 'pending'"
-        );
-        $stmt->execute([
-            'method' => $method,
-            'note'   => Validate::nullableString(isset($data['note']) ? (string) $data['note'] : null),
-            'id'     => $invoice['id'],
-        ]);
+        // Settling and activating a session package are one step: a paid
+        // invoice with no sessions behind it would leave the athlete stuck.
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare(
+                "UPDATE invoices SET status = 'paid', payment_method = :method, note = :note, paid_at = NOW()
+                 WHERE id = :id AND status = 'pending'"
+            );
+            $stmt->execute([
+                'method' => $method,
+                'note'   => Validate::nullableString(isset($data['note']) ? (string) $data['note'] : null),
+                'id'     => $invoice['id'],
+            ]);
 
-        if ($stmt->rowCount() === 0) {
-            Response::error(409, 'not_pending', 'Only a pending invoice can be marked paid.');
-            return;
+            if ($stmt->rowCount() === 0) {
+                $pdo->rollBack();
+                Response::error(409, 'not_pending', 'Only a pending invoice can be marked paid.');
+                return;
+            }
+
+            if ($invoice['item_type'] === 'session_package') {
+                SessionPackageController::activate($invoice['item_id']);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
 
+        $isPackage = $invoice['item_type'] === 'session_package';
         AuthController::notify(
             $pdo,
             $invoice['athlete_id'],
             $user['id'],
             'invoice_paid',
             'پرداخت شما تایید شد',
-            'پرداخت شما ثبت شد و برنامه اکنون برای شما باز است.',
+            $isPackage
+                ? 'پرداخت شما ثبت شد و پکیج جلسات خصوصی شما فعال است.'
+                : 'پرداخت شما ثبت شد و برنامه اکنون برای شما باز است.',
             self::linkFor($invoice['item_type']),
             ['invoice_id' => $invoice['id']]
         );
@@ -201,17 +212,56 @@ final class InvoiceController
         $invoice = self::invoiceOr404($params['id']);
         Acl::require($invoice['trainer_id'] === $user['id'], 'Only the invoicing trainer can cancel it.');
 
-        $stmt = Database::connection()->prepare(
-            "UPDATE invoices SET status = 'cancelled' WHERE id = :id AND status = 'pending'"
-        );
-        $stmt->execute(['id' => $invoice['id']]);
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare("UPDATE invoices SET status = 'cancelled' WHERE id = :id AND status = 'pending'");
+            $stmt->execute(['id' => $invoice['id']]);
 
-        if ($stmt->rowCount() === 0) {
-            Response::error(409, 'not_pending', 'Only a pending invoice can be cancelled.');
-            return;
+            if ($stmt->rowCount() === 0) {
+                $pdo->rollBack();
+                Response::error(409, 'not_pending', 'Only a pending invoice can be cancelled.');
+                return;
+            }
+
+            // An unpaid package has nothing left to wait for once its bill is void.
+            if ($invoice['item_type'] === 'session_package') {
+                SessionPackageController::cancelUnpaid($invoice['item_id']);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
 
         Response::ok(['ok' => true]);
+    }
+
+    /**
+     * Inserts a pending invoice and returns its id. Callers own the checks
+     * (who may bill whom, for what) — this only writes the row, so anything
+     * that sells something billable can issue an invoice without copying the
+     * INSERT. Throws PDOException (SQLSTATE 23000) if the item already has one.
+     */
+    public static function issue(string $trainerId, string $athleteId, string $itemType, string $itemId, int $amount): string
+    {
+        $id = Uuid::v4();
+        Database::connection()->prepare(
+            "INSERT INTO invoices (id, trainer_id, athlete_id, item_type, item_id, amount_toman)
+             VALUES (:id, :trainer_id, :athlete_id, :item_type, :item_id, :amount)"
+        )->execute([
+            'id'         => $id,
+            'trainer_id' => $trainerId,
+            'athlete_id' => $athleteId,
+            'item_type'  => $itemType,
+            'item_id'    => $itemId,
+            'amount'     => $amount,
+        ]);
+
+        return $id;
     }
 
     /** Whether a pending invoice currently locks this plan for its athlete. */
@@ -266,18 +316,23 @@ final class InvoiceController
 
     private static function linkFor(string $itemType): string
     {
-        return $itemType === 'nutrition_plan' ? '/nutrition' : '/workout';
+        return match ($itemType) {
+            'nutrition_plan'  => '/nutrition',
+            'session_package' => '/session-packages',
+            default           => '/workout',
+        };
     }
 
     private static function listSql(): string
     {
         return 'SELECT ' . self::SELECT . ",
-                       COALESCE(wa.title, na.title) AS item_title,
+                       COALESCE(wa.title, na.title, sp.title) AS item_title,
                        ap.first_name AS athlete_first_name, ap.last_name AS athlete_last_name
                 FROM invoices i
                 JOIN profiles ap ON ap.id = i.athlete_id
                 LEFT JOIN workout_assignments wa ON i.item_type = 'workout_plan' AND wa.id = i.item_id
-                LEFT JOIN nutrition_assignments na ON i.item_type = 'nutrition_plan' AND na.id = i.item_id";
+                LEFT JOIN nutrition_assignments na ON i.item_type = 'nutrition_plan' AND na.id = i.item_id
+                LEFT JOIN session_packages sp ON i.item_type = 'session_package' AND sp.id = i.item_id";
     }
 
     private static function present(array $rows): array
@@ -303,7 +358,7 @@ final class InvoiceController
     private static function invoiceOr404(string $id): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT id, trainer_id, athlete_id, item_type, status FROM invoices WHERE id = :id'
+            'SELECT id, trainer_id, athlete_id, item_type, item_id, status FROM invoices WHERE id = :id'
         );
         $stmt->execute(['id' => $id]);
         $invoice = $stmt->fetch();

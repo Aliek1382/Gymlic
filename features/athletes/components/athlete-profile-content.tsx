@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatAge, formatPersianDate } from "@/lib/persian";
+import { SessionPackagesPanel } from "@/features/session-packages";
 import { ProgressPageContent } from "@/features/progress/components/progress-page-content";
 import { useAthleteProfile } from "../hooks/use-athlete-profile";
 import { useRemoveAthlete } from "../hooks/use-remove-athlete";
@@ -91,6 +92,8 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
       </Card>
 
       <AthleteProfileNote athleteId={athleteId} initialNote={athlete.note} />
+
+      <SessionPackagesPanel athleteId={athleteId} />
 
       <ProgressPageContent athleteId={athleteId} />
     </div>

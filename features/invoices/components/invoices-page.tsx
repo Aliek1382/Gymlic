@@ -17,7 +17,7 @@ import {
 import { formatNumber, formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
-import { INVOICE_STATUS_LABEL, PAYMENT_METHOD_LABEL } from "../constants";
+import { INVOICE_ITEM_LABEL, INVOICE_STATUS_LABEL, PAYMENT_METHOD_LABEL } from "../constants";
 import { useInvoices } from "../hooks/use-invoices";
 import type { InvoiceStatus } from "../types/invoice-types";
 
@@ -46,8 +46,8 @@ export function InvoicesPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">فاکتورهای من</h1>
           <p className="text-sm text-muted-foreground">
-            فاکتورهایی که برای برنامه‌های ورزشکاران خود صادر کرده‌اید. پرداخت هر فاکتور را از صفحه
-            برنامه‌ها ثبت کنید.
+            فاکتورهایی که برای برنامه‌ها و پکیج‌های جلسه‌ی ورزشکاران خود صادر کرده‌اید. پرداخت
+            هر فاکتور را از صفحه برنامه‌ها یا صفحه‌ی همان ورزشکار ثبت کنید.
           </p>
         </div>
 
@@ -106,7 +106,7 @@ export function InvoicesPage() {
                       {row.itemTitle ?? "—"}
                       <span className="text-xs text-muted-foreground">
                         {" "}
-                        · {row.itemType === "workout_plan" ? "تمرینی" : "غذایی"}
+                        · {INVOICE_ITEM_LABEL[row.itemType]}
                       </span>
                     </TableCell>
                     <TableCell>{formatNumber(row.amountToman)}</TableCell>

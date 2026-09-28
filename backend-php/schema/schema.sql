@@ -494,16 +494,16 @@ CREATE TABLE trainer_payments (
 -- =========================================================================
 -- invoices: a trainer's bill to one athlete for one plan. A pending invoice
 -- locks that plan's content for the athlete until the trainer records the
--- payment. item_id is polymorphic (workout_assignments.id or
--- nutrition_assignments.id), so it carries no FK.
+-- payment. item_id is polymorphic (workout_assignments.id,
+-- nutrition_assignments.id or session_packages.id), so it carries no FK.
 -- =========================================================================
 CREATE TABLE invoices (
   id             CHAR(36) NOT NULL PRIMARY KEY,
   trainer_id     CHAR(36) NOT NULL,
   athlete_id     CHAR(36) NOT NULL,
-  item_type      ENUM('workout_plan','nutrition_plan') NOT NULL,
-  item_id        CHAR(36) NOT NULL,   -- workout_assignments.id or nutrition_assignments.id
-                                      -- (polymorphic across two tables, so no real FK)
+  item_type      ENUM('workout_plan','nutrition_plan','session_package') NOT NULL,
+  item_id        CHAR(36) NOT NULL,   -- workout_assignments.id, nutrition_assignments.id or
+                                      -- session_packages.id (polymorphic, so no real FK)
   amount_toman   BIGINT NOT NULL,
   status         ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
   payment_method ENUM('cash','card_transfer','online') NULL,
@@ -517,6 +517,48 @@ CREATE TABLE invoices (
   CONSTRAINT fk_invoices_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_invoices_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT chk_invoices_amount CHECK (amount_toman > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- session_packages: a block of N private sessions a trainer sells one athlete.
+-- Selling it issues an invoice; settling that invoice flips it to 'active' and
+-- creates its package_sessions rows. Unrelated to class_attendance_logs (a
+-- club's class attendance).
+-- =========================================================================
+CREATE TABLE session_packages (
+  id              CHAR(36) NOT NULL PRIMARY KEY,
+  trainer_id      CHAR(36) NOT NULL,
+  athlete_id      CHAR(36) NOT NULL,
+  title           VARCHAR(255) NOT NULL,
+  total_sessions  INT NOT NULL,
+  price_toman     BIGINT NOT NULL,
+  discount_toman  BIGINT NOT NULL DEFAULT 0,
+  status          ENUM('pending_payment','active','completed','cancelled') NOT NULL DEFAULT 'pending_payment',
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_sp_trainer (trainer_id, created_at DESC),
+  KEY idx_sp_athlete (athlete_id, status),
+  CONSTRAINT fk_sp_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sp_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT chk_sp_total CHECK (total_sessions > 0),
+  CONSTRAINT chk_sp_price CHECK (price_toman >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- package_sessions: one row per session of a package. Named so it can't be
+-- confused with `sessions` below (login tokens). scheduled_at stays NULL until
+-- the trainer plans it, and is the column a future calendar reads.
+-- =========================================================================
+CREATE TABLE package_sessions (
+  id           CHAR(36) NOT NULL PRIMARY KEY,
+  package_id   CHAR(36) NOT NULL,
+  scheduled_at DATETIME NULL,
+  status       ENUM('unscheduled','scheduled','done','canceled') NOT NULL DEFAULT 'unscheduled',
+  note         VARCHAR(500) NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_package_sessions_package (package_id, scheduled_at),
+  CONSTRAINT fk_package_sessions_package FOREIGN KEY (package_id) REFERENCES session_packages(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
