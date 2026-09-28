@@ -26,6 +26,7 @@ use Gymlic\Controllers\MemberController;
 use Gymlic\Controllers\MessageController;
 use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\PlanController;
+use Gymlic\Controllers\SessionPackageController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
@@ -113,6 +114,12 @@ $router->get('/invoices', fn () => InvoiceController::list());
 $router->get('/invoices/mine', fn () => InvoiceController::listMine());
 $router->patch('/invoices/{id}/mark-paid', fn (array $p) => InvoiceController::markPaid($p));
 $router->patch('/invoices/{id}/cancel', fn (array $p) => InvoiceController::cancel($p));
+
+$router->post('/session-packages', fn () => SessionPackageController::create());
+$router->get('/session-packages', fn () => SessionPackageController::list());
+$router->get('/session-packages/mine', fn () => SessionPackageController::listMine());
+$router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
+$router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
 
 $router->get('/plans/{kind}', fn (array $p) => PlanController::list($p));
 $router->get('/plans/{kind}/mine', fn (array $p) => PlanController::listMine($p));

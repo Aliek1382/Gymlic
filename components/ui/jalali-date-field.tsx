@@ -20,19 +20,27 @@ import { parseIsoDate } from "@/lib/iso-date";
 
 // A payment or a revenue entry is recorded when it happens, or shortly
 // after — the settings BirthDatePicker's 90-year list would be the wrong
-// tool here, so this offers the current Jalali year and the two before it.
-const SELECTABLE_YEARS = 3;
+// tool here, so by default this offers the current Jalali year and the two
+// before it. A field for something still to come (a planned session) asks
+// for years ahead instead.
+const DEFAULT_PAST_YEARS = 3;
 
 export function JalaliDateField({
   id,
   label,
   value,
   onChange,
+  pastYears = DEFAULT_PAST_YEARS,
+  futureYears = 0,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  /** How many years, counting the current one, to offer up to today. */
+  pastYears?: number;
+  /** How many years after the current one to offer. */
+  futureYears?: number;
 }) {
   // Parsed as a local calendar day so Intl reads back the same Jalali date
   // the trainer picked, whatever their timezone.
@@ -40,8 +48,8 @@ export function JalaliDateField({
 
   const currentYear = getCurrentJalaliYear();
   const recentYears = Array.from(
-    { length: SELECTABLE_YEARS },
-    (_, i) => currentYear - i
+    { length: pastYears + futureYears },
+    (_, i) => currentYear + futureYears - i
   );
   // A stored date outside that window still has to appear in the list, or
   // editing an older payment would silently move it to a year in range.
