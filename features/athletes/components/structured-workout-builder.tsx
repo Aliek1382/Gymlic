@@ -65,6 +65,25 @@ function parseOptionalFloat(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// A label sitting above the field, not just inside it as a placeholder — a
+// placeholder disappears the moment a trainer types a value, so "ست" or
+// "تکرار" would otherwise vanish right when the field is at its narrowest
+// and hardest to guess from the number alone.
+function LabeledField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="truncate text-[11px] text-muted-foreground">{label}</p>
+      {children}
+    </div>
+  );
+}
+
 function ExerciseRow({
   assignmentId,
   dayId,
@@ -124,63 +143,73 @@ function ExerciseRow({
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Input
-          value={sets}
-          onChange={(e) => {
-            setSets(e.target.value);
-            save({ dayId, exerciseRowId: exercise.id, sets: parseOptionalInt(e.target.value) });
-          }}
-          inputMode="numeric"
-          placeholder="ست"
-          className="text-center"
-        />
-        <Input
-          value={reps}
-          onChange={(e) => {
-            setReps(e.target.value);
-            save({ dayId, exerciseRowId: exercise.id, reps: e.target.value || null });
-          }}
-          placeholder="تکرار (مثلا 12-10-8)"
-          className="text-center"
-        />
-        <Input
-          value={weightKg}
-          onChange={(e) => {
-            setWeightKg(e.target.value);
-            save({
-              dayId,
-              exerciseRowId: exercise.id,
-              weightKg: parseOptionalFloat(e.target.value),
-            });
-          }}
-          inputMode="decimal"
-          placeholder="وزن (کیلوگرم)"
-          className="text-center"
-        />
-        <Input
-          value={restSeconds}
-          onChange={(e) => {
-            setRestSeconds(e.target.value);
-            save({
-              dayId,
-              exerciseRowId: exercise.id,
-              restSeconds: parseOptionalInt(e.target.value),
-            });
-          }}
-          inputMode="numeric"
-          placeholder="استراحت (ثانیه)"
-          className="text-center"
-        />
+        <LabeledField label="ست">
+          <Input
+            value={sets}
+            onChange={(e) => {
+              setSets(e.target.value);
+              save({ dayId, exerciseRowId: exercise.id, sets: parseOptionalInt(e.target.value) });
+            }}
+            inputMode="numeric"
+            placeholder="مثلا 4"
+            className="text-center"
+          />
+        </LabeledField>
+        <LabeledField label="تکرار">
+          <Input
+            value={reps}
+            onChange={(e) => {
+              setReps(e.target.value);
+              save({ dayId, exerciseRowId: exercise.id, reps: e.target.value || null });
+            }}
+            placeholder="مثلا 12-10-8"
+            className="text-center"
+          />
+        </LabeledField>
+        <LabeledField label="وزن (کیلوگرم)">
+          <Input
+            value={weightKg}
+            onChange={(e) => {
+              setWeightKg(e.target.value);
+              save({
+                dayId,
+                exerciseRowId: exercise.id,
+                weightKg: parseOptionalFloat(e.target.value),
+              });
+            }}
+            inputMode="decimal"
+            placeholder="مثلا 40"
+            className="text-center"
+          />
+        </LabeledField>
+        <LabeledField label="استراحت (ثانیه)">
+          <Input
+            value={restSeconds}
+            onChange={(e) => {
+              setRestSeconds(e.target.value);
+              save({
+                dayId,
+                exerciseRowId: exercise.id,
+                restSeconds: parseOptionalInt(e.target.value),
+              });
+            }}
+            inputMode="numeric"
+            placeholder="مثلا 60"
+            className="text-center"
+          />
+        </LabeledField>
       </div>
 
-      <Input
-        value={note}
-        onChange={(e) => {
-          setNote(e.target.value);
-          save({ dayId, exerciseRowId: exercise.id, note: e.target.value || null });
-        }}
-        placeholder="یادداشت (مثلا سوپرست با حرکت بعدی)"
-      />
+      <LabeledField label="یادداشت">
+        <Input
+          value={note}
+          onChange={(e) => {
+            setNote(e.target.value);
+            save({ dayId, exerciseRowId: exercise.id, note: e.target.value || null });
+          }}
+          placeholder="مثلا سوپرست با حرکت بعدی"
+        />
+      </LabeledField>
     </div>
   );
 }
@@ -241,33 +270,41 @@ function AddExerciseForm({ assignmentId, dayId }: { assignmentId: string; dayId:
       </Select>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Input
-          value={sets}
-          onChange={(e) => setSets(e.target.value)}
-          inputMode="numeric"
-          placeholder="ست"
-          className="text-center"
-        />
-        <Input
-          value={reps}
-          onChange={(e) => setReps(e.target.value)}
-          placeholder="تکرار"
-          className="text-center"
-        />
-        <Input
-          value={weightKg}
-          onChange={(e) => setWeightKg(e.target.value)}
-          inputMode="decimal"
-          placeholder="وزن (کیلوگرم)"
-          className="text-center"
-        />
-        <Input
-          value={restSeconds}
-          onChange={(e) => setRestSeconds(e.target.value)}
-          inputMode="numeric"
-          placeholder="استراحت (ثانیه)"
-          className="text-center"
-        />
+        <LabeledField label="ست">
+          <Input
+            value={sets}
+            onChange={(e) => setSets(e.target.value)}
+            inputMode="numeric"
+            placeholder="مثلا 4"
+            className="text-center"
+          />
+        </LabeledField>
+        <LabeledField label="تکرار">
+          <Input
+            value={reps}
+            onChange={(e) => setReps(e.target.value)}
+            placeholder="مثلا 12-10-8"
+            className="text-center"
+          />
+        </LabeledField>
+        <LabeledField label="وزن (کیلوگرم)">
+          <Input
+            value={weightKg}
+            onChange={(e) => setWeightKg(e.target.value)}
+            inputMode="decimal"
+            placeholder="مثلا 40"
+            className="text-center"
+          />
+        </LabeledField>
+        <LabeledField label="استراحت (ثانیه)">
+          <Input
+            value={restSeconds}
+            onChange={(e) => setRestSeconds(e.target.value)}
+            inputMode="numeric"
+            placeholder="مثلا 60"
+            className="text-center"
+          />
+        </LabeledField>
       </div>
 
       <Button
