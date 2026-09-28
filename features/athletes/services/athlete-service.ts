@@ -1,3 +1,4 @@
+import type { PlanInvoiceSummary } from "@/features/invoices/types/invoice-types";
 import { api, fullName, query, type ListResponse } from "@/lib/api/client";
 import type {
   AthleteProfile,
@@ -152,6 +153,11 @@ export interface PlanEntry {
   // builder — nutrition plans (and every workout plan written before it
   // existed) are "text", read straight from `description`.
   builderMode: "text" | "structured";
+  // Set by the API when a pending invoice locks the plan: for an athlete the
+  // content is withheld (description is null) and this says what is owed; for
+  // the trainer the content is intact and this only flags the lock.
+  locked: boolean;
+  invoice: PlanInvoiceSummary | null;
 }
 
 interface PlanRow {
@@ -161,6 +167,8 @@ interface PlanRow {
   status: PlanEntry["status"];
   assigned_at: string;
   builder_mode?: "text" | "structured";
+  locked?: boolean;
+  invoice?: { id: string; number: string; amount_toman: number };
 }
 
 function toPlanEntry(row: PlanRow): PlanEntry {
@@ -171,6 +179,10 @@ function toPlanEntry(row: PlanRow): PlanEntry {
     status: row.status,
     assignedAt: row.assigned_at,
     builderMode: row.builder_mode ?? "text",
+    locked: row.locked ?? false,
+    invoice: row.invoice
+      ? { id: row.invoice.id, number: row.invoice.number, amountToman: row.invoice.amount_toman }
+      : null,
   };
 }
 

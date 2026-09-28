@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   LineChart,
   MessageCircle,
+  Receipt,
   Ruler,
   Salad,
   Settings,
@@ -72,6 +73,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
       icon: Wallet,
       description:
         "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
+    },
+    {
+      label: "فاکتورهای من",
+      href: "/invoices",
+      icon: Receipt,
+      description:
+        "فاکتورهایی که برای برنامه‌های ورزشکاران صادر کرده‌اید و وضعیت پرداخت هرکدام.",
     },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },

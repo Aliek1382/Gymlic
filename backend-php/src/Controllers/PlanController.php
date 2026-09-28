@@ -40,7 +40,19 @@ final class PlanController
         );
         $stmt->execute(['trainer_id' => $user['id'], 'target' => $athleteId ?? $invitationId]);
 
-        Response::ok(['items' => $stmt->fetchAll()]);
+        // The trainer always sees the full plan; a pending invoice only adds
+        // the locked flag so their screen can badge it.
+        $items = $stmt->fetchAll();
+        $pending = InvoiceController::pendingByItem(InvoiceController::itemTypeFor($params['kind']), array_column($items, 'id'));
+        foreach ($items as &$item) {
+            if (isset($pending[$item['id']])) {
+                $item['locked'] = true;
+                $item['invoice'] = $pending[$item['id']];
+            }
+        }
+        unset($item);
+
+        Response::ok(['items' => $items]);
     }
 
     /** The athlete's own plans. Drafts stay hidden — the trainer hasn't sent them. */
@@ -56,7 +68,9 @@ final class PlanController
         );
         $stmt->execute(['athlete_id' => $user['id']]);
 
-        Response::ok(['items' => $stmt->fetchAll()]);
+        $items = self::lockForAthlete($params['kind'], $stmt->fetchAll());
+
+        Response::ok(['items' => $items]);
     }
 
     public static function get(array $params): void
@@ -70,7 +84,43 @@ final class PlanController
             return;
         }
 
+        // Only the plan's own athlete is locked out — its trainer, a club
+        // manager and platform admins always see the whole plan.
+        if ($plan['athlete_id'] === $user['id'] && $plan['trainer_id'] !== $user['id']) {
+            [$plan] = self::lockForAthlete($params['kind'], [$plan]);
+        }
+
         Response::ok($plan);
+    }
+
+    /**
+     * Strips the content of any plan with a pending invoice and says why, so
+     * the athlete sees the amount instead. A plan with no invoice, or a paid or
+     * cancelled one, passes through untouched. Shared with the athlete dashboard.
+     *
+     * @param array<int, array<string, mixed>> $plans rows with at least `id`
+     * @return array<int, array<string, mixed>>
+     */
+    public static function lockForAthlete(string $kind, array $plans): array
+    {
+        $pending = InvoiceController::pendingByItem(InvoiceController::itemTypeFor($kind), array_column($plans, 'id'));
+        if ($pending === []) {
+            return $plans;
+        }
+
+        foreach ($plans as &$plan) {
+            if (!isset($pending[$plan['id']])) {
+                continue;
+            }
+            // builder_mode is dropped too: 'structured' would make the client
+            // fetch days it must not show.
+            unset($plan['description'], $plan['builder_mode']);
+            $plan['locked'] = true;
+            $plan['invoice'] = $pending[$plan['id']];
+        }
+        unset($plan);
+
+        return $plans;
     }
 
     public static function save(array $params): void

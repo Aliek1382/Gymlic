@@ -492,6 +492,34 @@ CREATE TABLE trainer_payments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
+-- invoices: a trainer's bill to one athlete for one plan. A pending invoice
+-- locks that plan's content for the athlete until the trainer records the
+-- payment. item_id is polymorphic (workout_assignments.id or
+-- nutrition_assignments.id), so it carries no FK.
+-- =========================================================================
+CREATE TABLE invoices (
+  id             CHAR(36) NOT NULL PRIMARY KEY,
+  trainer_id     CHAR(36) NOT NULL,
+  athlete_id     CHAR(36) NOT NULL,
+  item_type      ENUM('workout_plan','nutrition_plan') NOT NULL,
+  item_id        CHAR(36) NOT NULL,   -- workout_assignments.id or nutrition_assignments.id
+                                      -- (polymorphic across two tables, so no real FK)
+  amount_toman   BIGINT NOT NULL,
+  status         ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
+  payment_method ENUM('cash','card_transfer','online') NULL,
+  note           TEXT NULL,
+  paid_at        DATETIME NULL,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_invoices_item (item_type, item_id),   -- one invoice row per plan
+  KEY idx_invoices_trainer (trainer_id, created_at DESC),
+  KEY idx_invoices_athlete (athlete_id, status),
+  CONSTRAINT fk_invoices_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_invoices_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT chk_invoices_amount CHECK (amount_toman > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
 -- sessions (new: replaces Supabase's client-managed JWT with a server-side session)
 -- =========================================================================
 CREATE TABLE sessions (

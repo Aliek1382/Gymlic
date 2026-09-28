@@ -41,6 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
+import { PlanInvoicePanel } from "@/features/invoices/components/plan-invoice-panel";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { ATHLETE_SORT_LABEL, type AthleteSortOrder } from "../constants/athletes";
@@ -263,6 +264,7 @@ export function PlanBrowser({
                     {plan.status === "draft" && (
                       <Badge variant="warning">پیش‌نویس</Badge>
                     )}
+                    {plan.locked && <Badge variant="warning">قفل تا پرداخت</Badge>}
                     {plan.status === "completed" && (
                       <Badge variant="success">تکمیل‌شده</Badge>
                     )}
@@ -318,6 +320,13 @@ export function PlanBrowser({
                 kind={kind}
                 builderMode={selectedPlan.builderMode}
               />
+              {selectedAthlete && (
+                <PlanInvoicePanel
+                  kind={kind}
+                  planId={selectedPlan.id}
+                  athleteId={selectedAthlete.id}
+                />
+              )}
               <Button
                 type="button"
                 size="sm"

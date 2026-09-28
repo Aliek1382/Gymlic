@@ -7,6 +7,8 @@ interface PlanRow {
   description: string | null;
   assigned_at: string;
   builder_mode?: "text" | "structured";
+  locked?: boolean;
+  invoice?: { id: string; number: string; amount_toman: number };
 }
 
 function mapPlan(row: PlanRow | null): AthletePlanSummary | null {
@@ -18,6 +20,10 @@ function mapPlan(row: PlanRow | null): AthletePlanSummary | null {
     description: row.description,
     assignedAt: row.assigned_at,
     builderMode: row.builder_mode ?? "text",
+    invoice:
+      row.locked && row.invoice
+        ? { id: row.invoice.id, number: row.invoice.number, amountToman: row.invoice.amount_toman }
+        : null,
   };
 }
 
