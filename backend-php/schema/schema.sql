@@ -562,6 +562,33 @@ CREATE TABLE package_sessions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
+-- calendar_events: the trainer's month calendar. 'manual' rows are typed in;
+-- 'auto' rows mirror a dated package_sessions row (source_type = 'session',
+-- source_id = package_sessions.id — a logical reference, no FK) and are kept
+-- in step by CalendarController::syncSessionEvent. recurrence_rule is PHP
+-- weekday numbers, 0 = Sunday ("1,3,5"); it is expanded per request, not stored.
+-- =========================================================================
+CREATE TABLE calendar_events (
+  id               CHAR(36) NOT NULL PRIMARY KEY,
+  trainer_id       CHAR(36) NOT NULL,
+  athlete_id       CHAR(36) NULL,
+  title            VARCHAR(255) NOT NULL,
+  event_date       DATE NOT NULL,
+  start_time       TIME NULL,
+  recurrence_rule  VARCHAR(100) NULL,
+  recurrence_until DATE NULL,
+  source           ENUM('auto','manual') NOT NULL DEFAULT 'manual',
+  source_type      VARCHAR(50) NULL,
+  source_id        CHAR(36) NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_ce_trainer_date (trainer_id, event_date),
+  KEY idx_ce_source (source_type, source_id),
+  CONSTRAINT fk_ce_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ce_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
 -- sessions (new: replaces Supabase's client-managed JWT with a server-side session)
 -- =========================================================================
 CREATE TABLE sessions (

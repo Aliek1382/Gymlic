@@ -6,6 +6,7 @@ import {
   Bookmark,
   Calendar,
   CalendarCheck,
+  CalendarDays,
   Dumbbell,
   LayoutGrid,
   LineChart,
@@ -81,6 +82,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
       icon: Receipt,
       description:
         "فاکتورهایی که برای برنامه‌های ورزشکاران صادر کرده‌اید و وضعیت پرداخت هرکدام.",
+    },
+    {
+      label: "تقویم",
+      href: "/calendar",
+      icon: CalendarDays,
+      description:
+        "جلسات خصوصی زمان‌بندی‌شده و یادآوری‌های خودتان را در تقویم شمسی ماهانه ببینید.",
     },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
