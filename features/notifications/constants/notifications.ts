@@ -1,5 +1,6 @@
 import {
   Apple,
+  CalendarClock,
   Dumbbell,
   Megaphone,
   MessageCircle,
@@ -23,6 +24,7 @@ export const NOTIFICATION_ICON: Record<NotificationType, LucideIcon> = {
   member_joined: Users,
   complete_profile: Sparkles,
   broadcast: Megaphone,
+  calendar_reminder: CalendarClock,
   // Written by plan_comments' trigger until 0036; historical rows only.
   plan_comment: MessageSquare,
   message: MessageCircle,

@@ -28,6 +28,7 @@ export type NotificationType =
   | "member_joined"
   | "complete_profile"
   | "broadcast"
+  | "calendar_reminder"
   // Written by plan_comments' trigger until 0036; kept so historical rows
   // still render with an icon.
   | "plan_comment"

@@ -72,3 +72,16 @@ shape as the Supabase JWT it replaces.
    used to do (each table's former RLS policy tells you exactly what to
    check — see the migration file).
 3. Register its routes in `public/index.php`.
+
+## Cron: calendar reminders
+
+Reminders for calendar events are sent by `cron/calendar-reminders.php`, which
+must be run by the host's cron every 5 minutes (command line only; over HTTP it
+answers 404):
+
+```
+*/5 * * * * php /home/USER/path/to/backend-php/cron/calendar-reminders.php
+```
+
+Use the same `php` binary the site runs on (in cPanel: Cron Jobs → the path
+shown there for PHP 8.1). The script prints how many reminders it sent.

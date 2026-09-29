@@ -31,7 +31,8 @@ function EventChip({
       </span>
     </>
   );
-  const title = event.athleteName ? `${event.title} — ${event.athleteName}` : event.title;
+  const heading = event.athleteName ? `${event.title} — ${event.athleteName}` : event.title;
+  const title = event.notes ? `${heading}\n${event.notes}` : heading;
 
   // A session belongs to its package, which is managed on the athlete's profile — not edited here.
   if (event.source === "auto") {
