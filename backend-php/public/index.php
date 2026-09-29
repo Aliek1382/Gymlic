@@ -35,6 +35,7 @@ use Gymlic\Controllers\InvitationController;
 use Gymlic\Controllers\NotificationController;
 use Gymlic\Controllers\ProfileController;
 use Gymlic\Controllers\ProgressController;
+use Gymlic\Controllers\PushController;
 use Gymlic\Controllers\UploadController;
 use Gymlic\Controllers\WorkoutPlanBuilderController;
 use Gymlic\Response;
@@ -121,6 +122,11 @@ $router->get('/session-packages', fn () => SessionPackageController::list());
 $router->get('/session-packages/mine', fn () => SessionPackageController::listMine());
 $router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
 $router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
+
+$router->get('/push/public-key', fn () => PushController::publicKey());
+$router->post('/push/subscriptions', fn () => PushController::subscribe());
+$router->post('/push/unsubscribe', fn () => PushController::unsubscribe());
+$router->post('/push/test', fn () => PushController::test());
 
 $router->get('/calendar/events', fn () => CalendarController::list());
 $router->post('/calendar/events', fn () => CalendarController::create());

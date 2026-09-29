@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
+import { PushToggle } from "@/features/push";
 import { todayIso } from "@/lib/iso-date";
 import {
   PERSIAN_MONTH_NAMES,
@@ -44,6 +45,8 @@ export function CalendarPageContent() {
 
   return (
     <div className="space-y-4">
+      <PushToggle />
+
       <Card className="gap-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">

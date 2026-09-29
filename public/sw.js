@@ -101,3 +101,43 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+// Web Push. The payload ({ title, body, url }) is only ever shown, never
+// stored: nothing tenant-scoped goes into a cache here either.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "جیم‌لیک", {
+      body: data.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      dir: "rtl",
+      lang: "fa",
+      data: { url: data.url || "/dashboard" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/dashboard", self.location.origin).href;
+
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (open) {
+        // navigate() is missing on some clients; focusing alone still beats a duplicate window.
+        if ("navigate" in open) await open.navigate(target).catch(() => undefined);
+        return open.focus();
+      }
+      return self.clients.openWindow(target);
+    })()
+  );
+});
