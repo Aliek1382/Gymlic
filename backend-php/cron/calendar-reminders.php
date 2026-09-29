@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-// Sends the calendar's due reminders as in-panel notifications. Meant for the
+// Sends the calendar's due reminders as notifications, and pushes pending notifications to devices. Meant for the
 // host's cron, every 5 minutes:
 //
 //   php /home/USER/path/to/backend-php/cron/calendar-reminders.php
@@ -23,4 +23,7 @@ spl_autoload_register(static function (string $class): void {
 });
 
 $sent = Gymlic\Controllers\CalendarController::sendDueReminders();
-echo date('Y-m-d H:i:s'), " reminders sent: {$sent}\n";
+// Every notification is also pushed to phones and desktops; this sweep delivers
+// the ones nothing pushed at creation time (admin broadcasts, or a push that never ran).
+$pushed = Gymlic\Controllers\PushController::deliverPending();
+echo date('Y-m-d H:i:s'), " reminders sent: {$sent}, notifications pushed: {$pushed}\n";

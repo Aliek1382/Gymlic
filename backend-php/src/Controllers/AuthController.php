@@ -214,8 +214,9 @@ final class AuthController
             'INSERT INTO notifications (id, recipient_id, actor_id, type, title, body, link, metadata)
              VALUES (:id, :recipient_id, :actor_id, :type, :title, :body, :link, :metadata)'
         );
+        $id = Uuid::v4();
         $stmt->execute([
-            'id'           => Uuid::v4(),
+            'id'           => $id,
             'recipient_id' => $recipientId,
             'actor_id'     => $actorId,
             'type'         => $type,
@@ -224,5 +225,8 @@ final class AuthController
             'link'         => $link,
             'metadata'     => json_encode($metadata, JSON_UNESCAPED_UNICODE),
         ]);
+
+        // Also a phone/desktop push, sent after the response (see PushController).
+        PushController::queueAfterResponse($id);
     }
 }

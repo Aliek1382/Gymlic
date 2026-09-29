@@ -25,8 +25,10 @@ import {
 } from "@/components/ui/select";
 import { useAthletes } from "@/features/athletes";
 import { REMINDER_OPTIONS } from "../types/calendar-types";
+import { RepeatField } from "./repeat-field";
+import { buildRule, emptyRepeat, parseRule, validateRepeat, type RepeatState } from "../utils/recurrence";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { parseIsoDate, todayIso } from "@/lib/iso-date";
+import { todayIso } from "@/lib/iso-date";
 import {
   useCreateCalendarEvent,
   useDeleteCalendarEvent,
@@ -61,7 +63,8 @@ export function EventDialog({
   const [notes, setNotes] = useState("");
   const [remind, setRemind] = useState(NO_REMINDER);
   const [athleteId, setAthleteId] = useState(NO_ATHLETE);
-  const [weekly, setWeekly] = useState(false);
+  const [repeat, setRepeat] = useState<RepeatState>(emptyRepeat());
+  const [repeatUntil, setRepeatUntil] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Re-seed on every open so "new" comes back blank for the clicked day.
@@ -76,7 +79,8 @@ export function EventDialog({
       setNotes(e.notes ?? "");
       setRemind(e.remindBeforeMinutes === null ? NO_REMINDER : String(e.remindBeforeMinutes));
       setAthleteId(e.athleteId ?? NO_ATHLETE);
-      setWeekly(e.isRecurring);
+      setRepeat(parseRule(e.recurrenceRule, e.eventDate));
+      setRepeatUntil(e.recurrenceUntil ?? "");
     } else {
       setTitle("");
       setDate(target.date);
@@ -84,7 +88,8 @@ export function EventDialog({
       setNotes("");
       setRemind(NO_REMINDER);
       setAthleteId(NO_ATHLETE);
-      setWeekly(false);
+      setRepeat(emptyRepeat());
+      setRepeatUntil("");
     }
   }, [target]);
 
@@ -102,9 +107,15 @@ export function EventDialog({
       toast.error("عنوان رویداد را وارد کنید.");
       return null;
     }
-    const weekday = String(parseIsoDate(date).getDay());
-    // A series set up with several weekdays through the API keeps them as long as this day is one of them.
-    const keepRule = event?.recurrenceRule?.split(",").includes(weekday) ? event.recurrenceRule : null;
+    const repeatError = validateRepeat(repeat);
+    if (repeatError) {
+      toast.error(repeatError);
+      return null;
+    }
+    if (repeat.preset !== "none" && repeatUntil && repeatUntil < date) {
+      toast.error("آخرین روز تکرار نمی‌تواند قبل از تاریخ رویداد باشد.");
+      return null;
+    }
 
     return {
       title: title.trim(),
@@ -114,8 +125,8 @@ export function EventDialog({
       startTime: time || null,
       // A reminder counts back from the start time, so it only exists with one.
       remindBeforeMinutes: time && remind !== NO_REMINDER ? Number(remind) : null,
-      recurrenceRule: weekly ? (keepRule ?? weekday) : null,
-      recurrenceUntil: weekly ? (event?.recurrenceUntil ?? null) : null,
+      recurrenceRule: buildRule(repeat),
+      recurrenceUntil: repeat.preset !== "none" && repeatUntil ? repeatUntil : null,
     };
   }
 
@@ -236,26 +247,18 @@ export function EventDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="event-recurrence">تکرار</Label>
-              <Select
-                value={weekly ? "weekly" : "none"}
-                onValueChange={(value) => setWeekly(value === "weekly")}
-              >
-                <SelectTrigger id="event-recurrence" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">بدون تکرار</SelectItem>
-                  <SelectItem value="weekly">هر هفته در همین روز</SelectItem>
-                </SelectContent>
-              </Select>
-              {event?.isRecurring && (
-                <p className="text-xs text-muted-foreground">
-                  تغییر یا حذف روی همه‌ی تکرارهای این رویداد اعمال می‌شود.
-                </p>
-              )}
-            </div>
+            <RepeatField
+              value={repeat}
+              onChange={setRepeat}
+              date={date || todayIso()}
+              until={repeatUntil}
+              onUntilChange={setRepeatUntil}
+            />
+            {event?.isRecurring && (
+              <p className="text-xs text-muted-foreground">
+                تغییر یا حذف روی همه‌ی تکرارهای این رویداد اعمال می‌شود.
+              </p>
+            )}
 
             <div className="flex gap-2">
               <Button className="flex-1" onClick={handleSave} disabled={isPending}>

@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\Recurrence;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -289,19 +290,17 @@ final class CalendarController
                     $body .= "\n" . mb_substr($row['notes'], 0, 200);
                 }
 
-                $pushBody = strtr($body, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
+                $message = strtr($body, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
                 AuthController::notify(
                     $pdo,
                     $row['trainer_id'],
                     null,
                     'calendar_reminder',
                     'یادآوری: ' . $row['title'],
-                    $pushBody,
+                    $message,
                     '/calendar',
                     ['event_id' => $row['id'], 'date' => $date]
                 );
-                // The same reminder to the trainer's phone and desktop, if they turned push on.
-                PushController::sendToUser($row['trainer_id'], 'یادآوری: ' . $row['title'], $pushBody, '/calendar');
                 $sent++;
             }
         }
@@ -401,13 +400,11 @@ final class CalendarController
         $until = null;
         $rawRule = $data['recurrence_rule'] ?? null;
         if ($rawRule !== null && $rawRule !== '') {
-            if (!preg_match('/^[0-6](,[0-6])*$/', (string) $rawRule)) {
-                Response::error(400, 'invalid_recurrence_rule', 'recurrence_rule must be weekday numbers 0-6 (0 = Sunday) separated by commas.');
+            $rule = Recurrence::normalize((string) $rawRule);
+            if ($rule === null) {
+                Response::error(400, 'invalid_recurrence_rule', 'recurrence_rule is not a valid repeat rule.');
                 return null;
             }
-            $days = array_unique(array_map('intval', explode(',', (string) $rawRule)));
-            sort($days);
-            $rule = implode(',', $days);
 
             $rawUntil = $data['recurrence_until'] ?? null;
             if ($rawUntil !== null && $rawUntil !== '') {
@@ -434,8 +431,7 @@ final class CalendarController
 
     /**
      * The Y-m-d dates a stored row lands on inside from..to: its own date for a
-     * plain row, every date whose weekday is in the rule (from event_date until
-     * recurrence_until, or without end) for a recurring one.
+     * plain row, the dates its recurrence rule produces for a recurring one.
      *
      * @return string[]
      */
@@ -447,22 +443,8 @@ final class CalendarController
             return [$start->format('Y-m-d')];
         }
 
-        $weekdays = array_map('intval', explode(',', $row['recurrence_rule']));
-        $cursor = $start > $from ? $start : $from;
-        $end = $to;
-        if ($row['recurrence_until'] !== null) {
-            $until = new \DateTimeImmutable($row['recurrence_until']);
-            $end = $until < $to ? $until : $to;
-        }
-
-        $dates = [];
-        for (; $cursor <= $end; $cursor = $cursor->modify('+1 day')) {
-            // 'w' is 0 for Sunday, the numbering recurrence_rule is stored in.
-            if (in_array((int) $cursor->format('w'), $weekdays, true)) {
-                $dates[] = $cursor->format('Y-m-d');
-            }
-        }
-        return $dates;
+        $until = $row['recurrence_until'] === null ? null : new \DateTimeImmutable($row['recurrence_until']);
+        return Recurrence::occurrences($row['recurrence_rule'], $start, $from, $to, $until);
     }
 
     private static function parseDate(mixed $value): ?\DateTimeImmutable

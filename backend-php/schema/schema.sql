@@ -443,8 +443,10 @@ CREATE TABLE notifications (
   link         VARCHAR(500) NULL,
   metadata     JSON NOT NULL,
   read_at      DATETIME NULL,
+  pushed_at    DATETIME NULL,            -- when it was sent to the recipient's devices (Web Push)
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_notifications_recipient (recipient_id, created_at DESC),
+  KEY idx_notifications_push (pushed_at, created_at),
   KEY idx_notifications_unread (recipient_id, read_at),
   KEY idx_notifications_plan_comment (recipient_id, actor_id, type, read_at),
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_id) REFERENCES profiles(id) ON DELETE CASCADE,
