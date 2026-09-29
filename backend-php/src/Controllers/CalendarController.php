@@ -289,16 +289,19 @@ final class CalendarController
                     $body .= "\n" . mb_substr($row['notes'], 0, 200);
                 }
 
+                $pushBody = strtr($body, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
                 AuthController::notify(
                     $pdo,
                     $row['trainer_id'],
                     null,
                     'calendar_reminder',
                     'یادآوری: ' . $row['title'],
-                    strtr($body, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']),
+                    $pushBody,
                     '/calendar',
                     ['event_id' => $row['id'], 'date' => $date]
                 );
+                // The same reminder to the trainer's phone and desktop, if they turned push on.
+                PushController::sendToUser($row['trainer_id'], 'یادآوری: ' . $row['title'], $pushBody, '/calendar');
                 $sent++;
             }
         }

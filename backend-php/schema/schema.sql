@@ -592,6 +592,34 @@ CREATE TABLE calendar_events (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
+-- push_subscriptions: one row per browser/device a user enabled notifications
+-- on (Web Push). Keyed by endpoint so one browser belongs to one account.
+-- push_vapid_keys: the server's single VAPID key pair (id = 1), generated on
+-- first use by WebPush::vapidKeys(). Never replace it: a new key orphans every
+-- subscription.
+-- =========================================================================
+CREATE TABLE push_subscriptions (
+  id            CHAR(36) NOT NULL PRIMARY KEY,
+  user_id       CHAR(36) NOT NULL,
+  endpoint      TEXT NOT NULL,
+  endpoint_hash CHAR(64) NOT NULL,
+  p256dh        VARCHAR(255) NOT NULL,
+  auth          VARCHAR(64) NOT NULL,
+  user_agent    VARCHAR(255) NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_push_endpoint (endpoint_hash),
+  KEY idx_push_user (user_id),
+  CONSTRAINT fk_push_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE push_vapid_keys (
+  id          TINYINT NOT NULL PRIMARY KEY,
+  private_pem TEXT NOT NULL,
+  public_key  VARCHAR(128) NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
 -- sessions (new: replaces Supabase's client-managed JWT with a server-side session)
 -- =========================================================================
 CREATE TABLE sessions (

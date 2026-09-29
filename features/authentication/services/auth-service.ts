@@ -1,4 +1,5 @@
 import { api, setToken } from "@/lib/api/client";
+import { removeCurrentDeviceSubscription } from "@/features/push/services/push-service";
 import type { AccountType, InvitationRole } from "@/types/database.types";
 
 import type { Profile } from "../types/auth-types";
@@ -134,6 +135,9 @@ export async function joinViaInvitation(
 }
 
 export async function signOut() {
+  // Before the token goes: this browser must stop receiving the signed-out
+  // user's notifications (the next person to sign in here would see them).
+  await removeCurrentDeviceSubscription();
   try {
     await api.post("/auth/logout");
   } finally {
