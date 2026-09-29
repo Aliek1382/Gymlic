@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toAsciiDigits, toPersianDigits } from "@/lib/persian";
+import { parseIsoDate } from "@/lib/iso-date";
+import { getJalaliParts, toAsciiDigits, toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
 import {
   REPEAT_PRESET_LABEL,
@@ -67,13 +68,23 @@ export function RepeatField({
 }) {
   const summary = describeRepeat(value, date);
 
+  // Choosing custom weeks or months starts from the event's own weekday or day of month, so it is never empty.
+  function change(next: RepeatState) {
+    if (next.preset === "custom") {
+      const day = parseIsoDate(date);
+      if (next.unit === "week" && next.weekdays.length === 0) next = { ...next, weekdays: [day.getDay()] };
+      if (next.unit === "month" && next.monthDays.length === 0) next = { ...next, monthDays: [getJalaliParts(day).jd] };
+    }
+    onChange(next);
+  }
+
   return (
     <div className="space-y-3">
       <div className="space-y-2">
         <Label htmlFor="event-recurrence">تکرار</Label>
         <Select
           value={value.preset}
-          onValueChange={(preset) => onChange({ ...value, preset: preset as RepeatPreset })}
+          onValueChange={(preset) => change({ ...value, preset: preset as RepeatPreset })}
         >
           <SelectTrigger id="event-recurrence" className="w-full">
             <SelectValue />
@@ -102,7 +113,7 @@ export function RepeatField({
                 onChange({ ...value, interval: digits === "" ? 0 : Number(digits) });
               }}
             />
-            <Select value={value.unit} onValueChange={(unit) => onChange({ ...value, unit: unit as RepeatUnit })}>
+            <Select value={value.unit} onValueChange={(unit) => change({ ...value, unit: unit as RepeatUnit })}>
               <SelectTrigger aria-label="واحد تکرار" className="w-full">
                 <SelectValue />
               </SelectTrigger>

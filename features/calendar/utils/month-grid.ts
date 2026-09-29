@@ -3,6 +3,9 @@ import { jalaliMonthLength, jalaliToGregorian } from "@/lib/persian";
 
 export { WEEKDAYS };
 
+/** One-letter headers for the narrow phone columns, in the same Saturday-first order as WEEKDAYS. */
+export const WEEKDAYS_SHORT = ["ش", "ی", "د", "س", "چ", "پ", "ج"] as const;
+
 const DAY_MS = 86_400_000;
 
 export interface MonthDay {

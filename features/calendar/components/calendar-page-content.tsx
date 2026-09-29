@@ -15,8 +15,10 @@ import {
   toPersianDigits,
 } from "@/lib/persian";
 import { useCalendarEvents } from "../hooks/use-calendar-events";
+import { useIsDesktop } from "../hooks/use-is-desktop";
 import type { CalendarEvent } from "../types/calendar-types";
 import { buildMonthGrid, shiftMonth } from "../utils/month-grid";
+import { DayAgenda } from "./day-agenda";
 import { EventDialog, type EventDialogTarget } from "./event-dialog";
 import { MonthGridView } from "./month-grid";
 
@@ -26,6 +28,9 @@ export function CalendarPageContent() {
     return { jy, jm };
   });
   const [dialog, setDialog] = useState<EventDialogTarget | null>(null);
+  // Phones pick a day to read its events below the grid; wider screens open the new-event form at once.
+  const isDesktop = useIsDesktop();
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
 
   const grid = useMemo(() => buildMonthGrid(month.jy, month.jm), [month]);
   const events = useCalendarEvents(month.jy, month.jm, grid.from, grid.to);
@@ -38,6 +43,15 @@ export function CalendarPageContent() {
     return map;
   }, [events.data]);
 
+  // The picked day if it is in this month, else today, else the 1st: the agenda always has a day.
+  const today = todayIso();
+  const selectedDay =
+    pickedDay && grid.days.some((day) => day.iso === pickedDay)
+      ? pickedDay
+      : grid.days.some((day) => day.iso === today)
+        ? today
+        : grid.days[0].iso;
+
   const isCurrentMonth = (() => {
     const now = getJalaliParts(new Date());
     return now.jy === month.jy && now.jm === month.jm;
@@ -47,7 +61,7 @@ export function CalendarPageContent() {
     <div className="space-y-4">
       <PushToggle />
 
-      <Card className="gap-4 p-4">
+      <Card className="gap-4 p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {/* The page is RTL: "previous" points right, "next" left. */}
@@ -84,7 +98,7 @@ export function CalendarPageContent() {
             )}
           </div>
 
-          <Button onClick={() => setDialog({ date: todayIso() })}>
+          <Button className="hidden sm:inline-flex" onClick={() => setDialog({ date: today })}>
             <Plus />
             رویداد جدید
           </Button>
@@ -109,9 +123,19 @@ export function CalendarPageContent() {
           <MonthGridView
             grid={grid}
             eventsByDate={eventsByDate}
-            todayIso={todayIso()}
-            onSelectDay={(date) => setDialog({ date })}
+            todayIso={today}
+            selectedIso={isDesktop ? null : selectedDay}
+            onSelectDay={(date) => (isDesktop ? setDialog({ date }) : setPickedDay(date))}
             onSelectEvent={(event) => setDialog({ event })}
+          />
+        )}
+
+        {events.isSuccess && (
+          <DayAgenda
+            dateIso={selectedDay}
+            events={eventsByDate.get(selectedDay) ?? []}
+            onNew={() => setDialog({ date: selectedDay })}
+            onEdit={(event) => setDialog({ event })}
           />
         )}
       </Card>
