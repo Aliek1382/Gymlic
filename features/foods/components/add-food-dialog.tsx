@@ -17,8 +17,33 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { parseLocaleNumber } from "@/lib/persian";
 import { useCreateFood } from "../hooks/use-create-food";
 import { addFoodSchema, type AddFoodFormValues } from "../validators/food-schemas";
+
+function MacroField({
+  id,
+  label,
+  error,
+  ...inputProps
+}: { id: string; label: string; error?: string } & React.ComponentProps<"input">) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        inputMode="decimal"
+        dir="ltr"
+        placeholder="مثلاً ۲۰"
+        className="text-center"
+        {...inputProps}
+      />
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
 
 export function AddFoodDialog() {
   const [open, setOpen] = useState(false);
@@ -32,6 +57,10 @@ export function AddFoodDialog() {
       description: "",
       category: "",
       defaultUnit: "",
+      caloriesPerUnit: "",
+      proteinG: "",
+      carbsG: "",
+      fatG: "",
     },
   });
 
@@ -43,6 +72,10 @@ export function AddFoodDialog() {
         description: values.description?.trim() || null,
         category: values.category,
         defaultUnit: values.defaultUnit,
+        caloriesPerUnit: parseLocaleNumber(values.caloriesPerUnit ?? ""),
+        proteinG: parseLocaleNumber(values.proteinG ?? ""),
+        carbsG: parseLocaleNumber(values.carbsG ?? ""),
+        fatG: parseLocaleNumber(values.fatG ?? ""),
       });
       toast.success("غذای جدید به کتابخانه اضافه شد.");
       handleOpenChange(false);
@@ -141,6 +174,43 @@ export function AddFoodDialog() {
               </p>
             )}
           </div>
+
+          <fieldset className="space-y-3 rounded-xl border border-border p-3">
+            <legend className="px-1 text-xs font-medium text-muted-foreground">
+              ارزش غذایی (اختیاری)
+            </legend>
+            <p className="text-xs leading-5 text-muted-foreground">
+              مقادیر را به‌ازای <strong className="text-foreground">یک واحد پیش‌فرض</strong>{" "}
+              بنویسید؛ مثلاً اگر واحد «۱۰۰ گرم» است، کالری و درشت‌مغذی‌ها هم برای
+              همان ۱۰۰ گرم باشد. خالی بماند، در جمع برنامه صفر حساب می‌شود.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <MacroField
+                id="food-calories"
+                label="کالری"
+                error={form.formState.errors.caloriesPerUnit?.message}
+                {...form.register("caloriesPerUnit")}
+              />
+              <MacroField
+                id="food-protein"
+                label="پروتئین (گرم)"
+                error={form.formState.errors.proteinG?.message}
+                {...form.register("proteinG")}
+              />
+              <MacroField
+                id="food-carbs"
+                label="کربوهیدرات (گرم)"
+                error={form.formState.errors.carbsG?.message}
+                {...form.register("carbsG")}
+              />
+              <MacroField
+                id="food-fat"
+                label="چربی (گرم)"
+                error={form.formState.errors.fatG?.message}
+                {...form.register("fatG")}
+              />
+            </div>
+          </fieldset>
 
           <Button type="submit" className="w-full" disabled={createFood.isPending}>
             {createFood.isPending && <Loader2 className="animate-spin" />}

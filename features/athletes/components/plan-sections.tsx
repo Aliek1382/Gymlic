@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useToggleWorkoutDay } from "../hooks/use-toggle-workout-day";
 import { useWorkoutDayLogs } from "../hooks/use-workout-day-logs";
 import { NutritionPlanSections } from "./nutrition-plan-sections";
+import { StructuredNutritionSections } from "./structured-nutrition-sections";
 import {
   hasExerciseRows,
   parsePlanDescription,
@@ -356,12 +357,19 @@ export function PlanSections({
   isActivePlan?: boolean;
   // Ticking is workout-only; workout_day_logs references workout_assignments.
   dayLogging?: boolean;
-  // Workout-only: "structured" reads the plan from workout_plan_days /
-  // workout_plan_exercises instead of parsing `description`.
+  // "structured" reads the plan from workout_plan_days / workout_plan_exercises
+  // (or, for nutrition, nutrition_plan_meals / nutrition_plan_items) instead of
+  // parsing `description`.
   builderMode?: "text" | "structured";
 }) {
   if (kind === "nutrition") {
-    return <NutritionPlanSections description={description} />;
+    // A plan built meal by meal reads from nutrition_plan_meals; every older
+    // one is still just its description.
+    return builderMode === "structured" ? (
+      <StructuredNutritionSections planId={planId} />
+    ) : (
+      <NutritionPlanSections description={description} />
+    );
   }
 
   return (

@@ -50,17 +50,20 @@ import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlanPrint } from "../hooks/use-plan-print";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
+import { nutritionPlanMealsKey } from "../hooks/use-nutrition-plan-meals";
 import { workoutPlanDaysKey } from "../hooks/use-workout-plan-days";
 import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanEntry } from "../services/athlete-service";
 import type { PlanKind } from "../types/athlete-types";
+import type { NutritionPlanMeal } from "../types/nutrition-plan-builder-types";
 import type { WorkoutPlanDay } from "../types/workout-plan-builder-types";
 import { NutritionFormatHint } from "./nutrition-format-hint";
 import { PlanComments } from "./plan-comments";
 import { PlanFormatHint } from "./plan-format-hint";
 import { PlanPrintArea } from "./plan-print-area";
 import { PlanSections } from "./plan-sections";
+import { StructuredNutritionBuilder } from "./structured-nutrition-builder";
 import { StructuredWorkoutBuilder } from "./structured-workout-builder";
 import { NutritionDayBuilder } from "./nutrition-day-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
@@ -347,6 +350,9 @@ export function PlanBrowser({
                     structuredDays: queryClient.getQueryData<WorkoutPlanDay[]>(
                       workoutPlanDaysKey(selectedPlan.id)
                     ),
+                    structuredMeals: queryClient.getQueryData<NutritionPlanMeal[]>(
+                      nutritionPlanMealsKey(selectedPlan.id)
+                    ),
                   })
                 }
               >
@@ -374,7 +380,11 @@ export function PlanBrowser({
         >
           {editingPlan && (
             <DialogContent
-              className={editBuilderMode === "structured" ? "sm:max-w-2xl" : undefined}
+              className={cn(
+                editBuilderMode === "structured" && "sm:max-w-2xl",
+                // The meal cards need the width more than the gutter on a phone.
+                kind === "nutrition" && editBuilderMode === "structured" && "p-4 sm:p-6"
+              )}
             >
               <DialogHeader>
                 <DialogTitle>ویرایش برنامه</DialogTitle>
@@ -405,7 +415,7 @@ export function PlanBrowser({
                 {/* Once the plan is genuinely structured on the server (it
                     already has rows), there's no going back to text for it —
                     the toggle only shows while it's still "text". */}
-                {kind === "workout" && editingPlan.builderMode === "text" && (
+                {editingPlan.builderMode === "text" && (
                   <div className="space-y-1.5">
                     <Label>روش نوشتن برنامه</Label>
                     <div className="flex flex-wrap gap-1.5">
@@ -445,7 +455,9 @@ export function PlanBrowser({
                         variant={editBuilderMode === "structured" ? "default" : "outline"}
                         onClick={() => setEditBuilderMode("structured")}
                       >
-                        ساخت ساختاریافته (روز به روز)
+                        {kind === "workout"
+                          ? "ساخت ساختاریافته (روز به روز)"
+                          : "ساخت ساختاریافته (وعده به وعده)"}
                       </Button>
                     </div>
                   </div>
@@ -453,15 +465,22 @@ export function PlanBrowser({
 
                 {editBuilderMode === "structured" ? (
                   // Everything below the title autosaves through
-                  // WorkoutPlanBuilderController — there's nothing else for
-                  // this form's submit to do.
-                  <StructuredWorkoutBuilder assignmentId={editingPlan.id} />
+                  // WorkoutPlanBuilderController / NutritionPlanBuilderController —
+                  // there's nothing else for this form's submit to do.
+                  kind === "workout" ? (
+                    <StructuredWorkoutBuilder assignmentId={editingPlan.id} />
+                  ) : (
+                    <StructuredNutritionBuilder
+                      assignmentId={editingPlan.id}
+                      athleteId={selectedAthlete?.id ?? null}
+                    />
+                  )
                 ) : (
                   <>
                     {kind === "workout" && editTextMode === "picker" && (
                       <WorkoutDayBuilder onInsertLine={handleInsertLine} />
                     )}
-                    {kind === "nutrition" && (
+                    {kind === "nutrition" && editTextMode === "picker" && (
                       <NutritionDayBuilder onInsertLine={handleInsertLine} />
                     )}
 
@@ -482,7 +501,7 @@ export function PlanBrowser({
                         </p>
                       )}
                       {kind === "workout" && editTextMode === "manual" && <PlanFormatHint />}
-                      {kind === "nutrition" && <NutritionFormatHint />}
+                      {kind === "nutrition" && editTextMode === "manual" && <NutritionFormatHint />}
                     </div>
                   </>
                 )}

@@ -38,6 +38,19 @@ export function normalizeAmount(value: string): string {
   return toAsciiDigits(value).replace(/[,٬\s]/g, "");
 }
 
+/**
+ * Parses a number typed into a text field on a Persian keyboard: Persian or
+ * Arabic-Indic digits, the Arabic decimal separator "٫", and grouping marks
+ * are all accepted. Returns null for an empty or non-numeric field, so callers
+ * can tell "left blank" from a real 0 by checking `=== null`.
+ */
+export function parseLocaleNumber(value: string): number | null {
+  const normalized = toAsciiDigits(value).replace(/٫/g, ".").replace(/[,٬\s]/g, "");
+  if (normalized === "") return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function formatNumber(value: number): string {
   return toPersianDigits(new Intl.NumberFormat("en-US").format(Math.round(value)));
 }

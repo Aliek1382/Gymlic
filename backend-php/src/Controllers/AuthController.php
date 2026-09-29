@@ -23,6 +23,10 @@ final class AuthController
             'avatar_url'        => $p['avatar_url'],
             'account_type'      => $p['account_type'],
             'birth_date'        => $p['birth_date'],
+            'daily_calorie_goal' => isset($p['daily_calorie_goal']) ? (int) $p['daily_calorie_goal'] : null,
+            'protein_percent'   => isset($p['protein_percent']) ? (int) $p['protein_percent'] : null,
+            'carbs_percent'     => isset($p['carbs_percent']) ? (int) $p['carbs_percent'] : null,
+            'fat_percent'       => isset($p['fat_percent']) ? (int) $p['fat_percent'] : null,
             'is_platform_admin' => (bool) $p['is_platform_admin'],
         ];
     }

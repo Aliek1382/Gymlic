@@ -10,6 +10,12 @@ export interface Profile {
   birthDate: string | null;
   accountType: AccountType | null;
   isPlatformAdmin: boolean;
+  // Athletes only: nutrition target. Null until set; the three percentages
+  // are all set (adding up to 100) or all null.
+  dailyCalorieGoal: number | null;
+  proteinPercent: number | null;
+  carbsPercent: number | null;
+  fatPercent: number | null;
 }
 
 export interface SessionContext {

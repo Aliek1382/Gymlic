@@ -48,6 +48,10 @@ export async function getAthleteProfile(
       birth_date: string | null;
       avatar_url: string | null;
       phone: string | null;
+      daily_calorie_goal?: number | null;
+      protein_percent?: number | null;
+      carbs_percent?: number | null;
+      fat_percent?: number | null;
     }>(`/athletes/${athleteId}`);
 
     return {
@@ -58,10 +62,32 @@ export async function getAthleteProfile(
       phone: row.phone,
       joinedAt: row.created_at,
       note: row.note,
+      dailyCalorieGoal: row.daily_calorie_goal ?? null,
+      proteinPercent: row.protein_percent ?? null,
+      carbsPercent: row.carbs_percent ?? null,
+      fatPercent: row.fat_percent ?? null,
     };
   } catch {
     return null;
   }
+}
+
+/** The trainer sets an athlete's goal for them; null clears it (all four together). */
+export async function updateAthleteNutritionGoal(
+  athleteId: string,
+  goal: {
+    dailyCalorieGoal: number | null;
+    proteinPercent: number | null;
+    carbsPercent: number | null;
+    fatPercent: number | null;
+  }
+): Promise<void> {
+  await api.patch(`/athletes/${athleteId}/nutrition-goal`, {
+    daily_calorie_goal: goal.dailyCalorieGoal,
+    protein_percent: goal.proteinPercent,
+    carbs_percent: goal.carbsPercent,
+    fat_percent: goal.fatPercent,
+  });
 }
 
 export async function updateAthleteNote(

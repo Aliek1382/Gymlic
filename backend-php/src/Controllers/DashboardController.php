@@ -23,7 +23,7 @@ final class DashboardController
         $payload = [];
 
         foreach (['workout' => 'todays_workout', 'nutrition' => 'nutrition_plan'] as $kind => $key) {
-            $extraColumn = $kind === 'workout' ? ', builder_mode' : '';
+            $extraColumn = ', ' . PlanController::builderModeColumn($kind);
             $stmt = $pdo->prepare(
                 'SELECT id, title, description, assigned_at' . $extraColumn . ' FROM ' . Acl::planTable($kind) . "
                  WHERE athlete_id = :athlete_id AND status = 'active' AND is_template = 0

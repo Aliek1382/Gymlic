@@ -11,6 +11,7 @@ import { SessionPackagesPanel } from "@/features/session-packages";
 import { ProgressPageContent } from "@/features/progress/components/progress-page-content";
 import { useAthleteProfile } from "../hooks/use-athlete-profile";
 import { useRemoveAthlete } from "../hooks/use-remove-athlete";
+import { AthleteNutritionGoal } from "./athlete-nutrition-goal";
 import { AthleteProfileNote } from "./athlete-profile-note";
 import { PlanDialog } from "./plan-dialog";
 import { RemoveAthleteButton } from "./remove-athlete-button";
@@ -92,6 +93,8 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
       </Card>
 
       <AthleteProfileNote athleteId={athleteId} initialNote={athlete.note} />
+
+      <AthleteNutritionGoal athleteId={athleteId} athlete={athlete} />
 
       <SessionPackagesPanel athleteId={athleteId} />
 

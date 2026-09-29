@@ -4,10 +4,13 @@
    print dialog on until it has decoded. */
 import { Apple, Dumbbell, GraduationCap, User } from "lucide-react";
 
-import { formatAge, formatPersianDate, toPersianDigits } from "@/lib/persian";
+import { formatMacro } from "@/features/foods";
+import { formatAge, formatNumber, formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
 import type { PrintablePlan } from "../hooks/use-plan-print";
 import type { PlanKind } from "../types/athlete-types";
+import type { NutritionPlanMeal } from "../types/nutrition-plan-builder-types";
+import { computeNutritionTotals, itemIssue, itemMacros, itemUnit, type MacroTotals } from "../utils/nutrition-macros";
 import {
   hasExerciseRows,
   parsePlanDescription,
@@ -357,6 +360,86 @@ function NutritionSection({ section }: { section: ParsedMealSection }) {
   );
 }
 
+function MacroLine({ totals }: { totals: MacroTotals }) {
+  return (
+    <>
+      {formatNumber(totals.calories)} کالری · پروتئین {formatMacro(totals.protein)} · کربو{" "}
+      {formatMacro(totals.carbs)} · چربی {formatMacro(totals.fat)}
+    </>
+  );
+}
+
+// The sheet for a plan built meal by meal: same meal blocks as the text plan,
+// with each food's amount and calories, a total under every meal, and the
+// day's total up front. Totals come from the same pure sum as the screen.
+function StructuredNutrition({ meals }: { meals: NutritionPlanMeal[] }) {
+  const totals = computeNutritionTotals(meals);
+  // A meal never given a food would only print as an empty box.
+  const filled = meals.filter((meal) => meal.items.length > 0);
+
+  return (
+    <>
+      <div className="print-row mb-3 rounded-lg border border-[#c7d2fe] bg-[#eef2ff] px-3 py-2 text-[9.5pt] font-bold text-[#1b2a6b]">
+        جمع کل روز: <MacroLine totals={totals.day} />
+        {totals.day.incompleteCount > 0 && (
+          <p className="mt-0.5 text-[8pt] font-normal text-[#b45309]">
+            {toPersianDigits(totals.day.incompleteCount)} غذا ارزش غذایی کامل ندارد و در جمع کم‌شمار
+            یا صفر حساب شده است.
+          </p>
+        )}
+      </div>
+
+      {filled.map((meal) => (
+        <section
+          key={meal.id}
+          className="print-day mb-3 overflow-hidden rounded-lg border border-[#dfe3ee]"
+        >
+          <div className="print-day-heading flex items-center justify-between gap-2 border-b border-[#dfe3ee] bg-[#eef2ff] px-3 py-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-3.5 w-1 rounded-full bg-[#3b5bfb]" />
+              <h2 className="text-[10.5pt] font-bold text-[#1b2a6b]">{meal.mealName}</h2>
+            </div>
+            <span className="text-[8pt] text-[#5566b8]">
+              {toPersianDigits(meal.items.length)} مورد
+            </span>
+          </div>
+
+          <div className="px-3 pb-1.5">
+            {meal.items.map((item, index) => {
+              const counted = itemIssue(item) !== "unit-mismatch" && item.caloriesPerUnit !== null;
+              return (
+                <div
+                  key={item.id}
+                  className="print-row grid grid-cols-[1.5rem_1fr_6rem_4rem] items-center gap-x-2 border-t border-[#eceef5] py-1.5 first:border-t-0"
+                >
+                  <span className="text-center text-[8pt] font-bold text-[#9aa2b5]">
+                    {toPersianDigits(index + 1)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[9.5pt] font-bold text-[#111827]">{item.foodName}</p>
+                    {item.note && <p className="text-[8pt] text-[#6b7280]">{item.note}</p>}
+                  </div>
+                  <span className="text-center text-[9pt] font-bold text-[#3b5bfb]">
+                    {toPersianDigits(item.amount)}{" "}
+                    <span className="text-[8pt] font-normal text-[#6b7280]">{itemUnit(item)}</span>
+                  </span>
+                  <span className="text-center text-[8pt] text-[#6b7280]">
+                    {counted ? `${formatNumber(itemMacros(item).calories)} کالری` : "—"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="print-row border-t border-[#dfe3ee] bg-[#fafbff] px-3 py-1.5 text-[8.5pt] text-[#374151]">
+            <MacroLine totals={totals.byMeal[meal.id]} />
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
 export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
   if (!plan) return null;
 
@@ -368,11 +451,19 @@ export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
     plan.builderMode === "structured"
       ? structuredDaysToSections(plan.structuredDays ?? [])
       : parsePlanDescription(plan.description);
+  const structuredNutrition =
+    plan.kind === "nutrition" && plan.builderMode === "structured"
+      ? (plan.structuredMeals ?? [])
+      : null;
   const body =
     plan.kind === "nutrition"
-      ? parseNutritionDescription(plan.description).map((section, index) => (
-          <NutritionSection key={index} section={section} />
-        ))
+      ? structuredNutrition
+        ? structuredNutrition.length > 0
+          ? [<StructuredNutrition key="meals" meals={structuredNutrition} />]
+          : []
+        : parseNutritionDescription(plan.description).map((section, index) => (
+            <NutritionSection key={index} section={section} />
+          ))
       : workoutSections.map((section, index) => (
           <WorkoutSection key={index} section={section} />
         ));

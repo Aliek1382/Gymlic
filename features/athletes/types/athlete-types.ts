@@ -17,6 +17,12 @@ export interface AthleteProfile {
   phone: string | null;
   joinedAt: string;
   note: string | null;
+  // The athlete's nutrition target — all null until they (or their trainer)
+  // set it. The three percentages are all set, adding up to 100, or all null.
+  dailyCalorieGoal: number | null;
+  proteinPercent: number | null;
+  carbsPercent: number | null;
+  fatPercent: number | null;
 }
 
 export interface PendingAthleteInvite {
