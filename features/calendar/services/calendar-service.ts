@@ -4,12 +4,14 @@ import type { CalendarEvent, CalendarEventInput, CalendarEventSource } from "../
 interface EventRow {
   id: string;
   title: string;
+  notes: string | null;
   athlete_id: string | null;
   athlete_first_name: string | null;
   athlete_last_name: string | null;
   date: string;
   event_date: string;
   start_time: string | null;
+  remind_before_minutes: number | null;
   recurrence_rule: string | null;
   recurrence_until: string | null;
   is_recurring: boolean;
@@ -20,6 +22,7 @@ function toEvent(row: EventRow): CalendarEvent {
   return {
     id: row.id,
     title: row.title,
+    notes: row.notes,
     athleteId: row.athlete_id,
     athleteName: row.athlete_id
       ? fullName(row.athlete_first_name, row.athlete_last_name, "ورزشکار")
@@ -27,6 +30,7 @@ function toEvent(row: EventRow): CalendarEvent {
     date: row.date,
     eventDate: row.event_date,
     startTime: row.start_time,
+    remindBeforeMinutes: row.remind_before_minutes,
     recurrenceRule: row.recurrence_rule,
     recurrenceUntil: row.recurrence_until,
     isRecurring: row.is_recurring,
@@ -37,9 +41,11 @@ function toEvent(row: EventRow): CalendarEvent {
 function toPayload(input: CalendarEventInput) {
   return {
     title: input.title,
+    notes: input.notes,
     athlete_id: input.athleteId,
     event_date: input.eventDate,
     start_time: input.startTime,
+    remind_before_minutes: input.remindBeforeMinutes,
     recurrence_rule: input.recurrenceRule,
     recurrence_until: input.recurrenceUntil,
   };

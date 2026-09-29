@@ -573,8 +573,11 @@ CREATE TABLE calendar_events (
   trainer_id       CHAR(36) NOT NULL,
   athlete_id       CHAR(36) NULL,
   title            VARCHAR(255) NOT NULL,
+  notes            TEXT NULL,
   event_date       DATE NOT NULL,
   start_time       TIME NULL,
+  remind_before_minutes INT NULL,        -- 10/30/60/1440; needs start_time
+  last_reminded_on DATE NULL,            -- last occurrence a reminder was sent for
   recurrence_rule  VARCHAR(100) NULL,
   recurrence_until DATE NULL,
   source           ENUM('auto','manual') NOT NULL DEFAULT 'manual',

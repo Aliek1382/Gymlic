@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAthletes } from "@/features/athletes";
+import { REMINDER_OPTIONS } from "../types/calendar-types";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { parseIsoDate, todayIso } from "@/lib/iso-date";
 import {
@@ -34,6 +35,7 @@ import {
 import type { CalendarEvent, CalendarEventInput } from "../types/calendar-types";
 
 const NO_ATHLETE = "none";
+const NO_REMINDER = "none";
 
 export type EventDialogTarget = { date: string } | { event: CalendarEvent };
 
@@ -56,6 +58,8 @@ export function EventDialog({
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [notes, setNotes] = useState("");
+  const [remind, setRemind] = useState(NO_REMINDER);
   const [athleteId, setAthleteId] = useState(NO_ATHLETE);
   const [weekly, setWeekly] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -69,12 +73,16 @@ export function EventDialog({
       // A recurring event is edited as a series, so show where the series starts.
       setDate(e.eventDate);
       setTime(e.startTime ?? "");
+      setNotes(e.notes ?? "");
+      setRemind(e.remindBeforeMinutes === null ? NO_REMINDER : String(e.remindBeforeMinutes));
       setAthleteId(e.athleteId ?? NO_ATHLETE);
       setWeekly(e.isRecurring);
     } else {
       setTitle("");
       setDate(target.date);
       setTime("");
+      setNotes("");
+      setRemind(NO_REMINDER);
       setAthleteId(NO_ATHLETE);
       setWeekly(false);
     }
@@ -100,9 +108,12 @@ export function EventDialog({
 
     return {
       title: title.trim(),
+      notes: notes.trim() || null,
       athleteId: athleteId === NO_ATHLETE ? null : athleteId,
       eventDate: date,
       startTime: time || null,
+      // A reminder counts back from the start time, so it only exists with one.
+      remindBeforeMinutes: time && remind !== NO_REMINDER ? Number(remind) : null,
       recurrenceRule: weekly ? (keepRule ?? weekday) : null,
       recurrenceUntil: weekly ? (event?.recurrenceUntil ?? null) : null,
     };
@@ -170,6 +181,28 @@ export function EventDialog({
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="event-remind">اعلان یادآوری</Label>
+              <Select value={time ? remind : NO_REMINDER} onValueChange={setRemind} disabled={!time}>
+                <SelectTrigger id="event-remind" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_REMINDER}>بدون یادآوری</SelectItem>
+                  {REMINDER_OPTIONS.map((option) => (
+                    <SelectItem key={option.minutes} value={String(option.minutes)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!time && (
+                <p className="text-xs text-muted-foreground">
+                  برای دریافت اعلان، ابتدا ساعت رویداد را وارد کنید.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="event-athlete">
                 ورزشکار <span className="text-muted-foreground">(اختیاری)</span>
               </Label>
@@ -186,6 +219,21 @@ export function EventDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="event-notes">
+                توضیحات <span className="text-muted-foreground">(اختیاری)</span>
+              </Label>
+              <textarea
+                id="event-notes"
+                value={notes}
+                maxLength={2000}
+                rows={4}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="کارهایی که باید انجام دهید را اینجا بنویسید…"
+                className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+              />
             </div>
 
             <div className="space-y-2">

@@ -3,7 +3,7 @@
 # takes over instead and these rules never run.
 
 # Never serve application source, config, or SQL over HTTP.
-RedirectMatch 404 ^/(.*/)?(src|schema)/
+RedirectMatch 404 ^/(.*/)?(src|schema|cron)/
 RedirectMatch 404 ^/(.*/)?config\.php$
 
 RewriteEngine On
