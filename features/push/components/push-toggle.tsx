@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { IosInstallGuide } from "./ios-install-guide";
 import {
   disablePush,
   enablePush,
@@ -17,8 +18,7 @@ import {
 
 const HINT: Partial<Record<PushStatus, string>> = {
   unsupported: "این مرورگر از اعلان پشتیبانی نمی‌کند.",
-  "ios-install":
-    "در آیفون، ابتدا سایت را از منوی اشتراک‌گذاری (Share) با «Add to Home Screen» نصب کنید و از همان برنامه وارد شوید.",
+  "ios-install": "در آیفون، اعلان فقط برای برنامه‌ای کار می‌کند که روی صفحهٔ اصلی گوشی نصب شده باشد. راهنمای نصب را ببینید.",
   denied: "اعلان برای این سایت در مرورگر مسدود شده است. از تنظیمات مرورگر اجازه را فعال کنید.",
   off: "یادآوری‌ها را روی گوشی یا کامپیوتر به‌صورت اعلان دریافت کنید، حتی وقتی سایت بسته است.",
   on: "اعلان‌ها روی این دستگاه فعال است.",
@@ -97,6 +97,8 @@ export function PushToggle() {
           </>
         )}
       </div>
+
+      {status === "ios-install" && <IosInstallGuide />}
     </Card>
   );
 }

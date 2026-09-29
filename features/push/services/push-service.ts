@@ -7,6 +7,11 @@ function isIos(): boolean {
   return /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
+/** iPhone Chrome/Firefox/Edge can't install a web app for push; only Safari can. */
+export function isIosNonSafari(): boolean {
+  return isIos() && /CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent);
+}
+
 function isStandalone(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
