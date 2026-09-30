@@ -14,12 +14,14 @@ use Gymlic\Validate;
 /** The trainer's private fee ledger — every row is scoped to trainer_id. */
 final class EarningsController
 {
+    public const METHODS = ['cash', 'card_transfer', 'online'];
+
     public static function list(): void
     {
         $user = Auth::requireUser();
 
         $stmt = Database::connection()->prepare(
-            'SELECT tp.id, tp.athlete_id, tp.amount_toman, tp.paid_at, tp.note,
+            'SELECT tp.id, tp.athlete_id, tp.amount_toman, tp.payment_method, tp.paid_at, tp.note,
                     p.first_name, p.last_name
              FROM trainer_payments tp
              LEFT JOIN profiles p ON p.id = tp.athlete_id
@@ -46,15 +48,21 @@ final class EarningsController
             Acl::require(Acl::isTrainerOf($user['id'], $athleteId), 'This athlete is not on your roster.');
         }
 
+        $method = self::method($data['payment_method'] ?? null);
+        if ($method === null) {
+            return;
+        }
+
         $id = Uuid::v4();
         Database::connection()->prepare(
-            'INSERT INTO trainer_payments (id, trainer_id, athlete_id, amount_toman, paid_at, note)
-             VALUES (:id, :trainer_id, :athlete_id, :amount_toman, :paid_at, :note)'
+            'INSERT INTO trainer_payments (id, trainer_id, athlete_id, amount_toman, payment_method, paid_at, note)
+             VALUES (:id, :trainer_id, :athlete_id, :amount_toman, :payment_method, :paid_at, :note)'
         )->execute([
             'id'           => $id,
             'trainer_id'   => $user['id'],
             'athlete_id'   => $athleteId,
             'amount_toman' => (int) $data['amount_toman'],
+            'payment_method' => $method,
             'paid_at'      => (string) $data['paid_at'],
             'note'         => Validate::nullableString($data['note'] ?? null),
         ]);
@@ -70,7 +78,17 @@ final class EarningsController
         $fields = [];
         $bind = ['id' => $params['id'], 'trainer_id' => $user['id']];
 
-        foreach (['athlete_id', 'amount_toman', 'paid_at', 'note'] as $key) {
+        // Unlike create(), an explicit null here is refused rather than
+        // defaulted: the column is NOT NULL and "leave it alone" is spelled
+        // by omitting the key.
+        if (array_key_exists('payment_method', $data)) {
+            if (!in_array($data['payment_method'], self::METHODS, true)) {
+                Response::error(400, 'invalid_payment_method', 'payment_method must be cash, card_transfer or online.');
+                return;
+            }
+        }
+
+        foreach (['athlete_id', 'amount_toman', 'payment_method', 'paid_at', 'note'] as $key) {
             if (array_key_exists($key, $data)) {
                 $fields[] = "{$key} = :{$key}";
                 $bind[$key] = $data[$key] === null ? null : (string) $data[$key];
@@ -110,5 +128,22 @@ final class EarningsController
         }
 
         Response::ok(['ok' => true]);
+    }
+
+    /**
+     * Absent/null/'' -> 'cash' (the column default). Anything outside the enum
+     * ends the request with 400 and returns null, since MySQL would otherwise
+     * reject it as a 500.
+     */
+    private static function method(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return 'cash';
+        }
+        if (!in_array($value, self::METHODS, true)) {
+            Response::error(400, 'invalid_payment_method', 'payment_method must be cash, card_transfer or online.');
+            return null;
+        }
+        return $value;
     }
 }

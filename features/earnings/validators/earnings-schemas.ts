@@ -14,6 +14,7 @@ export const trainerPaymentFormSchema = z.object({
     .refine((value) => Number(normalizeAmount(value)) > 0, {
       message: "مبلغ باید بزرگ‌تر از صفر باشد.",
     }),
+  paymentMethod: z.enum(["cash", "card_transfer", "online"]),
   paidAt: z.string().min(1, "تاریخ پرداخت را انتخاب کنید."),
   note: z.string().trim().optional(),
 });
