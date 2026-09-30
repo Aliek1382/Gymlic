@@ -1,5 +1,6 @@
 "use client";
 
+import { isQueued } from "@/lib/offline-queue";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -79,8 +80,8 @@ export function MeasurementFormDialog({
         await updateMeasurement.mutateAsync({ id: entry.id, input });
         toast.success("اندازه‌گیری ویرایش شد.");
       } else {
-        await addMeasurement.mutateAsync(input);
-        toast.success("اندازه‌گیری جدید ثبت شد.");
+        const result = await addMeasurement.mutateAsync(input);
+        if (!isQueued(result)) toast.success("اندازه‌گیری جدید ثبت شد.");
       }
       setOpen(false);
     } catch (error) {

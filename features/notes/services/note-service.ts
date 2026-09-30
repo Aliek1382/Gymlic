@@ -1,3 +1,4 @@
+import type { Queued } from "@/lib/offline-queue";
 import { api, query, type ListResponse } from "@/lib/api/client";
 import type { Note } from "../types/note-types";
 
@@ -28,12 +29,12 @@ export async function listNotes(athleteId: string | null): Promise<Note[]> {
 export async function createNote(input: {
   athleteId: string | null;
   content: string;
-}): Promise<void> {
-  await api.post("/notes", { athlete_id: input.athleteId, content: input.content });
+}): Promise<void | Queued> {
+  return api.queueable.post("/notes", { athlete_id: input.athleteId, content: input.content });
 }
 
-export async function updateNote(input: { id: string; content: string }): Promise<void> {
-  await api.patch(`/notes/${input.id}`, { content: input.content });
+export async function updateNote(input: { id: string; content: string }): Promise<void | Queued> {
+  return api.queueable.patch(`/notes/${input.id}`, { content: input.content });
 }
 
 export async function deleteNote(id: string): Promise<void> {

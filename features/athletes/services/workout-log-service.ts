@@ -1,3 +1,4 @@
+import type { Queued } from "@/lib/offline-queue";
 import { api, query, type ListResponse } from "@/lib/api/client";
 import { computeWeekStreak } from "../utils/streak";
 import { calendarWindowStart } from "../utils/training-calendar";
@@ -39,8 +40,8 @@ export async function logWorkoutDay(
   assignmentId: string,
   dayKey: string,
   completedOn: string
-): Promise<void> {
-  await api.post("/workout-day-logs", {
+): Promise<void | Queued> {
+  return api.queueable.post("/workout-day-logs", {
     assignment_id: assignmentId,
     day_key: dayKey,
     completed_on: completedOn,

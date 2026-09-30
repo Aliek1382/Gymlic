@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyIfQueued } from "@/lib/offline-sync";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { addMeasurement } from "../services/progress-service";
@@ -10,7 +11,8 @@ export function useAddMeasurement(athleteId: string) {
 
   return useMutation({
     mutationFn: (input: MeasurementInput) => addMeasurement(athleteId, input),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (notifyIfQueued(result)) return;
       queryClient.invalidateQueries({
         queryKey: ["progress", "measurements", athleteId],
       });

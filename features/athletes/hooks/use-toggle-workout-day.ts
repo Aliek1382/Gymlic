@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyIfQueued } from "@/lib/offline-sync";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -25,7 +26,8 @@ export function useToggleWorkoutDay(assignmentId: string) {
       existingLogId
         ? deleteWorkoutDayLog(existingLogId)
         : logWorkoutDay(assignmentId, dayKey, toDateKey(new Date())),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (notifyIfQueued(result)) return;
       queryClient.invalidateQueries({ queryKey: ["athletes", "day-logs", weekStart] });
     },
   });

@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { OfflineQueueBadge } from "@/components/pwa/offline-queue-badge";
 import { useProfile } from "@/features/authentication/hooks/use-profile";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { NotificationBell } from "@/features/notifications";
@@ -103,6 +104,8 @@ export function DashboardHeader({
       >
         <CircleHelp className="size-[18px]" />
       </button>
+
+      <OfflineQueueBadge />
 
       <NotificationBell userId={userId} />
 
