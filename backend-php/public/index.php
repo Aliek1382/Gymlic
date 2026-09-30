@@ -276,6 +276,8 @@ $router->post('/me/avatar', fn () => UploadController::avatar());
 $router->get('/athletes/{id}/measurements', fn (array $p) => ProgressController::list($p));
 $router->post('/athletes/{id}/measurements', fn (array $p) => ProgressController::create($p));
 $router->patch('/measurements/{id}', fn (array $p) => ProgressController::update($p));
+$router->get('/progress/reminders/{athleteId}', fn (array $p) => ProgressController::getReminder($p));
+$router->put('/progress/reminders/{athleteId}', fn (array $p) => ProgressController::setReminder($p));
 
 $router->get('/notifications', fn () => NotificationController::list());
 $router->get('/notifications/archive', fn () => NotificationController::archive());

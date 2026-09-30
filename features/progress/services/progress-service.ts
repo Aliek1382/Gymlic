@@ -61,3 +61,34 @@ export async function updateMeasurement(
 ): Promise<void> {
   await api.patch(`/measurements/${id}`, toPayload(input));
 }
+
+export interface AssessmentReminder {
+  intervalWeeks: number;
+  isActive: boolean;
+  lastRemindedAt: string | null;
+}
+
+interface AssessmentReminderRow {
+  interval_weeks: number;
+  is_active: boolean;
+  last_reminded_at: string | null;
+}
+
+export async function getAssessmentReminder(athleteId: string): Promise<AssessmentReminder> {
+  const row = await api.get<AssessmentReminderRow>(`/progress/reminders/${athleteId}`);
+  return {
+    intervalWeeks: row.interval_weeks,
+    isActive: row.is_active,
+    lastRemindedAt: row.last_reminded_at,
+  };
+}
+
+export async function saveAssessmentReminder(
+  athleteId: string,
+  input: { intervalWeeks: number; isActive: boolean }
+): Promise<void> {
+  await api.put(`/progress/reminders/${athleteId}`, {
+    interval_weeks: input.intervalWeeks,
+    is_active: input.isActive,
+  });
+}
