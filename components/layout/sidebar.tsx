@@ -30,15 +30,15 @@ export function SidebarContent({
   const items = SIDEBAR_NAV[accountType];
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 px-6 py-6">
+    <div className="flex h-full min-h-0 flex-col bg-sidebar">
+      <div className="flex shrink-0 items-center gap-2.5 px-6 py-6">
         <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <GymlicMark className="size-5" />
         </div>
         <span className="text-lg font-bold text-foreground">جیم‌لیک</span>
       </div>
 
-      <nav className="flex-1 space-y-1 px-4">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-4">
         <TooltipProvider delayDuration={300}>
           {items.map((item) => {
             const isActive =
@@ -85,7 +85,7 @@ export function SidebarContent({
         </TooltipProvider>
       </nav>
 
-      <div className="space-y-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
+      <div className="shrink-0 space-y-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
         {accountType === "club" && (
           <Button className="w-full" size="lg" asChild>
             <Link href="/members?new=1" onClick={onNavigate}>
@@ -111,7 +111,7 @@ export function SidebarContent({
 
 export function Sidebar({ accountType }: { accountType: AccountType }) {
   return (
-    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-l border-sidebar-border bg-sidebar lg:block">
+    <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 border-l border-sidebar-border bg-sidebar lg:block">
       <SidebarContent accountType={accountType} />
     </aside>
   );
