@@ -294,7 +294,8 @@ final class WorkoutPlanBuilderController
         Response::ok(['dayIds' => $newDayIds], 201);
     }
 
-    private static function copyExercisesToDay(string $sourceDayId, string $targetDayId): void
+    /** Also used by PlanController::copyStructure (templates), hence public. */
+    public static function copyExercisesToDay(string $sourceDayId, string $targetDayId): void
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(

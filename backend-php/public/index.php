@@ -139,6 +139,7 @@ $router->get('/plans/{kind}', fn (array $p) => PlanController::list($p));
 $router->get('/plans/{kind}/mine', fn (array $p) => PlanController::listMine($p));
 $router->get('/plans/{kind}/templates', fn (array $p) => PlanController::listTemplates($p));
 $router->post('/plans/{kind}/templates', fn (array $p) => PlanController::saveTemplate($p));
+$router->post('/plans/{kind}/templates/{id}/apply', fn (array $p) => PlanController::applyTemplate($p));
 $router->delete('/plans/{kind}/templates/{id}', fn (array $p) => PlanController::deleteTemplate($p));
 $router->post('/plans/{kind}', fn (array $p) => PlanController::save($p));
 $router->get('/plans/{kind}/{id}', fn (array $p) => PlanController::get($p));

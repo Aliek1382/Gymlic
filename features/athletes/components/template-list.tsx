@@ -63,6 +63,8 @@ export function TemplateList({ kind }: { kind: PlanKind }) {
               </p>
               <p className="text-xs text-muted-foreground">
                 {formatPersianDate(new Date(template.createdAt))}
+                {" · "}
+                {template.builderMode === "structured" ? "ساختاریافته" : "فقط متنی"}
               </p>
             </div>
             <Button

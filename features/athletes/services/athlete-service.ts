@@ -264,17 +264,50 @@ export async function listTemplates(kind: PlanKind): Promise<PlanTemplate[]> {
     title: row.title,
     description: row.description,
     createdAt: row.assigned_at,
+    builderMode: row.builder_mode ?? "text",
   }));
 }
 
+// sourceId is the saved plan the template is made from; the server copies its
+// days/exercises or meals/foods too. Without it only title/description are kept.
 export async function saveTemplate(
   kind: PlanKind,
-  input: { title: string; description: string | null }
+  input: { title: string; description: string | null; sourceId?: string }
 ): Promise<{ id: string }> {
   return api.post<{ id: string }>(`/plans/${kind}/templates`, {
     title: input.title,
     description: input.description,
+    source_id: input.sourceId,
   });
+}
+
+// Creates a new draft plan for the target from a template, structure included.
+export async function applyTemplate(
+  kind: PlanKind,
+  templateId: string,
+  target: PlanTarget
+): Promise<{
+  id: string;
+  title: string;
+  description: string | null;
+  builderMode: "text" | "structured";
+}> {
+  const data = await api.post<{
+    id: string;
+    title: string;
+    description: string | null;
+    builder_mode?: "text" | "structured";
+  }>(`/plans/${kind}/templates/${templateId}/apply`, {
+    athlete_id: "athleteId" in target ? target.athleteId : undefined,
+    invitation_id: "invitationId" in target ? target.invitationId : undefined,
+  });
+
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    builderMode: data.builder_mode ?? "text",
+  };
 }
 
 export async function deleteTemplate(kind: PlanKind, templateId: string): Promise<void> {
