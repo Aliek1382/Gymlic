@@ -23,6 +23,7 @@ export function useWorkoutPlanExerciseActions(assignmentId: string) {
       weightKg: number | null;
       restSeconds: number | null;
       note: string | null;
+      techniqueId: string | null;
     }) => addWorkoutPlanExercise(assignmentId, input.dayId, input),
     onSuccess: invalidate,
   });
@@ -39,6 +40,7 @@ export function useWorkoutPlanExerciseActions(assignmentId: string) {
       weightKg?: number | null;
       restSeconds?: number | null;
       note?: string | null;
+      techniqueId?: string | null;
     }) => updateWorkoutPlanExercise(assignmentId, input.dayId, input.exerciseRowId, input),
   });
 

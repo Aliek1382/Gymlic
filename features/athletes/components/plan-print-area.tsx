@@ -141,9 +141,13 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
             )}
             {move.name}
           </p>
-          {(row.rest.betweenExercises || row.weightKg != null || row.note) && (
+          {(row.rest.betweenExercises ||
+            row.weightKg != null ||
+            row.note ||
+            row.customTechnique) && (
             <RowNote>
               {[
+                row.customTechnique && `تکنیک: ${row.customTechnique.name}`,
                 row.rest.betweenExercises && `استراحت تا حرکت بعد: ${row.rest.betweenExercises}`,
                 row.weightKg != null && `وزن: ${toPersianDigits(row.weightKg)} کیلوگرم`,
                 row.note,

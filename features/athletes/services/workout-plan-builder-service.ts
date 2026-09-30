@@ -10,6 +10,9 @@ interface ExerciseRow {
   weight_kg: number | null;
   rest_seconds: number | null;
   note: string | null;
+  technique_id: string | null;
+  technique_name: string | null;
+  technique_description: string | null;
   sort_order: number;
   exercise_name: string;
   exercise_name_en: string | null;
@@ -37,6 +40,9 @@ function toExercise(row: ExerciseRow): WorkoutPlanExerciseEntry {
     weightKg: row.weight_kg,
     restSeconds: row.rest_seconds,
     note: row.note,
+    techniqueId: row.technique_id,
+    techniqueName: row.technique_name,
+    techniqueDescription: row.technique_description,
     sortOrder: row.sort_order,
   };
 }
@@ -94,6 +100,7 @@ export async function addWorkoutPlanExercise(
     weightKg: number | null;
     restSeconds: number | null;
     note: string | null;
+    techniqueId: string | null;
   }
 ): Promise<{ id: string }> {
   return api.post<{ id: string }>(`/plans/workout/${assignmentId}/days/${dayId}/exercises`, {
@@ -103,6 +110,7 @@ export async function addWorkoutPlanExercise(
     weight_kg: input.weightKg,
     rest_seconds: input.restSeconds,
     note: input.note,
+    technique_id: input.techniqueId,
   });
 }
 
@@ -116,6 +124,7 @@ export async function updateWorkoutPlanExercise(
     weightKg: number | null;
     restSeconds: number | null;
     note: string | null;
+    techniqueId: string | null;
   }>
 ): Promise<void> {
   const body: Record<string, unknown> = {};
@@ -124,6 +133,7 @@ export async function updateWorkoutPlanExercise(
   if ("weightKg" in input) body.weight_kg = input.weightKg;
   if ("restSeconds" in input) body.rest_seconds = input.restSeconds;
   if ("note" in input) body.note = input.note;
+  if ("techniqueId" in input) body.technique_id = input.techniqueId;
   await api.patch(`/plans/workout/${assignmentId}/days/${dayId}/exercises/${exerciseRowId}`, body);
 }
 

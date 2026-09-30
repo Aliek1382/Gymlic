@@ -9,6 +9,11 @@ export interface WorkoutPlanExerciseEntry {
   weightKg: number | null;
   restSeconds: number | null;
   note: string | null;
+  // The trainer's technique for this exercise, if one was picked. Name and
+  // description come joined in so a plan never needs a second request.
+  techniqueId: string | null;
+  techniqueName: string | null;
+  techniqueDescription: string | null;
   sortOrder: number;
 }
 

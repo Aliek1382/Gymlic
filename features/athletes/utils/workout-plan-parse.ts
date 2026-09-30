@@ -42,6 +42,10 @@ export interface ParsedExerciseRow {
   // from `description` always leaves this undefined.
   weightKg?: number | null;
   note?: string | null;
+  // The trainer's own technique picked on a structured exercise. Separate from
+  // `technique` above, which is the fixed superset/tri-set/drop-set grammar of
+  // the free-text lines.
+  customTechnique?: { name: string; description: string | null } | null;
 }
 
 export interface ParsedTextRow {
@@ -416,6 +420,9 @@ export function structuredDaysToSections(days: WorkoutPlanDay[]): ParsedSection[
           muscleGroup: exercise.muscleGroup,
           weightKg: exercise.weightKg,
           note: exercise.note,
+          customTechnique: exercise.techniqueName
+            ? { name: exercise.techniqueName, description: exercise.techniqueDescription }
+            : null,
         })),
     }));
 }

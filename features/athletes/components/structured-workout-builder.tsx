@@ -23,6 +23,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { toPersianDigits } from "@/lib/persian";
 import { useExercisesForPicker } from "@/features/exercises";
+import { TechniquePicker } from "@/features/techniques";
 import { getMuscleGroupBadgeVariant } from "@/features/exercises/utils/muscle-group-color";
 import type { ExercisePickerItem } from "@/features/exercises/types/exercise-types";
 import { useWorkoutPlanDayActions } from "../hooks/use-workout-plan-day-actions";
@@ -104,6 +105,7 @@ function ExerciseRow({
     exercise.restSeconds !== null ? String(exercise.restSeconds) : ""
   );
   const [note, setNote] = useState(exercise.note ?? "");
+  const [techniqueId, setTechniqueId] = useState(exercise.techniqueId);
 
   const save = useDebouncedCallback(
     (patch: Parameters<typeof updateExercise.mutate>[0]) => updateExercise.mutate(patch),
@@ -200,16 +202,29 @@ function ExerciseRow({
         </LabeledField>
       </div>
 
-      <LabeledField label="یادداشت">
-        <Input
-          value={note}
-          onChange={(e) => {
-            setNote(e.target.value);
-            save({ dayId, exerciseRowId: exercise.id, note: e.target.value || null });
-          }}
-          placeholder="مثلا سوپرست با حرکت بعدی"
-        />
-      </LabeledField>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <LabeledField label="تکنیک">
+          <TechniquePicker
+            value={techniqueId}
+            onChange={(next) => {
+              setTechniqueId(next);
+              // Not debounced: a picker change is one discrete click, and going
+              // through `save` would cancel a note edit still waiting to flush.
+              updateExercise.mutate({ dayId, exerciseRowId: exercise.id, techniqueId: next });
+            }}
+          />
+        </LabeledField>
+        <LabeledField label="یادداشت">
+          <Input
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value);
+              save({ dayId, exerciseRowId: exercise.id, note: e.target.value || null });
+            }}
+            placeholder="مثلا فقط تا ست سوم"
+          />
+        </LabeledField>
+      </div>
     </div>
   );
 }
@@ -223,6 +238,7 @@ function AddExerciseForm({ assignmentId, dayId }: { assignmentId: string; dayId:
   const [reps, setReps] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [restSeconds, setRestSeconds] = useState("");
+  const [techniqueId, setTechniqueId] = useState<string | null>(null);
 
   const groups = groupByMuscle(exercises.data ?? []);
 
@@ -237,12 +253,14 @@ function AddExerciseForm({ assignmentId, dayId }: { assignmentId: string; dayId:
         weightKg: parseOptionalFloat(weightKg),
         restSeconds: parseOptionalInt(restSeconds),
         note: null,
+        techniqueId,
       });
       setExerciseId("");
       setSets("");
       setReps("");
       setWeightKg("");
       setRestSeconds("");
+      setTechniqueId(null);
     } catch (error) {
       toast.error(getErrorMessage(error, "افزودن حرکت با خطا مواجه شد."));
     }
@@ -306,6 +324,10 @@ function AddExerciseForm({ assignmentId, dayId }: { assignmentId: string; dayId:
           />
         </LabeledField>
       </div>
+
+      <LabeledField label="تکنیک (اختیاری)">
+        <TechniquePicker value={techniqueId} onChange={setTechniqueId} />
+      </LabeledField>
 
       <Button
         type="button"

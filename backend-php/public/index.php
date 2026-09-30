@@ -29,6 +29,7 @@ use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\NutritionPlanBuilderController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\SessionPackageController;
+use Gymlic\Controllers\TechniqueController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
@@ -171,6 +172,11 @@ $router->get('/library/{kind}', fn (array $p) => LibraryController::list($p));
 $router->get('/library/{kind}/picker', fn (array $p) => LibraryController::picker($p));
 $router->post('/library/{kind}', fn (array $p) => LibraryController::create($p));
 $router->post('/library/{kind}/{id}/usage', fn (array $p) => LibraryController::recordUsage($p));
+
+$router->get('/techniques', fn () => TechniqueController::list());
+$router->post('/techniques', fn () => TechniqueController::create());
+$router->patch('/techniques/{id}', fn (array $p) => TechniqueController::update($p));
+$router->delete('/techniques/{id}', fn (array $p) => TechniqueController::delete($p));
 
 $router->get('/dashboard/athlete', fn () => DashboardController::athlete());
 $router->get('/dashboard/trainer', fn () => DashboardController::trainer());
