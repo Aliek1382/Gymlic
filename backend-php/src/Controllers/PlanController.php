@@ -255,7 +255,7 @@ final class PlanController
         $table = self::table($params['kind']);
 
         $stmt = Database::connection()->prepare(
-            "SELECT id, title, description, assigned_at FROM {$table}
+            "SELECT id, title, description, assigned_at, " . self::builderModeColumn($params['kind']) . " FROM {$table}
              WHERE trainer_id = :trainer_id AND is_template = 1
              ORDER BY assigned_at DESC"
         );
@@ -270,18 +270,191 @@ final class PlanController
         $table = self::table($params['kind']);
         $data = Validate::required(Validate::body(), ['title']);
 
+        // Optional: the plan the template is made from. Without it (or when
+        // that plan is plain text) only title/description are stored.
+        $sourceId = Validate::nullableString($data['source_id'] ?? null);
+        if ($sourceId !== null) {
+            $source = self::planOr404($params['kind'], $sourceId);
+            Acl::require($source['trainer_id'] === $user['id'], 'Only the plan\'s trainer can save it as a template.');
+        }
+
+        $pdo = Database::connection();
         $id = Uuid::v4();
-        Database::connection()->prepare(
-            "INSERT INTO {$table} (id, trainer_id, title, description, is_template)
-             VALUES (:id, :trainer_id, :title, :description, 1)"
-        )->execute([
-            'id'          => $id,
-            'trainer_id'  => $user['id'],
-            'title'       => (string) $data['title'],
-            'description' => Validate::nullableString($data['description'] ?? null),
-        ]);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare(
+                "INSERT INTO {$table} (id, trainer_id, title, description, is_template)
+                 VALUES (:id, :trainer_id, :title, :description, 1)"
+            )->execute([
+                'id'          => $id,
+                'trainer_id'  => $user['id'],
+                'title'       => (string) $data['title'],
+                'description' => Validate::nullableString($data['description'] ?? null),
+            ]);
+
+            if ($sourceId !== null) {
+                self::copyStructure($sourceId, $id, $params['kind']);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
 
         Response::ok(['id' => $id], 201);
+    }
+
+    /**
+     * Starts a new draft plan for an athlete/invitation from one of the
+     * trainer's templates, copying the template's structure (if any) so the
+     * draft is fully independent of it.
+     */
+    public static function applyTemplate(array $params): void
+    {
+        $user = Auth::requireUser();
+        $kind = $params['kind'];
+        $table = self::table($kind);
+        $data = Validate::body();
+
+        $template = self::planOr404($kind, $params['id']);
+        if ((int) $template['is_template'] !== 1 || $template['trainer_id'] !== $user['id']) {
+            Response::error(404, 'not_found', 'Template not found.');
+            return;
+        }
+
+        $athleteId = Validate::nullableString($data['athlete_id'] ?? null);
+        $invitationId = Validate::nullableString($data['invitation_id'] ?? null);
+
+        if ($athleteId === null && $invitationId === null) {
+            Response::error(400, 'missing_target', 'Pass athlete_id or invitation_id.');
+            return;
+        }
+        if ($athleteId !== null) {
+            Acl::require(Acl::isTrainerOf($user['id'], $athleteId), 'This athlete is not on your roster.');
+        }
+
+        $title = trim((string) ($data['title'] ?? ''));
+        if ($title === '') {
+            $title = (string) $template['title'];
+        }
+
+        $pdo = Database::connection();
+        $clubId = self::trainerClubId($user['id']);
+        $id = Uuid::v4();
+
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare(
+                "INSERT INTO {$table} (id, club_id, trainer_id, athlete_id, invitation_id, title, description, status)
+                 VALUES (:id, :club_id, :trainer_id, :athlete_id, :invitation_id, :title, :description, 'draft')"
+            )->execute([
+                'id'            => $id,
+                'club_id'       => $clubId,
+                'trainer_id'    => $user['id'],
+                'athlete_id'    => $athleteId,
+                'invitation_id' => $invitationId,
+                'title'         => $title,
+                'description'   => $template['description'],
+            ]);
+
+            self::copyStructure($params['id'], $id, $kind);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        $created = self::planOr404($kind, $id);
+        Response::ok([
+            'id'           => $id,
+            'title'        => $created['title'],
+            'description'  => $created['description'],
+            'builder_mode' => $created['builder_mode'],
+        ], 201);
+    }
+
+    /**
+     * Deep-copies the structured rows (workout days + exercises, or nutrition
+     * meals + items) of one assignment under another, with fresh ids, so the
+     * two never share a row. A text plan has no rows and this is a no-op.
+     * Shared by saveTemplate (plan -> template) and applyTemplate
+     * (template -> plan). Callers wrap it in a transaction.
+     */
+    private static function copyStructure(string $fromAssignmentId, string $toAssignmentId, string $kind): void
+    {
+        $pdo = Database::connection();
+
+        if ($kind === 'workout') {
+            $stmt = $pdo->prepare(
+                'SELECT id, week_number, day_number, day_name, sort_order FROM workout_plan_days
+                 WHERE assignment_id = :assignment_id ORDER BY sort_order ASC'
+            );
+            $stmt->execute(['assignment_id' => $fromAssignmentId]);
+            $days = $stmt->fetchAll();
+            if ($days === []) {
+                return;
+            }
+
+            $insert = $pdo->prepare(
+                'INSERT INTO workout_plan_days (id, assignment_id, week_number, day_number, day_name, sort_order)
+                 VALUES (:id, :assignment_id, :week_number, :day_number, :day_name, :sort_order)'
+            );
+            foreach ($days as $day) {
+                $newDayId = Uuid::v4();
+                $insert->execute([
+                    'id'            => $newDayId,
+                    'assignment_id' => $toAssignmentId,
+                    'week_number'   => $day['week_number'],
+                    'day_number'    => $day['day_number'],
+                    'day_name'      => $day['day_name'],
+                    'sort_order'    => $day['sort_order'],
+                ]);
+                WorkoutPlanBuilderController::copyExercisesToDay($day['id'], $newDayId);
+            }
+
+            $pdo->prepare("UPDATE workout_assignments SET builder_mode = 'structured' WHERE id = :id")
+                ->execute(['id' => $toAssignmentId]);
+            return;
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT id, meal_name, sort_order FROM nutrition_plan_meals
+             WHERE assignment_id = :assignment_id ORDER BY sort_order ASC'
+        );
+        $stmt->execute(['assignment_id' => $fromAssignmentId]);
+        $insertMeal = $pdo->prepare(
+            'INSERT INTO nutrition_plan_meals (id, assignment_id, meal_name, sort_order)
+             VALUES (:id, :assignment_id, :meal_name, :sort_order)'
+        );
+        $selectItems = $pdo->prepare(
+            'SELECT food_id, amount, unit, note, sort_order FROM nutrition_plan_items
+             WHERE meal_id = :meal_id ORDER BY sort_order ASC'
+        );
+        $insertItem = $pdo->prepare(
+            'INSERT INTO nutrition_plan_items (id, meal_id, food_id, amount, unit, note, sort_order)
+             VALUES (:id, :meal_id, :food_id, :amount, :unit, :note, :sort_order)'
+        );
+        foreach ($stmt->fetchAll() as $meal) {
+            $newMealId = Uuid::v4();
+            $insertMeal->execute([
+                'id'            => $newMealId,
+                'assignment_id' => $toAssignmentId,
+                'meal_name'     => $meal['meal_name'],
+                'sort_order'    => $meal['sort_order'],
+            ]);
+            $selectItems->execute(['meal_id' => $meal['id']]);
+            foreach ($selectItems->fetchAll() as $item) {
+                $insertItem->execute([
+                    'id'         => Uuid::v4(),
+                    'meal_id'    => $newMealId,
+                    'food_id'    => $item['food_id'],
+                    'amount'     => $item['amount'],
+                    'unit'       => $item['unit'],
+                    'note'       => $item['note'],
+                    'sort_order' => $item['sort_order'],
+                ]);
+            }
+        }
     }
 
     public static function deleteTemplate(array $params): void

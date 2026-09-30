@@ -57,6 +57,9 @@ export interface PlanTemplate {
   title: string;
   description: string | null;
   createdAt: string;
+  // "structured" templates carry days/exercises or meals/foods, "text" ones
+  // only a title and description.
+  builderMode: "text" | "structured";
 }
 
 // One message in the back-and-forth on an assigned plan — a trainer and

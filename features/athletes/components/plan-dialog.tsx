@@ -29,6 +29,7 @@ import { useDeleteTemplate } from "../hooks/use-delete-template";
 import { nutritionPlanMealsKey } from "../hooks/use-nutrition-plan-meals";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
+import { useApplyTemplate } from "../hooks/use-apply-template";
 import { useSaveTemplate } from "../hooks/use-save-template";
 import { useTemplates } from "../hooks/use-templates";
 import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
@@ -76,6 +77,7 @@ export function PlanDialog({
   const savePlan = useSavePlan(kind, target);
   const templates = useTemplates(kind, open);
   const saveTemplate = useSaveTemplate(kind);
+  const applyTemplate = useApplyTemplate(kind, target);
   const deleteTemplate = useDeleteTemplate(kind);
   const { title: kindTitle, icon: Icon } = KIND_LABEL[kind];
 
@@ -167,9 +169,18 @@ export function PlanDialog({
     form.setValue("description", next, { shouldDirty: true });
   }
 
-  function handleApplyTemplate(template: { title: string; description: string | null }) {
-    form.reset({ title: template.title, description: template.description ?? "" });
-    toast.success("قالب اعمال شد — قبل از ثبت می‌توانید ویرایش کنید.");
+  // The server builds a whole new draft from the template — structure
+  // included — so we just open it, instead of copying text into the form.
+  async function handleApplyTemplate(templateId: string) {
+    try {
+      const draft = await applyTemplate.mutateAsync(templateId);
+      form.reset({ title: draft.title, description: draft.description ?? "" });
+      setDraftId(draft.id);
+      setBuilderMode(draft.builderMode);
+      toast.success("قالب اعمال شد — قبل از ثبت می‌توانید ویرایش کنید.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "اعمال قالب با خطا مواجه شد."));
+    }
   }
 
   async function handleSaveAsTemplate() {
@@ -178,10 +189,17 @@ export function PlanDialog({
       toast.error("برای ذخیره قالب، عنوان را وارد کنید.");
       return;
     }
+    if (builderMode === "structured" && !draftId) {
+      toast.error("اول برنامه را ذخیره کنید.");
+      return;
+    }
     try {
       await saveTemplate.mutateAsync({
         title: values.title,
-        description: values.description || null,
+        description: builderMode === "structured" ? null : values.description || null,
+        // The saved plan the server copies days/exercises or meals/foods from.
+        // A text plan that was never saved has none and is stored as text only.
+        sourceId: draftId ?? undefined,
       });
       toast.success("به‌عنوان قالب ذخیره شد.");
     } catch (error) {
@@ -246,10 +264,14 @@ export function PlanDialog({
                 >
                   <button
                     type="button"
-                    onClick={() => handleApplyTemplate(template)}
+                    disabled={applyTemplate.isPending}
+                    onClick={() => handleApplyTemplate(template.id)}
                     className="rounded-full px-2 py-1 text-xs font-medium text-foreground hover:text-primary"
                   >
                     {template.title}
+                    <span className="mr-1 text-[10px] font-normal text-muted-foreground">
+                      {template.builderMode === "structured" ? "ساختاریافته" : "متنی"}
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -388,23 +410,21 @@ export function PlanDialog({
             )}
           </div>
 
-          {builderMode !== "structured" && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full text-muted-foreground"
-              disabled={saveTemplate.isPending}
-              onClick={handleSaveAsTemplate}
-            >
-              {saveTemplate.isPending ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Bookmark />
-              )}
-              ذخیره به‌عنوان قالب
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground"
+            disabled={saveTemplate.isPending || (builderMode === "structured" && !draftId)}
+            onClick={handleSaveAsTemplate}
+          >
+            {saveTemplate.isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Bookmark />
+            )}
+            ذخیره به‌عنوان قالب
+          </Button>
         </form>
 
         <div className="space-y-2 border-t border-border pt-4">
