@@ -24,7 +24,7 @@ use Gymlic\Validate;
  */
 final class WorkoutPlanBuilderController
 {
-    private const EXERCISE_FIELDS = ['sets', 'reps', 'weight_kg', 'rest_seconds', 'note', 'sort_order'];
+    private const EXERCISE_FIELDS = ['sets', 'reps', 'weight_kg', 'rest_seconds', 'note', 'technique_id', 'sort_order'];
 
     public static function listDays(array $params): void
     {
@@ -128,6 +128,7 @@ final class WorkoutPlanBuilderController
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         $data = Validate::required(Validate::body(), ['exercise_id']);
+        $techniqueId = self::techniqueIdOr404($data['technique_id'] ?? null, $user['id']);
         $pdo = Database::connection();
 
         $stmt = $pdo->prepare(
@@ -139,8 +140,8 @@ final class WorkoutPlanBuilderController
 
         $id = Uuid::v4();
         $pdo->prepare(
-            'INSERT INTO workout_plan_exercises (id, day_id, exercise_id, sets, reps, weight_kg, rest_seconds, note, sort_order)
-             VALUES (:id, :day_id, :exercise_id, :sets, :reps, :weight_kg, :rest_seconds, :note, :sort_order)'
+            'INSERT INTO workout_plan_exercises (id, day_id, exercise_id, sets, reps, weight_kg, rest_seconds, note, technique_id, sort_order)
+             VALUES (:id, :day_id, :exercise_id, :sets, :reps, :weight_kg, :rest_seconds, :note, :technique_id, :sort_order)'
         )->execute([
             'id'           => $id,
             'day_id'       => $day['id'],
@@ -150,6 +151,7 @@ final class WorkoutPlanBuilderController
             'weight_kg'    => $data['weight_kg'] ?? null,
             'rest_seconds' => isset($data['rest_seconds']) ? (int) $data['rest_seconds'] : null,
             'note'         => Validate::nullableString($data['note'] ?? null),
+            'technique_id' => $techniqueId,
             'sort_order'   => $sortOrder,
         ]);
 
@@ -175,7 +177,11 @@ final class WorkoutPlanBuilderController
                 continue;
             }
             $fields[] = "{$key} = :{$key}";
-            $bind[$key] = $key === 'note' ? Validate::nullableString($data[$key]) : $data[$key];
+            $bind[$key] = match ($key) {
+                'note'         => Validate::nullableString($data[$key]),
+                'technique_id' => self::techniqueIdOr404($data[$key], $user['id']),
+                default        => $data[$key],
+            };
         }
 
         if ($fields === []) {
@@ -298,14 +304,14 @@ final class WorkoutPlanBuilderController
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'SELECT exercise_id, sets, reps, weight_kg, rest_seconds, note, sort_order
+            'SELECT exercise_id, sets, reps, weight_kg, rest_seconds, note, technique_id, sort_order
              FROM workout_plan_exercises WHERE day_id = :day_id ORDER BY sort_order ASC'
         );
         $stmt->execute(['day_id' => $sourceDayId]);
 
         $insert = $pdo->prepare(
-            'INSERT INTO workout_plan_exercises (id, day_id, exercise_id, sets, reps, weight_kg, rest_seconds, note, sort_order)
-             VALUES (:id, :day_id, :exercise_id, :sets, :reps, :weight_kg, :rest_seconds, :note, :sort_order)'
+            'INSERT INTO workout_plan_exercises (id, day_id, exercise_id, sets, reps, weight_kg, rest_seconds, note, technique_id, sort_order)
+             VALUES (:id, :day_id, :exercise_id, :sets, :reps, :weight_kg, :rest_seconds, :note, :technique_id, :sort_order)'
         );
         foreach ($stmt->fetchAll() as $row) {
             $insert->execute([
@@ -317,6 +323,7 @@ final class WorkoutPlanBuilderController
                 'weight_kg'    => $row['weight_kg'],
                 'rest_seconds' => $row['rest_seconds'],
                 'note'         => $row['note'],
+                'technique_id' => $row['technique_id'],
                 'sort_order'   => $row['sort_order'],
             ]);
         }
@@ -341,10 +348,12 @@ final class WorkoutPlanBuilderController
         $dayIds = array_column($days, 'id');
         $placeholders = implode(',', array_fill(0, count($dayIds), '?'));
         $stmt = Database::connection()->prepare(
-            "SELECT e.id, e.day_id, e.exercise_id, e.sets, e.reps, e.weight_kg, e.rest_seconds, e.note, e.sort_order,
-                    x.name AS exercise_name, x.name_en AS exercise_name_en, x.muscle_group
+            "SELECT e.id, e.day_id, e.exercise_id, e.sets, e.reps, e.weight_kg, e.rest_seconds, e.note, e.technique_id, e.sort_order,
+                    x.name AS exercise_name, x.name_en AS exercise_name_en, x.muscle_group,
+                    t.name AS technique_name, t.description AS technique_description
              FROM workout_plan_exercises e
              JOIN exercises x ON x.id = e.exercise_id
+             LEFT JOIN techniques t ON t.id = e.technique_id
              WHERE e.day_id IN ({$placeholders})
              ORDER BY e.sort_order ASC"
         );
@@ -425,6 +434,23 @@ final class WorkoutPlanBuilderController
         }
 
         return $exercise;
+    }
+
+    /**
+     * The technique_id a request may attach: absent/''/null means none, anything
+     * else must be one of this trainer's own techniques — 404 otherwise, the
+     * same answer for someone else's technique as for a made-up id.
+     */
+    private static function techniqueIdOr404(mixed $techniqueId, string $coachId): ?string
+    {
+        if ($techniqueId === null || $techniqueId === '') {
+            return null;
+        }
+        if (!is_string($techniqueId) || !TechniqueController::isOwnedBy($techniqueId, $coachId)) {
+            Response::error(404, 'not_found', 'Technique not found.');
+            exit;
+        }
+        return $techniqueId;
     }
 
     private static function markStructured(\PDO $pdo, string $assignmentId): void

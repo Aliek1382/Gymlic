@@ -391,6 +391,21 @@ CREATE TABLE workout_plan_days (
   CONSTRAINT fk_wpd_assignment FOREIGN KEY (assignment_id) REFERENCES workout_assignments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- techniques: a trainer's own named training techniques (drop-set, super-set…)
+-- with an explanation the athlete can read from the plan. Always private to the
+-- trainer — unlike exercises/foods there is no shared preset row. Must exist
+-- before workout_plan_exercises, which points at it.
+CREATE TABLE techniques (
+  id          CHAR(36) NOT NULL PRIMARY KEY,
+  coach_id    CHAR(36) NOT NULL,
+  name        VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_techniques_coach_name (coach_id, name),
+  CONSTRAINT fk_techniques_coach FOREIGN KEY (coach_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE workout_plan_exercises (
   id             CHAR(36) NOT NULL PRIMARY KEY,
   day_id         CHAR(36) NOT NULL,
@@ -400,13 +415,16 @@ CREATE TABLE workout_plan_exercises (
   weight_kg      DECIMAL(6,2) NULL,
   rest_seconds   INT NULL,
   note           VARCHAR(500) NULL,
+  -- Optional link to the trainer's technique bank; note stays a free extra line.
+  technique_id   CHAR(36) NULL,
   sort_order     INT NOT NULL DEFAULT 0,
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_wpe_day (day_id, sort_order),
   KEY idx_wpe_exercise (exercise_id),
   CONSTRAINT fk_wpe_day FOREIGN KEY (day_id) REFERENCES workout_plan_days(id) ON DELETE CASCADE,
-  CONSTRAINT fk_wpe_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(id)
+  CONSTRAINT fk_wpe_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(id),
+  CONSTRAINT fk_wpe_technique FOREIGN KEY (technique_id) REFERENCES techniques(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================

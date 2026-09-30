@@ -24,6 +24,7 @@ import {
   type PlanTechnique,
 } from "../utils/workout-plan-parse";
 import { getTodayWeekday, headingWeekday } from "../utils/workout-plan-weekday";
+import { TechniqueInfo } from "@/features/techniques";
 import { useWorkoutPlanDays } from "../hooks/use-workout-plan-days";
 import type { Weekday } from "../utils/workout-plan-text";
 import type { PlanKind } from "../types/athlete-types";
@@ -91,6 +92,12 @@ function ExerciseRow({ row, index }: { row: ParsedExerciseRow; index: number }) 
               <span className={GROUP_CHIP}>{row.muscleGroup}</span>
             )}
             <p className="text-sm font-medium text-foreground">{move.name}</p>
+            {row.customTechnique && (
+              <TechniqueInfo
+                name={row.customTechnique.name}
+                description={row.customTechnique.description}
+              />
+            )}
           </div>
           {rest && <p className="mt-0.5 text-xs text-muted-foreground">{rest}</p>}
         </div>
