@@ -5,6 +5,7 @@ import { Trophy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
+import { cn } from "@/lib/utils";
 import { formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { useMyPoints } from "../hooks/use-my-points";
 import { PointsWidget } from "./points-widget";
@@ -38,8 +39,16 @@ export function PointsHistory() {
                     {formatPersianDate(new Date(log.createdAt.replace(" ", "T")))}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-success" dir="ltr">
-                  +{toPersianDigits(log.points)}
+                {/* Negative only when the admin took points away by hand. */}
+                <span
+                  className={cn(
+                    "text-sm font-bold",
+                    log.points < 0 ? "text-destructive" : "text-success"
+                  )}
+                  dir="ltr"
+                >
+                  {log.points < 0 ? "−" : "+"}
+                  {toPersianDigits(Math.abs(log.points))}
                 </span>
               </div>
             ))

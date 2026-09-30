@@ -24,13 +24,17 @@ final class PointsController
         $total = (int) $sum->fetchColumn();
 
         // LEFT JOIN: a rule the owner later deleted must not hide its history.
+        // An admin's manual award has no rule at all.
         $logs = $pdo->prepare(
-            'SELECT l.id, l.action_type, COALESCE(r.label, l.action_type) AS label, l.points, l.created_at
+            "SELECT l.id, l.action_type,
+                    COALESCE(r.label, CASE WHEN l.action_type = '" . AdminPointsController::ADJUSTMENT . "'
+                                           THEN 'امتیاز از طرف مدیریت' ELSE l.action_type END) AS label,
+                    l.points, l.created_at
              FROM coach_point_logs l
              LEFT JOIN point_rules r ON r.action_type = l.action_type
              WHERE l.coach_id = :id
              ORDER BY l.created_at DESC, l.id
-             LIMIT ' . self::RECENT_LOGS
+             LIMIT " . self::RECENT_LOGS
         );
         $logs->execute(['id' => $user['id']]);
 

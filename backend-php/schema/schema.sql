@@ -356,6 +356,7 @@ CREATE TABLE exercises (
   description   TEXT NULL,
   muscle_group  VARCHAR(100) NOT NULL,
   created_by    CHAR(36) NULL,
+  is_hidden     TINYINT(1) NOT NULL DEFAULT 0,  -- hidden by the admin from lists/pickers
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_exercises_creator (created_by),
   CONSTRAINT fk_exercises_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE CASCADE
@@ -447,6 +448,7 @@ CREATE TABLE foods (
   carbs_g       DECIMAL(8,4) NULL,
   fat_g         DECIMAL(8,4) NULL,
   created_by    CHAR(36) NULL,
+  is_hidden     TINYINT(1) NOT NULL DEFAULT 0,  -- hidden by the admin from lists/pickers
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_foods_creator (created_by),
   CONSTRAINT fk_foods_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE CASCADE
@@ -735,6 +737,7 @@ CREATE TABLE supplements (
   description TEXT NULL,
   image_url   VARCHAR(1024) NULL,
   created_by  CHAR(36) NULL,   -- NULL = بانک عمومی، پر = اختصاصی همان مربی (دقیقاً مثل exercises/foods)
+  is_hidden   TINYINT(1) NOT NULL DEFAULT 0,  -- hidden by the admin from lists/pickers
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_supplements_creator (created_by),
   CONSTRAINT fk_supplements_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE CASCADE

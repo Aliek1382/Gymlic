@@ -23,7 +23,8 @@ export function PointsWidget() {
 
   const { totalPoints, level, pointsToNextLevel } = points.data;
   const span = level.nextMinPoints !== null ? level.nextMinPoints - level.minPoints : 0;
-  const percent = span > 0 ? Math.min(100, ((totalPoints - level.minPoints) / span) * 100) : 100;
+  const percent =
+    span > 0 ? Math.max(0, Math.min(100, ((totalPoints - level.minPoints) / span) * 100)) : 100;
 
   return (
     <Card className="gap-4 py-5">

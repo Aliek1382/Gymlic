@@ -18,12 +18,22 @@ final class Settings
 {
     public const ROLES = ['club', 'trainer', 'athlete'];
 
-    public const KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features'];
+    public const KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels'];
 
     /** The groups any visitor may read; everything else is admin-only. */
     public const PUBLIC_KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features'];
 
     private const ANNOUNCEMENT_TONES = ['info', 'warning', 'success'];
+
+    /** Coach levels before the admin edits them (what PointsService used to hard-code). */
+    public const DEFAULT_POINT_LEVELS = [
+        ['name' => 'تازه‌کار', 'min_points' => 0],
+        ['name' => 'مربی فعال', 'min_points' => 100],
+        ['name' => 'مربی حرفه‌ای', 'min_points' => 500],
+        ['name' => 'مربی برتر', 'min_points' => 2000],
+    ];
+
+    private const MAX_POINT_LEVELS = 20;
 
     /** @var array<string, mixed>|null raw decoded rows, loaded once per request */
     private static ?array $stored = null;
@@ -127,6 +137,7 @@ final class Settings
                 'hours'    => self::text($v['hours'] ?? null, 200),
             ],
             'features' => self::features($v),
+            'points_levels' => ['levels' => self::pointLevels($v['levels'] ?? null)],
             default => throw new \InvalidArgumentException("Unknown settings key: {$key}"),
         };
     }
@@ -143,6 +154,46 @@ final class Settings
             ];
         }
         return $out;
+    }
+
+    /**
+     * Levels sorted by threshold, the lowest always starting at 0 (every coach
+     * must be on some level), no two sharing a threshold, none unnamed.
+     */
+    private static function pointLevels(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return self::DEFAULT_POINT_LEVELS;
+        }
+
+        $levels = [];
+        foreach ($value as $level) {
+            if (!is_array($level)) {
+                continue;
+            }
+            $name = self::text($level['name'] ?? null, 50);
+            $min = $level['min_points'] ?? null;
+            if ($name === '' || !is_numeric($min)) {
+                continue;
+            }
+            $levels[] = ['name' => $name, 'min_points' => max(0, min(100_000_000, (int) $min))];
+        }
+
+        usort($levels, static fn (array $a, array $b): int => $a['min_points'] <=> $b['min_points']);
+
+        $unique = [];
+        foreach ($levels as $level) {
+            if (!isset($unique[$level['min_points']])) {
+                $unique[$level['min_points']] = $level;
+            }
+        }
+        $levels = array_slice(array_values($unique), 0, self::MAX_POINT_LEVELS);
+
+        if ($levels === []) {
+            return self::DEFAULT_POINT_LEVELS;
+        }
+        $levels[0]['min_points'] = 0;
+        return $levels;
     }
 
     /** @param string[] $allowed */
