@@ -101,6 +101,122 @@ final class ProgressController
         Response::ok(['ok' => true]);
     }
 
+    /** Trainer: the reminder settings for one athlete, or the defaults if none were saved yet. */
+    public static function getReminder(array $params): void
+    {
+        $user = Auth::requireUser();
+        $athleteId = $params['athleteId'];
+
+        Acl::require(Acl::isTrainerOf($user['id'], $athleteId));
+
+        $stmt = Database::connection()->prepare(
+            'SELECT interval_weeks, is_active, last_reminded_at FROM assessment_reminders
+             WHERE trainer_id = :trainer_id AND athlete_id = :athlete_id'
+        );
+        $stmt->execute(['trainer_id' => $user['id'], 'athlete_id' => $athleteId]);
+        $row = $stmt->fetch();
+
+        Response::ok($row === false
+            ? ['interval_weeks' => 4, 'is_active' => true, 'last_reminded_at' => null]
+            : [
+                'interval_weeks'   => (int) $row['interval_weeks'],
+                'is_active'        => (bool) $row['is_active'],
+                'last_reminded_at' => $row['last_reminded_at'],
+            ]);
+    }
+
+    /** Trainer: set the re-measure interval (weeks) and on/off for one athlete. */
+    public static function setReminder(array $params): void
+    {
+        $user = Auth::requireUser();
+        $athleteId = $params['athleteId'];
+
+        Acl::require(Acl::isTrainerOf($user['id'], $athleteId));
+
+        $data = Validate::body();
+        $weeks = $data['interval_weeks'] ?? 4;
+        if (!is_int($weeks) || $weeks < 1 || $weeks > 52) {
+            Response::error(400, 'invalid_interval', 'interval_weeks must be a whole number from 1 to 52.');
+            return;
+        }
+        $active = $data['is_active'] ?? true;
+        if (!is_bool($active)) {
+            Response::error(400, 'invalid_is_active', 'is_active must be true or false.');
+            return;
+        }
+
+        Database::connection()->prepare(
+            'INSERT INTO assessment_reminders (id, trainer_id, athlete_id, interval_weeks, is_active)
+             VALUES (:id, :trainer_id, :athlete_id, :interval_weeks, :is_active)
+             ON DUPLICATE KEY UPDATE interval_weeks = VALUES(interval_weeks), is_active = VALUES(is_active)'
+        )->execute([
+            'id'             => Uuid::v4(),
+            'trainer_id'     => $user['id'],
+            'athlete_id'     => $athleteId,
+            'interval_weeks' => $weeks,
+            'is_active'      => $active ? 1 : 0,
+        ]);
+
+        Response::ok(['interval_weeks' => $weeks, 'is_active' => $active]);
+    }
+
+    /**
+     * Called by cron/assessment-reminders.php. An active reminder is due once the
+     * athlete's latest measurement (or, if they have none, the day the reminder
+     * was created) is at least interval_weeks old AND we have not already
+     * reminded within the same interval. The reminder row is claimed with a
+     * conditional UPDATE before notifying, so overlapping runs send nothing twice.
+     * An athlete measuring in time pushes the due date out, so they get nothing.
+     * Returns how many notifications were created.
+     */
+    public static function sendDueReminders(): int
+    {
+        $pdo = Database::connection();
+
+        $due = $pdo->query(
+            "SELECT ar.id, ar.trainer_id, ar.athlete_id
+             FROM assessment_reminders ar
+             JOIN trainer_athletes ta
+               ON ta.trainer_id = ar.trainer_id AND ta.athlete_id = ar.athlete_id AND ta.status = 'active'
+             WHERE ar.is_active = 1
+               AND COALESCE((SELECT MAX(m.recorded_at) FROM measurements m WHERE m.athlete_id = ar.athlete_id), ar.created_at)
+                   <= DATE_SUB(NOW(), INTERVAL ar.interval_weeks WEEK)
+               AND (ar.last_reminded_at IS NULL OR ar.last_reminded_at < DATE_SUB(NOW(), INTERVAL ar.interval_weeks WEEK))"
+        )->fetchAll();
+
+        $claim = $pdo->prepare(
+            'UPDATE assessment_reminders SET last_reminded_at = NOW()
+             WHERE id = :id AND (last_reminded_at IS NULL OR last_reminded_at < DATE_SUB(NOW(), INTERVAL interval_weeks WEEK))'
+        );
+
+        $sent = 0;
+        $notified = [];
+        foreach ($due as $row) {
+            $claim->execute(['id' => $row['id']]);
+            if ($claim->rowCount() === 0) {
+                continue;
+            }
+            // An athlete with two trainers who both set a reminder still gets one notification per run.
+            if (isset($notified[$row['athlete_id']])) {
+                continue;
+            }
+            $notified[$row['athlete_id']] = true;
+
+            AuthController::notify(
+                $pdo,
+                $row['athlete_id'],
+                $row['trainer_id'],
+                'assessment_reminder',
+                'یادآوری ثبت اندازه‌گیری',
+                'وقتشه دوباره اندازه‌هاتو ثبت کنی.',
+                '/progress'
+            );
+            $sent++;
+        }
+
+        return $sent;
+    }
+
     /**
      * notify_measurement_recorded (0020): an athlete's own entry notifies every
      * active trainer; a trainer's entry notifies the athlete.

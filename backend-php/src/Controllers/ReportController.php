@@ -12,6 +12,15 @@ use Gymlic\Response;
 /** Trainer-side analytics. All read-only. */
 final class ReportController
 {
+    /**
+     * Whether the invoices table exists on the live database. Flip to true
+     * once the invoice task's SQL has been run in phpMyAdmin; while false the
+     * financial summary reads trainer_payments only. Deliberately a constant
+     * here rather than a config.php key: the live config.php is never
+     * overwritten by a deploy, so a new key would silently be missing there.
+     */
+    private const INVOICES_DEPLOYED = false;
+
     public static function monthlyStats(): void
     {
         $user = Auth::requireUser();
@@ -36,6 +45,65 @@ final class ReportController
         Response::ok(Cast::row($stmt->fetch(), [], [
             'athletes_count', 'workout_plans_this_month', 'nutrition_plans_this_month',
         ]));
+    }
+
+    /**
+     * Money the trainer received, summed on the server per month (Gregorian
+     * 'YYYY-MM') and payment method over from..to inclusive (YYYY-MM-DD).
+     * Sources: the manual ledger (trainer_payments) and, when deployed, paid
+     * invoices — which already cover session packages, so those are not
+     * counted a second time. Read-only.
+     */
+    public static function financialSummary(): void
+    {
+        $user = Auth::requireUser();
+
+        $from = (string) ($_GET['from'] ?? '');
+        $to = (string) ($_GET['to'] ?? '');
+        $fromTs = self::isoDate($from);
+        $toTs = self::isoDate($to);
+        if ($fromTs === null || $toTs === null || $fromTs > $toTs) {
+            Response::error(400, 'invalid_range', 'from and to must be YYYY-MM-DD dates, from <= to.');
+            return;
+        }
+
+        // invoices.paid_at is a DATETIME, so its upper bound is the start of
+        // the day after `to`; trainer_payments.paid_at is a DATE.
+        $toExclusive = date('Y-m-d', strtotime('+1 day', $toTs));
+
+        $sql = "SELECT DATE_FORMAT(paid_at, '%Y-%m') AS month, payment_method,
+                       SUM(amount_toman) AS total_toman, COUNT(*) AS cnt
+                FROM trainer_payments
+                WHERE trainer_id = :tp_trainer AND paid_at BETWEEN :tp_from AND :tp_to
+                GROUP BY month, payment_method";
+        $bind = ['tp_trainer' => $user['id'], 'tp_from' => $from, 'tp_to' => $to];
+
+        if (self::INVOICES_DEPLOYED) {
+            $sql .= " UNION ALL
+                SELECT DATE_FORMAT(paid_at, '%Y-%m') AS month, payment_method,
+                       SUM(amount_toman) AS total_toman, COUNT(*) AS cnt
+                FROM invoices
+                WHERE trainer_id = :inv_trainer AND status = 'paid'
+                  AND payment_method IS NOT NULL
+                  AND paid_at >= :inv_from AND paid_at < :inv_to
+                GROUP BY month, payment_method";
+            $bind += ['inv_trainer' => $user['id'], 'inv_from' => $from, 'inv_to' => $toExclusive];
+        }
+
+        $stmt = Database::connection()->prepare("SELECT month, payment_method, SUM(total_toman) AS total_toman, SUM(cnt) AS `count`
+             FROM ({$sql}) AS t GROUP BY month, payment_method ORDER BY month DESC, payment_method");
+        $stmt->execute($bind);
+
+        Response::ok(['items' => Cast::rows($stmt->fetchAll(), [], ['total_toman', 'count'])]);
+    }
+
+    private static function isoDate(string $value): ?int
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+        $ts = strtotime($value);
+        return ($ts === false || date('Y-m-d', $ts) !== $value) ? null : $ts;
     }
 
     /** Completed plan count per athlete on the trainer's roster. */

@@ -30,7 +30,12 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { useAthletes } from "@/features/athletes";
 import { useAddTrainerPayment } from "../hooks/use-add-trainer-payment";
 import { useUpdateTrainerPayment } from "../hooks/use-update-trainer-payment";
-import type { TrainerPayment, TrainerPaymentInput } from "../types/earnings-types";
+import {
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethod,
+  type TrainerPayment,
+  type TrainerPaymentInput,
+} from "../types/earnings-types";
 import {
   trainerPaymentFormSchema,
   type TrainerPaymentFormValues,
@@ -40,6 +45,7 @@ function toInput(values: TrainerPaymentFormValues): TrainerPaymentInput {
   return {
     athleteId: values.athleteId,
     amountToman: Number(normalizeAmount(values.amountToman)),
+    paymentMethod: values.paymentMethod,
     paidAt: values.paidAt,
     note: values.note?.trim() || null,
   };
@@ -57,7 +63,7 @@ export function PaymentFormDialog({ payment }: { payment?: TrainerPayment }) {
 
   const form = useForm<TrainerPaymentFormValues>({
     resolver: zodResolver(trainerPaymentFormSchema),
-    defaultValues: { athleteId: "", amountToman: "", paidAt: todayIso(), note: "" },
+    defaultValues: { athleteId: "", amountToman: "", paymentMethod: "cash", paidAt: todayIso(), note: "" },
   });
 
   // Re-seed on every open rather than only at mount: "add" should come back
@@ -68,6 +74,7 @@ export function PaymentFormDialog({ payment }: { payment?: TrainerPayment }) {
     form.reset({
       athleteId: payment?.athleteId ?? "",
       amountToman: payment ? String(payment.amountToman) : "",
+      paymentMethod: payment?.paymentMethod ?? "cash",
       paidAt: payment?.paidAt ?? todayIso(),
       note: payment?.note ?? "",
     });
@@ -202,6 +209,30 @@ export function PaymentFormDialog({ payment }: { payment?: TrainerPayment }) {
                 </p>
               )
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="payment-method">روش پرداخت</Label>
+            <Controller
+              control={form.control}
+              name="paymentMethod"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="payment-method" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map(
+                      (method) => (
+                        <SelectItem key={method} value={method}>
+                          {PAYMENT_METHOD_LABELS[method]}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </div>
 
           <Controller

@@ -4,6 +4,8 @@ import { trendFromChange } from "@/features/dashboard/utils/trend";
 import { parseIsoDate, toIsoDate } from "@/lib/iso-date";
 import type {
   EarningsPoint,
+  FinancialSummaryRow,
+  PaymentMethod,
   TrainerEarningsSummary,
   TrainerPayment,
   TrainerPaymentInput,
@@ -15,6 +17,7 @@ interface PaymentRow {
   id: string;
   athlete_id: string | null;
   amount_toman: number;
+  payment_method: PaymentMethod;
   paid_at: string;
   note: string | null;
   first_name: string | null;
@@ -36,6 +39,7 @@ function mapRow(row: PaymentRow): TrainerPayment {
       row.athlete_id ? "ورزشکار" : DELETED_ATHLETE_LABEL
     ),
     amountToman: row.amount_toman,
+    paymentMethod: row.payment_method,
     paidAt: row.paid_at,
     note: row.note,
   };
@@ -45,6 +49,7 @@ function toPayload(input: TrainerPaymentInput) {
   return {
     athlete_id: input.athleteId,
     amount_toman: input.amountToman,
+    payment_method: input.paymentMethod,
     paid_at: input.paidAt,
     note: input.note,
   };
@@ -154,4 +159,28 @@ export async function getTrainerEarningsSeries(months = 6): Promise<EarningsPoin
   // Newest month first so it renders on the right edge of the RTL chart,
   // matching the club revenue chart.
   return points.reverse();
+}
+
+/**
+ * The month × payment-method report for [from, to] (ISO dates). Summed and
+ * grouped by the server — this deliberately does not go through listRows().
+ */
+export async function getFinancialSummary(
+  from: string,
+  to: string
+): Promise<FinancialSummaryRow[]> {
+  const data = await api.get<
+    ListResponse<{
+      month: string;
+      payment_method: PaymentMethod;
+      total_toman: number;
+      count: number;
+    }>
+  >(`/reports/financial-summary?from=${from}&to=${to}`);
+  return data.items.map((row) => ({
+    month: row.month,
+    paymentMethod: row.payment_method,
+    totalToman: row.total_toman,
+    count: row.count,
+  }));
 }

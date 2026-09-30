@@ -215,6 +215,7 @@ $router->get('/reports/trainer/monthly-stats', fn () => ReportController::monthl
 $router->get('/reports/trainer/athlete-progress', fn () => ReportController::athleteProgress());
 $router->get('/reports/trainer/weekly-adherence', fn () => ReportController::weeklyAdherence());
 $router->get('/reports/trainer/completion-rates', fn () => ReportController::completionRates());
+$router->get('/reports/financial-summary', fn () => ReportController::financialSummary());
 $router->get('/athletes/{id}/completed-plans', fn (array $p) => ReportController::completedPlans($p));
 
 $router->get('/clubs/{id}/revenue', fn (array $p) => RevenueController::list($p));
@@ -278,6 +279,8 @@ $router->post('/me/avatar', fn () => UploadController::avatar());
 $router->get('/athletes/{id}/measurements', fn (array $p) => ProgressController::list($p));
 $router->post('/athletes/{id}/measurements', fn (array $p) => ProgressController::create($p));
 $router->patch('/measurements/{id}', fn (array $p) => ProgressController::update($p));
+$router->get('/progress/reminders/{athleteId}', fn (array $p) => ProgressController::getReminder($p));
+$router->put('/progress/reminders/{athleteId}', fn (array $p) => ProgressController::setReminder($p));
 
 $router->get('/notifications', fn () => NotificationController::list());
 $router->get('/notifications/archive', fn () => NotificationController::archive());
