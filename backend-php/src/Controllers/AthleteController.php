@@ -47,7 +47,8 @@ final class AthleteController
 
         $stmt = Database::connection()->prepare(
             "SELECT ta.created_at, ta.note,
-                    p.id, p.first_name, p.last_name, p.birth_date, p.avatar_url, p.phone
+                    p.id, p.first_name, p.last_name, p.birth_date, p.avatar_url, p.phone,
+                    p.daily_calorie_goal, p.protein_percent, p.carbs_percent, p.fat_percent
              FROM trainer_athletes ta
              JOIN profiles p ON p.id = ta.athlete_id
              WHERE ta.trainer_id = :trainer_id AND ta.athlete_id = :athlete_id AND ta.status = 'active'"
@@ -60,7 +61,38 @@ final class AthleteController
             return;
         }
 
-        Response::ok($athlete);
+        Response::ok(Cast::row($athlete, [], ProfileController::NUTRITION_GOAL_KEYS));
+    }
+
+    /**
+     * The athlete's calorie goal and macro split, set by their trainer when
+     * the athlete hasn't entered one. Same rules as ProfileController.
+     */
+    public static function updateNutritionGoal(array $params): void
+    {
+        $user = Auth::requireUser();
+        Acl::require(Acl::isTrainerOf($user['id'], $params['id']), 'This athlete is not on your roster.');
+
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM profiles WHERE id = :id');
+        $stmt->execute(['id' => $params['id']]);
+        $athlete = $stmt->fetch();
+        if ($athlete === false) {
+            Response::error(404, 'not_found', 'Athlete not found.');
+            return;
+        }
+
+        $goal = ProfileController::nutritionGoal(Validate::body(), $athlete);
+        if ($goal === []) {
+            Response::error(400, 'no_fields', 'Nothing to update.');
+            return;
+        }
+
+        $sets = array_map(fn ($key) => "{$key} = :{$key}", array_keys($goal));
+        $pdo->prepare('UPDATE profiles SET ' . implode(', ', $sets) . ' WHERE id = :id')
+            ->execute($goal + ['id' => $params['id']]);
+
+        Response::ok(['ok' => true]);
     }
 
     /** The private note is the trainer's own; only they may write it (0037). */

@@ -10,6 +10,7 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useFoods } from "../hooks/use-foods";
 import type { FoodSummary } from "../types/food-types";
+import { FoodMacroTag } from "./food-macro-tag";
 
 function groupByCategory(foods: FoodSummary[]) {
   const groups = new Map<string, FoodSummary[]>();
@@ -117,6 +118,7 @@ export function FoodList() {
                     <Badge variant="secondary">{food.category}</Badge>
                     <Badge variant="outline">{food.defaultUnit}</Badge>
                     {food.isCustom && <Badge variant="info">غذای شما</Badge>}
+                    <FoodMacroTag food={food} />
                   </div>
                 </div>
               ))}

@@ -17,11 +17,13 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { useMyPlans } from "../hooks/use-my-plans";
 import { usePlanPrint } from "../hooks/use-plan-print";
+import { nutritionPlanMealsKey } from "../hooks/use-nutrition-plan-meals";
 import { workoutPlanDaysKey } from "../hooks/use-workout-plan-days";
 import { PlanComments } from "./plan-comments";
 import { PlanPrintArea } from "./plan-print-area";
 import { PlanSections } from "./plan-sections";
 import type { PlanKind } from "../types/athlete-types";
+import type { NutritionPlanMeal } from "../types/nutrition-plan-builder-types";
 import type { WorkoutPlanDay } from "../types/workout-plan-builder-types";
 
 // Icon components can't cross the Server -> Client Component boundary as a
@@ -158,6 +160,9 @@ export function MyPlanList({
                     builderMode: plan.builderMode,
                     structuredDays: queryClient.getQueryData<WorkoutPlanDay[]>(
                       workoutPlanDaysKey(plan.id)
+                    ),
+                    structuredMeals: queryClient.getQueryData<NutritionPlanMeal[]>(
+                      nutritionPlanMealsKey(plan.id)
                     ),
                   })
                 }

@@ -5,6 +5,7 @@ namespace Gymlic\Controllers;
 
 use Gymlic\Acl;
 use Gymlic\Auth;
+use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Validate;
@@ -26,6 +27,16 @@ final class ProfileController
             }
         }
 
+        // Calorie goal and macro split only mean something for an athlete.
+        $goal = self::nutritionGoal($data, $user);
+        if ($goal !== []) {
+            Acl::require($user['account_type'] === 'athlete', 'Only athletes have a calorie goal.');
+            foreach ($goal as $key => $value) {
+                $fields[] = "{$key} = :{$key}";
+                $params[$key] = $value;
+            }
+        }
+
         if ($fields === []) {
             Response::error(400, 'no_fields', 'Nothing to update.');
             return;
@@ -36,6 +47,54 @@ final class ProfileController
             ->execute($params);
 
         Response::ok(['ok' => true]);
+    }
+
+    public const NUTRITION_GOAL_KEYS = ['daily_calorie_goal', 'protein_percent', 'carbs_percent', 'fat_percent'];
+
+    /**
+     * The nutrition-goal columns present in $data, validated and ready to
+     * bind ([] when the request touches none of them). $current is the
+     * profile row as it stands: the three percentages are checked as a set
+     * after merging, so a PATCH that sends only one of them is judged against
+     * the other two — they are all filled and add up to 100, or all empty.
+     * Ends the request with 400 otherwise. Shared with the trainer's
+     * AthleteController::updateNutritionGoal.
+     *
+     * @return array<string, int|null>
+     */
+    public static function nutritionGoal(array $data, array $current): array
+    {
+        $touched = array_values(array_filter(self::NUTRITION_GOAL_KEYS, fn ($k) => array_key_exists($k, $data)));
+        if ($touched === []) {
+            return [];
+        }
+
+        $values = [];
+        foreach ($touched as $key) {
+            $max = $key === 'daily_calorie_goal' ? 20000.0 : 100.0;
+            $number = Validate::nullableNumber($data[$key], $key, $max);
+            if ($number !== null && $number != floor($number)) {
+                Response::error(400, 'invalid_number', "{$key} must be a whole number.");
+                exit;
+            }
+            $values[$key] = $number === null ? null : (int) $number;
+        }
+
+        $percents = [];
+        foreach (['protein_percent', 'carbs_percent', 'fat_percent'] as $key) {
+            $percents[$key] = array_key_exists($key, $values) ? $values[$key] : ($current[$key] ?? null);
+        }
+        $filled = count(array_filter($percents, fn ($v) => $v !== null));
+        if ($filled !== 0 && $filled !== 3) {
+            Response::error(400, 'incomplete_macro_split', 'Enter all three macro percentages, or leave all three empty.');
+            exit;
+        }
+        if ($filled === 3 && array_sum($percents) !== 100) {
+            Response::error(400, 'invalid_macro_split', 'Protein, carbs and fat percentages must add up to 100.');
+            exit;
+        }
+
+        return $values;
     }
 
     /**
@@ -98,7 +157,8 @@ final class ProfileController
         Acl::require(Acl::canViewProfile($user, $params['id']));
 
         $stmt = Database::connection()->prepare(
-            'SELECT id, first_name, last_name, email, phone, avatar_url, account_type, birth_date
+            'SELECT id, first_name, last_name, email, phone, avatar_url, account_type, birth_date,
+                    daily_calorie_goal, protein_percent, carbs_percent, fat_percent
              FROM profiles WHERE id = :id'
         );
         $stmt->execute(['id' => $params['id']]);
@@ -109,6 +169,6 @@ final class ProfileController
             return;
         }
 
-        Response::ok($profile);
+        Response::ok(Cast::row($profile, [], self::NUTRITION_GOAL_KEYS));
     }
 }

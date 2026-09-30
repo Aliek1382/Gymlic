@@ -302,11 +302,24 @@ final class PlanController
         Response::ok(['ok' => true]);
     }
 
-    /** workout_assignments carries builder_mode; nutrition_assignments (out of this
-     *  feature's scope) never gained the column, so it's added only for 'workout'. */
     private static function columns(string $kind): string
     {
-        return $kind === 'workout' ? self::COLUMNS . ', builder_mode' : self::COLUMNS;
+        return self::COLUMNS . ', ' . self::builderModeColumn($kind);
+    }
+
+    /**
+     * The builder_mode select expression for a plan kind. workout_assignments
+     * stores it; nutrition_assignments has no such column, so a nutrition plan
+     * counts as 'structured' exactly when it has meal rows and 'text' when it
+     * has none. Unqualified table name on purpose: callers select FROM the bare
+     * table (no alias), and the correlated subquery needs that name.
+     */
+    public static function builderModeColumn(string $kind): string
+    {
+        if ($kind === 'workout') {
+            return 'builder_mode';
+        }
+        return "IF(EXISTS(SELECT 1 FROM nutrition_plan_meals m WHERE m.assignment_id = nutrition_assignments.id), 'structured', 'text') AS builder_mode";
     }
 
     private static function table(string $kind): string
@@ -321,7 +334,9 @@ final class PlanController
     private static function planOr404(string $kind, string $id): array
     {
         $table = self::table($kind);
-        $stmt = Database::connection()->prepare("SELECT * FROM {$table} WHERE id = :id");
+        // Workout rows already carry builder_mode; a nutrition row gets it derived.
+        $extra = $kind === 'nutrition' ? ', ' . self::builderModeColumn($kind) : '';
+        $stmt = Database::connection()->prepare("SELECT *{$extra} FROM {$table} WHERE id = :id");
         $stmt->execute(['id' => $id]);
         $plan = $stmt->fetch();
 

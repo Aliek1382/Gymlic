@@ -26,6 +26,7 @@ use Gymlic\Controllers\LibraryController;
 use Gymlic\Controllers\MemberController;
 use Gymlic\Controllers\MessageController;
 use Gymlic\Controllers\InvoiceController;
+use Gymlic\Controllers\NutritionPlanBuilderController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\SessionPackageController;
 use Gymlic\Controllers\TrainerController;
@@ -105,6 +106,7 @@ $router->delete('/trainer-memberships/{id}', fn (array $p) => TrainerController:
 $router->get('/athletes', fn () => AthleteController::list());
 $router->get('/athletes/{id}', fn (array $p) => AthleteController::get($p));
 $router->patch('/athletes/{id}/note', fn (array $p) => AthleteController::updateNote($p));
+$router->patch('/athletes/{id}/nutrition-goal', fn (array $p) => AthleteController::updateNutritionGoal($p));
 $router->delete('/athletes/{id}', fn (array $p) => AthleteController::remove($p));
 $router->get('/athlete-invites', fn () => AthleteController::listInvites());
 $router->post('/athlete-invites', fn () => AthleteController::createInvite());
@@ -152,6 +154,14 @@ $router->patch('/plans/workout/{id}/days/{dayId}/exercises/{exId}', fn (array $p
 $router->delete('/plans/workout/{id}/days/{dayId}/exercises/{exId}', fn (array $p) => WorkoutPlanBuilderController::deleteExercise($p));
 $router->post('/plans/workout/{id}/days/{dayId}/copy', fn (array $p) => WorkoutPlanBuilderController::copyDay($p));
 $router->post('/plans/workout/{id}/weeks/{weekNumber}/copy', fn (array $p) => WorkoutPlanBuilderController::copyWeek($p));
+
+$router->get('/plans/nutrition/{id}/meals', fn (array $p) => NutritionPlanBuilderController::listMeals($p));
+$router->post('/plans/nutrition/{id}/meals', fn (array $p) => NutritionPlanBuilderController::createMeal($p));
+$router->patch('/plans/nutrition/{id}/meals/{mealId}', fn (array $p) => NutritionPlanBuilderController::updateMeal($p));
+$router->delete('/plans/nutrition/{id}/meals/{mealId}', fn (array $p) => NutritionPlanBuilderController::deleteMeal($p));
+$router->post('/plans/nutrition/{id}/meals/{mealId}/items', fn (array $p) => NutritionPlanBuilderController::addItem($p));
+$router->patch('/plans/nutrition/{id}/meals/{mealId}/items/{itemId}', fn (array $p) => NutritionPlanBuilderController::updateItem($p));
+$router->delete('/plans/nutrition/{id}/meals/{mealId}/items/{itemId}', fn (array $p) => NutritionPlanBuilderController::deleteItem($p));
 
 $router->get('/workout-day-logs', fn () => WorkoutLogController::list());
 $router->post('/workout-day-logs', fn () => WorkoutLogController::create());

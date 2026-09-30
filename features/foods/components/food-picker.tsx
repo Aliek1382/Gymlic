@@ -18,6 +18,7 @@ import { FOOD_UNITS } from "../constants/foods";
 import { useFoodsForPicker } from "../hooks/use-foods-for-picker";
 import { useRecordFoodUsage } from "../hooks/use-record-food-usage";
 import type { FoodPickerItem } from "../types/food-types";
+import { FoodMacroTag } from "./food-macro-tag";
 
 export function FoodPicker({
   onInsert,
@@ -99,6 +100,7 @@ export function FoodPicker({
               <SelectItem key={food.id} value={food.id}>
                 {food.name}
                 {food.nameEn ? ` / ${food.nameEn}` : ""}
+                <FoodMacroTag food={food} className="mr-1.5" />
               </SelectItem>
             ))}
           </SelectContent>

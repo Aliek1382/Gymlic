@@ -18,6 +18,21 @@ export async function updateProfileInfo(input: {
   await api.patch("/me/profile", patch);
 }
 
+/** Athlete-only; the API rejects it for any other account type. */
+export async function updateNutritionGoal(input: {
+  dailyCalorieGoal: number | null;
+  proteinPercent: number | null;
+  carbsPercent: number | null;
+  fatPercent: number | null;
+}): Promise<void> {
+  await api.patch("/me/profile", {
+    daily_calorie_goal: input.dailyCalorieGoal,
+    protein_percent: input.proteinPercent,
+    carbs_percent: input.carbsPercent,
+    fat_percent: input.fatPercent,
+  });
+}
+
 export async function updateEmail(email: string): Promise<void> {
   await api.patch("/me/email", { email });
 }

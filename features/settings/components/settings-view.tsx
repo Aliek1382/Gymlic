@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/features/authentication";
 import { EmailForm } from "./email-form";
+import { NutritionGoalCard } from "./nutrition-goal-card";
 import { PasswordForm } from "./password-form";
 import { ProfileInfoForm } from "./profile-info-form";
 import { SignOutSection } from "./sign-out-section";
@@ -34,6 +35,9 @@ export function SettingsView() {
   return (
     <div className="space-y-6">
       <ProfileInfoForm profile={profile.data} />
+      {profile.data.accountType === "athlete" && (
+        <NutritionGoalCard profile={profile.data} />
+      )}
       <EmailForm currentEmail={profile.data.email} />
       <PasswordForm />
       <SignOutSection />

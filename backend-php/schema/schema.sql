@@ -19,6 +19,13 @@ CREATE TABLE profiles (
   avatar_url         VARCHAR(1024) NULL,
   account_type       ENUM('club','trainer','athlete') NULL,
   birth_date         DATE NULL,
+  -- Athletes only. The three percentages are all set (and add up to 100) or
+  -- all NULL; that rule lives in ProfileController, not a CHECK, because they
+  -- are three separate columns.
+  daily_calorie_goal INT NULL,
+  protein_percent    TINYINT NULL,
+  carbs_percent      TINYINT NULL,
+  fat_percent        TINYINT NULL,
   is_platform_admin  TINYINT(1) NOT NULL DEFAULT 0,
   is_suspended       TINYINT(1) NOT NULL DEFAULT 0,
   created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -412,6 +419,12 @@ CREATE TABLE foods (
   description   TEXT NULL,
   category      VARCHAR(100) NOT NULL,
   default_unit  VARCHAR(50) NOT NULL,
+  -- Per ONE default_unit (default_unit = '100 گرم' -> these are for 100 g).
+  -- NULL = not entered yet: counted as zero in a plan and flagged in the UI.
+  calories_per_unit DECIMAL(7,2) NULL,
+  protein_g     DECIMAL(6,2) NULL,
+  carbs_g       DECIMAL(6,2) NULL,
+  fat_g         DECIMAL(6,2) NULL,
   created_by    CHAR(36) NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_foods_creator (created_by),
@@ -428,6 +441,40 @@ CREATE TABLE food_usage (
   KEY idx_food_usage_trainer (trainer_id),
   CONSTRAINT fk_food_usage_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_food_usage_food FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- nutrition_plan_meals / nutrition_plan_items: the structured builder for
+-- nutrition plans. Unlike workout_assignments there is no builder_mode column:
+-- a nutrition assignment is 'structured' exactly when it has a meal row here,
+-- and 'text' (description only) when it has none. Totals are never stored —
+-- the client sums amount x the food's per-unit figures.
+-- =========================================================================
+CREATE TABLE nutrition_plan_meals (
+  id            CHAR(36) NOT NULL PRIMARY KEY,
+  assignment_id CHAR(36) NOT NULL,
+  meal_name     VARCHAR(100) NOT NULL,
+  sort_order    INT NOT NULL DEFAULT 0,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_npm_assignment (assignment_id, sort_order),
+  CONSTRAINT fk_npm_assignment FOREIGN KEY (assignment_id) REFERENCES nutrition_assignments(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE nutrition_plan_items (
+  id         CHAR(36) NOT NULL PRIMARY KEY,
+  meal_id    CHAR(36) NOT NULL,
+  food_id    CHAR(36) NOT NULL,
+  amount     DECIMAL(7,2) NOT NULL,
+  unit       VARCHAR(50) NULL,
+  note       VARCHAR(255) NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_npi_meal (meal_id, sort_order),
+  KEY idx_npi_food (food_id),
+  CONSTRAINT fk_npi_meal FOREIGN KEY (meal_id) REFERENCES nutrition_plan_meals(id) ON DELETE CASCADE,
+  CONSTRAINT fk_npi_food FOREIGN KEY (food_id) REFERENCES foods(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Apple, Bookmark, Dumbbell, Loader2, X } from "lucide-react";
@@ -25,6 +26,7 @@ import { NutritionFormatHint } from "./nutrition-format-hint";
 import { PlanFormatHint } from "./plan-format-hint";
 import { PLAN_DESCRIPTION_PLACEHOLDER } from "../constants/athletes";
 import { useDeleteTemplate } from "../hooks/use-delete-template";
+import { nutritionPlanMealsKey } from "../hooks/use-nutrition-plan-meals";
 import { usePlans } from "../hooks/use-plans";
 import { useSavePlan } from "../hooks/use-save-plan";
 import { useSaveTemplate } from "../hooks/use-save-template";
@@ -32,7 +34,9 @@ import { useTemplates } from "../hooks/use-templates";
 import { appendLine, insertLineUnderHeading } from "../utils/workout-plan-text";
 import { planSchema, type PlanFormValues } from "../validators/athlete-schemas";
 import type { PlanKind, PlanTarget } from "../types/athlete-types";
+import type { NutritionPlanMeal } from "../types/nutrition-plan-builder-types";
 import { NutritionDayBuilder } from "./nutrition-day-builder";
+import { StructuredNutritionBuilder } from "./structured-nutrition-builder";
 import { StructuredWorkoutBuilder } from "./structured-workout-builder";
 import { WorkoutDayBuilder } from "./workout-day-builder";
 
@@ -53,9 +57,9 @@ export function PlanDialog({
   const [open, setOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  // Workout-only: "structured" builds the plan from workout_plan_days (no
-  // free text at all); "text" is the classic description box, written either
-  // through the picker or typed by hand. This only tracks which UI is
+  // "structured" builds the plan from rows (workout_plan_days, or for a
+  // nutrition plan nutrition_plan_meals; no free text at all); "text" is the
+  // classic description box, written either through the picker or typed by hand. This only tracks which UI is
   // showing right now — a trainer can flip between all three at any point
   // while drafting and nothing already written is lost, since picker/manual
   // both edit the same description field and a structured draft's rows live
@@ -66,6 +70,8 @@ export function PlanDialog({
   const [builderMode, setBuilderMode] = useState<"text" | "structured">("text");
   const [textMode, setTextMode] = useState<"picker" | "manual">("picker");
   const [creatingStructuredDraft, setCreatingStructuredDraft] = useState(false);
+  const queryClient = useQueryClient();
+  const athleteId = "athleteId" in target ? target.athleteId : null;
   const plans = usePlans(kind, target, open);
   const savePlan = useSavePlan(kind, target);
   const templates = useTemplates(kind, open);
@@ -119,6 +125,19 @@ export function PlanDialog({
   }
 
   async function onSubmit(values: PlanFormValues, status: "active" | "draft") {
+    // A nutrition plan sent as structured with no food in it would reach the
+    // athlete as an empty page. (Nothing else stops it: the meals autosave
+    // outside this form.)
+    if (kind === "nutrition" && builderMode === "structured" && status === "active") {
+      const meals = draftId
+        ? queryClient.getQueryData<NutritionPlanMeal[]>(nutritionPlanMealsKey(draftId))
+        : undefined;
+      if (!meals?.some((meal) => meal.items.length > 0)) {
+        toast.error("قبل از ثبت نهایی، حداقل یک وعده با یک غذا اضافه کنید.");
+        return;
+      }
+    }
+
     try {
       const result = await savePlan.mutateAsync({
         id: draftId ?? undefined,
@@ -197,7 +216,11 @@ export function PlanDialog({
       </Button>
 
       <DialogContent
-        className={kind === "workout" && builderMode === "structured" ? "sm:max-w-2xl" : undefined}
+        className={cn(
+          builderMode === "structured" && "sm:max-w-2xl",
+          // The meal cards need the width more than the gutter on a phone.
+          kind === "nutrition" && builderMode === "structured" && "p-4 sm:p-6"
+        )}
       >
         <DialogHeader>
           <DialogTitle>
@@ -260,47 +283,51 @@ export function PlanDialog({
             )}
           </div>
 
-          {kind === "workout" && (
-            <div className="space-y-1.5">
-              <Label>روش نوشتن برنامه</Label>
-              <div className="flex flex-wrap gap-1.5">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={builderMode === "text" && textMode === "picker" ? "default" : "outline"}
-                  onClick={() => {
-                    setBuilderMode("text");
-                    setTextMode("picker");
-                  }}
-                >
-                  نوشتن با انتخاب‌گر
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={builderMode === "text" && textMode === "manual" ? "default" : "outline"}
-                  onClick={() => {
-                    setBuilderMode("text");
-                    setTextMode("manual");
-                  }}
-                >
-                  تایپ دستی
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={builderMode === "structured" ? "default" : "outline"}
-                  onClick={() => setBuilderMode("structured")}
-                >
-                  ساخت ساختاریافته (روز به روز)
-                </Button>
-              </div>
+          <div className="space-y-1.5">
+            <Label>روش نوشتن برنامه</Label>
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant={builderMode === "text" && textMode === "picker" ? "default" : "outline"}
+                onClick={() => {
+                  setBuilderMode("text");
+                  setTextMode("picker");
+                }}
+              >
+                نوشتن با انتخاب‌گر
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={builderMode === "text" && textMode === "manual" ? "default" : "outline"}
+                onClick={() => {
+                  setBuilderMode("text");
+                  setTextMode("manual");
+                }}
+              >
+                تایپ دستی
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={builderMode === "structured" ? "default" : "outline"}
+                onClick={() => setBuilderMode("structured")}
+              >
+                {kind === "workout"
+                  ? "ساخت ساختاریافته (روز به روز)"
+                  : "ساخت ساختاریافته (وعده به وعده)"}
+              </Button>
             </div>
-          )}
+          </div>
 
-          {kind === "workout" && builderMode === "structured" ? (
+          {builderMode === "structured" ? (
             draftId ? (
-              <StructuredWorkoutBuilder assignmentId={draftId} />
+              kind === "workout" ? (
+                <StructuredWorkoutBuilder assignmentId={draftId} />
+              ) : (
+                <StructuredNutritionBuilder assignmentId={draftId} athleteId={athleteId} />
+              )
             ) : (
               <Button
                 type="button"
@@ -318,7 +345,9 @@ export function PlanDialog({
               {kind === "workout" && textMode === "picker" && (
                 <WorkoutDayBuilder onInsertLine={handleInsertLine} />
               )}
-              {kind === "nutrition" && <NutritionDayBuilder onInsertLine={handleInsertLine} />}
+              {kind === "nutrition" && textMode === "picker" && (
+                <NutritionDayBuilder onInsertLine={handleInsertLine} />
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor={`${kind}-description`}>توضیحات (اختیاری)</Label>
@@ -330,7 +359,7 @@ export function PlanDialog({
                   {...form.register("description")}
                 />
                 {kind === "workout" && textMode === "manual" && <PlanFormatHint />}
-                {kind === "nutrition" && <NutritionFormatHint />}
+                {kind === "nutrition" && textMode === "manual" && <NutritionFormatHint />}
               </div>
             </>
           )}
@@ -340,13 +369,13 @@ export function PlanDialog({
               type="submit"
               className="flex-1"
               disabled={
-                savePlan.isPending || (kind === "workout" && builderMode === "structured" && !draftId)
+                savePlan.isPending || (builderMode === "structured" && !draftId)
               }
             >
               {savePlan.isPending && <Loader2 className="animate-spin" />}
               ثبت نهایی برنامه
             </Button>
-            {!(kind === "workout" && builderMode === "structured") && (
+            {builderMode !== "structured" && (
               <Button
                 type="button"
                 variant="outline"
@@ -359,7 +388,7 @@ export function PlanDialog({
             )}
           </div>
 
-          {!(kind === "workout" && builderMode === "structured") && (
+          {builderMode !== "structured" && (
             <Button
               type="button"
               variant="ghost"

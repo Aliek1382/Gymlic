@@ -46,4 +46,26 @@ final class Validate
     {
         return ($value === null || $value === '') ? null : $value;
     }
+
+    /**
+     * An optional non-negative number: absent/''/null -> null. Anything that
+     * is not a number, or is outside 0..$max, ends the request with 400 naming
+     * $field — a DECIMAL column would otherwise clamp or reject it as a 500.
+     */
+    public static function nullableNumber(mixed $value, string $field, float $max): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_int($value) && !is_float($value) && !(is_string($value) && is_numeric($value))) {
+            Response::error(400, 'invalid_number', "{$field} must be a number.");
+            exit;
+        }
+        $number = (float) $value;
+        if ($number < 0 || $number > $max) {
+            Response::error(400, 'out_of_range', "{$field} must be between 0 and {$max}.");
+            exit;
+        }
+        return $number;
+    }
 }

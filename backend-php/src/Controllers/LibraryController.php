@@ -28,9 +28,12 @@ final class LibraryController
             'table'       => 'foods',
             'usage_table' => 'food_usage',
             'usage_key'   => 'food_id',
-            'extra'       => 'category, default_unit',
+            'extra'       => 'category, default_unit, calories_per_unit, protein_g, carbs_g, fat_g',
         ],
     ];
+
+    /** foods.* DECIMAL columns arrive as strings over PDO; NULL (macros not entered yet) stays NULL. */
+    private const FOOD_MACROS = ['calories_per_unit', 'protein_g', 'carbs_g', 'fat_g'];
 
     public static function list(array $params): void
     {
@@ -46,7 +49,7 @@ final class LibraryController
         );
         $stmt->execute(['user_id' => $user['id']]);
 
-        Response::ok(['items' => $stmt->fetchAll()]);
+        Response::ok(['items' => self::castMacros($params['kind'], $stmt->fetchAll())]);
     }
 
     /** Same library, ordered by how often this trainer has reached for each entry. */
@@ -66,7 +69,7 @@ final class LibraryController
         );
         $stmt->execute(['user_id' => $user['id'], 'user_id2' => $user['id']]);
 
-        Response::ok(['items' => Cast::rows($stmt->fetchAll(), [], ['usage_count'])]);
+        Response::ok(['items' => Cast::rows(self::castMacros($params['kind'], $stmt->fetchAll()), [], ['usage_count'])]);
     }
 
     public static function recordUsage(array $params): void
@@ -113,9 +116,13 @@ final class LibraryController
                 'created_by'   => $user['id'],
             ]);
         } else {
+            // Macros are per one default_unit and all optional: NULL means "not
+            // entered yet", which the plan builder counts as zero and flags.
             Database::connection()->prepare(
-                'INSERT INTO foods (id, name, name_en, description, category, default_unit, created_by)
-                 VALUES (:id, :name, :name_en, :description, :category, :default_unit, :created_by)'
+                'INSERT INTO foods (id, name, name_en, description, category, default_unit,
+                                    calories_per_unit, protein_g, carbs_g, fat_g, created_by)
+                 VALUES (:id, :name, :name_en, :description, :category, :default_unit,
+                         :calories_per_unit, :protein_g, :carbs_g, :fat_g, :created_by)'
             )->execute([
                 'id'           => $id,
                 'name'         => (string) $data['name'],
@@ -123,11 +130,21 @@ final class LibraryController
                 'description'  => Validate::nullableString($data['description'] ?? null),
                 'category'     => (string) $data['category'],
                 'default_unit' => (string) $data['default_unit'],
+                'calories_per_unit' => Validate::nullableNumber($data['calories_per_unit'] ?? null, 'calories_per_unit', 99999.99),
+                'protein_g'    => Validate::nullableNumber($data['protein_g'] ?? null, 'protein_g', 9999.99),
+                'carbs_g'      => Validate::nullableNumber($data['carbs_g'] ?? null, 'carbs_g', 9999.99),
+                'fat_g'        => Validate::nullableNumber($data['fat_g'] ?? null, 'fat_g', 9999.99),
                 'created_by'   => $user['id'],
             ]);
         }
 
         Response::ok(['id' => $id], 201);
+    }
+
+    /** @param array<int, array<string, mixed>> $rows */
+    private static function castMacros(string $kindName, array $rows): array
+    {
+        return $kindName === 'foods' ? Cast::rows($rows, self::FOOD_MACROS) : $rows;
     }
 
     private static function kind(string $kind): array
