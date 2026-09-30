@@ -136,19 +136,3 @@ cheap, and the interval guard makes extra runs harmless. The database step is
 `schema/assessment-reminders-update.sql` (run by hand in phpMyAdmin before
 deploying the backend). If the athlete has opted in to SMS/email, the copy goes
 out through the notification-dispatch cron like any other notification.
-
-## Cron: gymlic.ir articles in the news
-
-`cron/news-fetch.php` copies the newest articles of gymlic.ir's WordPress RSS
-feed (`https://gymlic.ir/feed/`, or `news_feed_url` if `config.php` defines it)
-into `news_items`, where the panel shows them next to the news the platform
-admin writes. Once an hour is plenty:
-
-```
-0 * * * * php /home/USER/path/to/backend-php/cron/news-fetch.php
-```
-
-Running it again imports nothing twice (`news_items.link_hash` is unique). A feed
-that is down or malformed prints the reason to stderr and exits 1; the articles
-already stored are untouched. The database step is `schema/news-update.sql`
-(run by hand in phpMyAdmin before deploying the backend).
