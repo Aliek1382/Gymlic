@@ -56,7 +56,7 @@ final class UploadController
     }
 
     /** Validates, re-encodes and writes the uploaded image; returns its public URL. */
-    private static function storeImage(string $ownerId, string $filename): string
+    public static function storeImage(string $ownerId, string $filename): string
     {
         $config = require __DIR__ . '/../../config.php';
 

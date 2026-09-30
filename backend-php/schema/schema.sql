@@ -869,3 +869,19 @@ CREATE TABLE ticket_messages (
   CONSTRAINT fk_tm_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
   CONSTRAINT fk_tm_sender FOREIGN KEY (sender_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- trainer_profiles: the trainer's self-written résumé shown to their athletes
+-- (one row per trainer). Existing installs: run schema/trainer-profiles-update.sql.
+-- =========================================================================
+
+CREATE TABLE trainer_profiles (
+  trainer_id     CHAR(36) NOT NULL PRIMARY KEY,
+  bio            TEXT NULL,
+  achievements   JSON NULL,   -- array of strings, e.g. ["قهرمان کشوری ۱۴۰۱", "مربی تیم ملی"]
+  certificates   JSON NULL,   -- array of image URLs (output of UploadController)
+  pricing_table  JSON NULL,   -- array of {"title":"...", "price_toman":..., "description":"..."}
+  social_links   JSON NULL,   -- {"instagram":"...", "telegram":"...", "website":"..."}
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_trainer_profiles_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

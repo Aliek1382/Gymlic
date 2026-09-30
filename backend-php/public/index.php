@@ -41,6 +41,7 @@ use Gymlic\Controllers\ProfileController;
 use Gymlic\Controllers\ProgressController;
 use Gymlic\Controllers\PushController;
 use Gymlic\Controllers\QuestionnaireController;
+use Gymlic\Controllers\TrainerProfileController;
 use Gymlic\Controllers\UploadController;
 use Gymlic\Controllers\WorkoutPlanBuilderController;
 use Gymlic\Response;
@@ -243,6 +244,11 @@ $router->post('/messages/conversation/{id}/read', fn (array $p) => MessageContro
 $router->post('/messages', fn () => MessageController::send());
 $router->get('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::planComments($p));
 $router->post('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::addPlanComment($p));
+
+$router->get('/trainer-profile', fn () => TrainerProfileController::mine());
+$router->put('/trainer-profile', fn () => TrainerProfileController::save());
+$router->post('/trainer-profile/certificates', fn () => TrainerProfileController::uploadCertificate());
+$router->get('/trainer-profile/{trainerId}', fn (array $p) => TrainerProfileController::view($p));
 
 $router->get('/tickets/mine', fn () => TicketController::listMine());
 $router->get('/tickets/trainers', fn () => TicketController::trainers());

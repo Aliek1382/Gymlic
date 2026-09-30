@@ -20,6 +20,7 @@ import {
   Ticket,
   User,
   UserCircle,
+  UserPen,
   Users,
   Wallet,
 } from "lucide-react";
@@ -107,6 +108,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
       description:
         "جلسات خصوصی زمان‌بندی‌شده و یادآوری‌های خودتان را در تقویم شمسی ماهانه ببینید.",
     },
+    {
+      label: "رزومهٔ من",
+      href: "/trainer-resume",
+      icon: UserPen,
+      description:
+        "بیوگرافی، افتخارات، مدارک، جدول تعرفه و شبکه‌های اجتماعی‌تان را برای شاگردانتان بنویسید.",
+    },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "تنظیمات", href: "/settings", icon: Settings },
@@ -120,6 +128,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
     { label: "تیکت‌ها", href: "/tickets", icon: Ticket },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },
+    { label: "رزومهٔ مربی", href: "/trainer-resume", icon: UserPen },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "پروفایل", href: "/profile", icon: UserCircle },
   ],
