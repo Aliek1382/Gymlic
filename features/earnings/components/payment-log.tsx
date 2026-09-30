@@ -6,7 +6,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { formatNumber, formatPersianDate } from "@/lib/persian";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { parseIsoDate } from "@/lib/iso-date";
-import type { TrainerPayment } from "../types/earnings-types";
+import { PAYMENT_METHOD_LABELS, type TrainerPayment } from "../types/earnings-types";
 import { PaymentFormDialog } from "./payment-form-dialog";
 import { DeletePaymentButton } from "./delete-payment-button";
 
@@ -42,7 +42,8 @@ export function PaymentLog({ payments }: { payments: TrainerPayment[] }) {
                 {/* The exact amount, not formatToman's "۲٫۵ میلیون" rounding —
                     a ledger row has to reconcile against what was received. */}
                 <p className="text-sm text-muted-foreground">
-                  {formatNumber(payment.amountToman)} تومان
+                  {formatNumber(payment.amountToman)} تومان ·{" "}
+                  {PAYMENT_METHOD_LABELS[payment.paymentMethod]}
                 </p>
                 {payment.note && (
                   <p className="text-xs text-muted-foreground">{payment.note}</p>

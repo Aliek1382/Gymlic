@@ -7,6 +7,7 @@ import { ChartCardSkeleton, TableCardSkeleton } from "@/features/dashboard/compo
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { useTrainerEarningsSeries } from "../hooks/use-trainer-earnings-series";
 import { useTrainerPayments } from "../hooks/use-trainer-payments";
+import { FinancialSummaryCard } from "./financial-summary-card";
 import { EarningsSummaryCards } from "./earnings-summary-cards";
 import { PaymentFormDialog } from "./payment-form-dialog";
 import { PaymentLog } from "./payment-log";
@@ -38,6 +39,8 @@ export function EarningsPageContent() {
           onRangeChange={setRange}
         />
       )}
+
+      <FinancialSummaryCard />
 
       <div className="flex justify-end">
         <PaymentFormDialog />

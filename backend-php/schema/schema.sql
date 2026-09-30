@@ -583,6 +583,7 @@ CREATE TABLE trainer_payments (
   trainer_id   CHAR(36) NOT NULL,
   athlete_id   CHAR(36) NULL,
   amount_toman BIGINT NOT NULL,
+  payment_method ENUM('cash','card_transfer','online') NOT NULL DEFAULT 'cash',
   paid_at      DATE NOT NULL,
   note         TEXT NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
