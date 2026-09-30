@@ -25,6 +25,28 @@ return [
     // in the `sessions` table so they can be revoked (logout / suspend).
     'session_ttl_seconds' => 60 * 60 * 24 * 30, // 30 days
 
+    // SMS for notifications (SmsGateway; provider: Melipayamak token API).
+    // With CHANGE_ME left in, SMS deliveries simply fail and are recorded as such.
+    'sms' => [
+        'provider' => getenv('GYMLIC_SMS_PROVIDER') ?: 'melipayamak',
+        'api_key'  => getenv('GYMLIC_SMS_API_KEY') ?: 'CHANGE_ME',
+        'sender'   => getenv('GYMLIC_SMS_SENDER') ?: 'CHANGE_ME',
+    ],
+
+    // Email for notifications (MailGateway). Uses PHP mail() unless 'smtp' has a host.
+    'mail' => [
+        'from_address' => getenv('GYMLIC_MAIL_FROM') ?: 'no-reply@gymlic-panel.ir',
+        'from_name'    => 'جیم‌لیک',
+        // Optional: a real mailbox on the domain, for better inbox placement than mail().
+        'smtp' => [
+            'host'   => getenv('GYMLIC_SMTP_HOST') ?: '', // '' = use mail()
+            'port'   => (int) (getenv('GYMLIC_SMTP_PORT') ?: 465),
+            'secure' => getenv('GYMLIC_SMTP_SECURE') ?: 'ssl', // 'ssl' (465) or 'tls' (587, STARTTLS)
+            'user'   => getenv('GYMLIC_SMTP_USER') ?: '',
+            'pass'   => getenv('GYMLIC_SMTP_PASS') ?: '',
+        ],
+    ],
+
     // Where uploaded avatars/logos are written on disk and the public URL
     // prefix used to build the value stored in profiles.avatar_url / clubs.logo_url.
     'uploads' => [

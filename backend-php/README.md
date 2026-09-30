@@ -98,3 +98,22 @@ dinner 20:00, before sleep 22:30 (Asia/Tehran), or its `custom_time`.
 `cron/supplement-reminders.php` runs just that part, for testing on a dev
 machine: `php cron/supplement-reminders.php`. Running it again the same day
 sends nothing new (`supplement_plan_items.last_reminded_on`).
+
+## Cron: SMS / email notifications
+
+Users can opt in (Settings) to get their notifications by SMS and/or email.
+`AuthController::notify` only queues a row in `notification_deliveries`;
+`cron/notification-dispatch.php` sends up to 50 queued rows per run through
+`SmsGateway` (Melipayamak) and `MailGateway` (PHP `mail()`, or SMTP if
+`mail.smtp.host` is set in `config.php`). A row is tried at most 3 times; the
+reason for a failure is in `notification_deliveries.last_error`.
+
+```
+*/5 * * * * php /home/USER/path/to/backend-php/cron/notification-dispatch.php
+```
+
+One cron entry can run both scripts:
+`php .../cron/calendar-reminders.php; php .../cron/notification-dispatch.php`.
+The database step is `schema/notification-channels-update.sql` (run by hand in
+phpMyAdmin before deploying the backend), and `config.php` on the host needs the
+new `sms` and `mail` keys copied in by hand.

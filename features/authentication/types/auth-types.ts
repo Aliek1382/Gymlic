@@ -10,6 +10,9 @@ export interface Profile {
   birthDate: string | null;
   accountType: AccountType | null;
   isPlatformAdmin: boolean;
+  // Opt-in extra notification channels; the in-app bell is always on.
+  notifySms: boolean;
+  notifyEmail: boolean;
   // Athletes only: nutrition target. Null until set; the three percentages
   // are all set (adding up to 100) or all null.
   dailyCalorieGoal: number | null;

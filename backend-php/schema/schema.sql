@@ -28,6 +28,8 @@ CREATE TABLE profiles (
   fat_percent        TINYINT NULL,
   is_platform_admin  TINYINT(1) NOT NULL DEFAULT 0,
   is_suspended       TINYINT(1) NOT NULL DEFAULT 0,
+  notify_sms         TINYINT(1) NOT NULL DEFAULT 0,   -- opt-in: also send notifications by SMS
+  notify_email       TINYINT(1) NOT NULL DEFAULT 0,   -- opt-in: also send notifications by email
   created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_profiles_phone (phone),
@@ -517,6 +519,24 @@ CREATE TABLE notifications (
   KEY idx_notifications_plan_comment (recipient_id, actor_id, type, read_at),
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_id) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- notification_deliveries: SMS / email copies of a notification, queued by
+-- AuthController::notify and sent by cron/notification-dispatch.php
+-- =========================================================================
+CREATE TABLE notification_deliveries (
+  id              CHAR(36) NOT NULL PRIMARY KEY,
+  notification_id CHAR(36) NOT NULL,
+  channel         ENUM('sms','email') NOT NULL,
+  status          ENUM('pending','sent','failed') NOT NULL DEFAULT 'pending',
+  attempts        INT NOT NULL DEFAULT 0,
+  last_error      VARCHAR(500) NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sent_at         DATETIME NULL,
+  KEY idx_nd_status (status, created_at),
+  KEY idx_nd_notification (notification_id),
+  CONSTRAINT fk_nd_notification FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================

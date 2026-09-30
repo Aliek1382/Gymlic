@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/features/authentication";
 import { EmailForm } from "./email-form";
 import { NutritionGoalCard } from "./nutrition-goal-card";
+import { NotificationChannelsCard } from "./notification-channels-card";
 import { PasswordForm } from "./password-form";
 import { ProfileInfoForm } from "./profile-info-form";
 import { SignOutSection } from "./sign-out-section";
@@ -38,6 +39,7 @@ export function SettingsView() {
       {profile.data.accountType === "athlete" && (
         <NutritionGoalCard profile={profile.data} />
       )}
+      <NotificationChannelsCard profile={profile.data} />
       <EmailForm currentEmail={profile.data.email} />
       <PasswordForm />
       <SignOutSection />

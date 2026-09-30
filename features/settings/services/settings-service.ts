@@ -33,6 +33,17 @@ export async function updateNutritionGoal(input: {
   });
 }
 
+export async function updateNotificationChannels(input: {
+  notifySms?: boolean;
+  notifyEmail?: boolean;
+}): Promise<void> {
+  const patch: Record<string, boolean> = {};
+  if (input.notifySms !== undefined) patch.notify_sms = input.notifySms;
+  if (input.notifyEmail !== undefined) patch.notify_email = input.notifyEmail;
+
+  await api.patch("/me/profile", patch);
+}
+
 export async function updateEmail(email: string): Promise<void> {
   await api.patch("/me/email", { email });
 }

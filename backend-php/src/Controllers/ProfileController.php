@@ -27,6 +27,18 @@ final class ProfileController
             }
         }
 
+        // Opt-in extra channels for notifications (in-app stays on regardless).
+        foreach (['notify_sms', 'notify_email'] as $key) {
+            if (array_key_exists($key, $data)) {
+                if (!is_bool($data[$key])) {
+                    Response::error(400, 'invalid_' . $key, "{$key} must be true or false.");
+                    return;
+                }
+                $fields[] = "{$key} = :{$key}";
+                $params[$key] = $data[$key] ? 1 : 0;
+            }
+        }
+
         // Calorie goal and macro split only mean something for an athlete.
         $goal = self::nutritionGoal($data, $user);
         if ($goal !== []) {

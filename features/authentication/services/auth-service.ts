@@ -14,6 +14,8 @@ interface ProfileRow {
   birth_date: string | null;
   account_type: AccountType | null;
   is_platform_admin: boolean;
+  notify_sms?: boolean;
+  notify_email?: boolean;
   daily_calorie_goal?: number | null;
   protein_percent?: number | null;
   carbs_percent?: number | null;
@@ -173,6 +175,8 @@ function mapProfile(row: ProfileRow): Profile {
     birthDate: row.birth_date,
     accountType: row.account_type,
     isPlatformAdmin: row.is_platform_admin,
+    notifySms: row.notify_sms ?? false,
+    notifyEmail: row.notify_email ?? false,
     dailyCalorieGoal: row.daily_calorie_goal ?? null,
     proteinPercent: row.protein_percent ?? null,
     carbsPercent: row.carbs_percent ?? null,
