@@ -5,6 +5,22 @@ import type { PlanKind } from "@/features/athletes/types/athlete-types";
 // messages are the `messages` rows between them — see list_message_threads.
 // Someone you have never written to still gets a thread, which is how a
 // first message is sent.
+export type MessageType = "text" | "voice" | "image" | "video" | "file";
+
+// What a non-text message reads as where there is no player — the inbox
+// preview and the dashboard card.
+const MEDIA_LABEL: Record<Exclude<MessageType, "text">, string> = {
+  voice: "🎤 پیام صوتی",
+  image: "🖼 عکس",
+  video: "🎬 ویدیو",
+  file: "📎 فایل",
+};
+
+export function messagePreview(type: MessageType | null, body: string | null): string | null {
+  if (type && type !== "text") return MEDIA_LABEL[type];
+  return body;
+}
+
 export interface MessageThread {
   counterpartId: string;
   // The other side's role relative to the viewer — an athlete's threads are
@@ -16,6 +32,9 @@ export interface MessageThread {
   messageCount: number;
   unreadCount: number;
   lastMessageBody: string | null;
+  lastMessageType: MessageType | null;
+  // Archived by the viewer only; the counterpart's list is unaffected.
+  isArchived: boolean;
   lastMessageAuthorId: string | null;
   lastMessageAt: string | null;
 }
@@ -38,7 +57,11 @@ export interface ConversationMessage {
   authorId: string;
   authorName: string;
   authorAvatarUrl: string | null;
-  body: string;
+  type: MessageType;
+  // Null on a media message sent without a caption.
+  body: string | null;
+  mediaUrl: string | null;
+  mediaName: string | null;
   createdAt: string;
 }
 

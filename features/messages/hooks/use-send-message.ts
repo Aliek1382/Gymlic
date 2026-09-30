@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { PlanKind } from "@/features/athletes/types/athlete-types";
-import { sendMessage } from "../services/message-service";
+import { sendMessage, type OutgoingMessage } from "../services/message-service";
 import { conversationQueryKey } from "./use-conversation";
 import { messageThreadsQueryKey } from "./use-message-threads";
 
@@ -16,12 +16,12 @@ export function useSendMessage(counterpartId: string | null) {
 
   return useMutation({
     mutationFn: ({
-      body,
+      message,
       plan,
     }: {
-      body: string;
+      message: OutgoingMessage;
       plan?: { kind: PlanKind; id: string } | null;
-    }) => sendMessage(counterpartId as string, body, plan),
+    }) => sendMessage(counterpartId as string, message, plan),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: conversationQueryKey(counterpartId) });
       queryClient.invalidateQueries({ queryKey: messageThreadsQueryKey() });

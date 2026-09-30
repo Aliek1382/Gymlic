@@ -121,9 +121,12 @@ export const api = {
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }),
   delete: <T>(path: string) => request<T>("DELETE", path),
-  upload: <T>(path: string, file: File) => {
+  upload: <T>(path: string, file: File, fields?: Record<string, string>) => {
     const formData = new FormData();
     formData.append("file", file);
+    for (const [key, value] of Object.entries(fields ?? {})) {
+      formData.append(key, value);
+    }
     return request<T>("POST", path, { formData });
   },
 };

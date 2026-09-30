@@ -5,6 +5,7 @@ export * from "./components/message-inbox";
 export * from "./components/thread-list";
 export * from "./components/messages-page";
 
+export * from "./hooks/use-archive-conversation";
 export * from "./hooks/use-conversation";
 export * from "./hooks/use-mark-conversation-read";
 export * from "./hooks/use-message-threads";

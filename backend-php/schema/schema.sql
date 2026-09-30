@@ -546,7 +546,10 @@ CREATE TABLE messages (
   id            CHAR(36) NOT NULL PRIMARY KEY,
   sender_id     CHAR(36) NOT NULL,
   recipient_id  CHAR(36) NOT NULL,
-  body          VARCHAR(1000) NOT NULL,
+  body          VARCHAR(1000) NULL,
+  type          ENUM('text','voice','image','video','file') NOT NULL DEFAULT 'text',
+  media_url     VARCHAR(1024) NULL,
+  media_name    VARCHAR(255) NULL,
   plan_kind     ENUM('workout','nutrition') NULL,
   plan_id       CHAR(36) NULL,
   read_at       DATETIME NULL,
@@ -558,6 +561,18 @@ CREATE TABLE messages (
   CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_messages_recipient FOREIGN KEY (recipient_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT chk_messages_pair CHECK (sender_id <> recipient_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One-sided, like archiving an email: it hides the thread from this user's
+-- main list only. The counterpart's list is untouched.
+CREATE TABLE conversation_archives (
+  id             CHAR(36) NOT NULL PRIMARY KEY,
+  user_id        CHAR(36) NOT NULL,
+  counterpart_id CHAR(36) NOT NULL,
+  archived_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_ca_pair (user_id, counterpart_id),
+  CONSTRAINT fk_ca_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ca_counterpart FOREIGN KEY (counterpart_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
@@ -885,6 +900,22 @@ CREATE TABLE notes (
   KEY idx_notes_athlete (trainer_id, athlete_id, created_at DESC),
   CONSTRAINT fk_notes_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_notes_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- trainer_profiles: the trainer's self-written résumé shown to their athletes
+-- (one row per trainer). Existing installs: run schema/trainer-profiles-update.sql.
+-- =========================================================================
+
+CREATE TABLE trainer_profiles (
+  trainer_id     CHAR(36) NOT NULL PRIMARY KEY,
+  bio            TEXT NULL,
+  achievements   JSON NULL,   -- array of strings, e.g. ["قهرمان کشوری ۱۴۰۱", "مربی تیم ملی"]
+  certificates   JSON NULL,   -- array of image URLs (output of UploadController)
+  pricing_table  JSON NULL,   -- array of {"title":"...", "price_toman":..., "description":"..."}
+  social_links   JSON NULL,   -- {"instagram":"...", "telegram":"...", "website":"..."}
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_trainer_profiles_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================

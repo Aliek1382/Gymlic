@@ -534,7 +534,10 @@ export interface Database {
           id: string;
           sender_id: string;
           recipient_id: string;
-          body: string;
+          body: string | null;
+          type: "text" | "voice" | "image" | "video" | "file";
+          media_url: string | null;
+          media_name: string | null;
           // Null on a plain direct message; set when the message was written
           // about one of the pair's plans.
           plan_kind: "workout" | "nutrition" | null;
@@ -545,7 +548,10 @@ export interface Database {
         {
           sender_id: string;
           recipient_id: string;
-          body: string;
+          body?: string | null;
+          type?: "text" | "voice" | "image" | "video" | "file";
+          media_url?: string | null;
+          media_name?: string | null;
           plan_kind?: "workout" | "nutrition" | null;
           plan_id?: string | null;
         },

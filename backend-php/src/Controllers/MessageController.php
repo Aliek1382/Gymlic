@@ -15,6 +15,17 @@ final class MessageController
 {
     private const MAX_BODY = 1000;
 
+    private const TYPES = ['text', 'voice', 'image', 'video', 'file'];
+
+    // What a media message reads as where there is no player: the inbox
+    // preview, the notification text, and the per-plan thread.
+    private const TYPE_LABELS = [
+        'voice' => '🎤 پیام صوتی',
+        'image' => '🖼 عکس',
+        'video' => '🎬 ویدیو',
+        'file'  => '📎 فایل',
+    ];
+
     /**
      * Everyone the caller can message, newest conversation first — ports
      * list_message_threads (0036). Postgres built this with FILTER aggregates
@@ -76,6 +87,7 @@ final class MessageController
         }
 
         $ids = array_keys($roles);
+        $archived = self::archivedIds($user['id']);
         $profiles = self::profilesById($ids);
         $stats = self::messageStats($user['id'], $ids);
         $last = self::lastMessages($user['id'], $ids);
@@ -94,6 +106,8 @@ final class MessageController
                 'message_count'          => (int) ($stats[$counterpartId]['message_count'] ?? 0),
                 'unread_count'           => (int) ($stats[$counterpartId]['unread_count'] ?? 0),
                 'last_message_body'      => $last[$counterpartId]['body'] ?? null,
+                'last_message_type'      => $last[$counterpartId]['type'] ?? null,
+                'is_archived'            => isset($archived[$counterpartId]),
                 'last_message_author_id' => $last[$counterpartId]['sender_id'] ?? null,
                 'last_message_at'        => $last[$counterpartId]['created_at'] ?? null,
             ];
@@ -132,7 +146,7 @@ final class MessageController
         usort($plans, static fn (array $a, array $b) => strcmp($b['assigned_at'], $a['assigned_at']));
 
         $stmt = $pdo->prepare(
-            'SELECT m.id, m.sender_id, m.body, m.created_at, m.plan_kind, m.plan_id, m.read_at,
+            'SELECT m.id, m.sender_id, m.body, m.type, m.media_url, m.media_name, m.created_at, m.plan_kind, m.plan_id, m.read_at,
                     p.first_name, p.last_name, p.avatar_url
              FROM messages m
              JOIN profiles p ON p.id = m.sender_id
@@ -171,7 +185,7 @@ final class MessageController
         Acl::require(Acl::canViewPlan($user, $plan));
 
         $stmt = Database::connection()->prepare(
-            'SELECT m.id, m.sender_id, m.body, m.created_at,
+            'SELECT m.id, m.sender_id, m.body, m.type, m.created_at,
                     p.first_name, p.last_name, p.avatar_url
              FROM messages m
              JOIN profiles p ON p.id = m.sender_id
@@ -180,7 +194,16 @@ final class MessageController
         );
         $stmt->execute(['kind' => $params['kind'], 'plan_id' => $params['id']]);
 
-        Response::ok(['items' => $stmt->fetchAll()]);
+        // This thread is text-only; an attachment sent about the plan from the
+        // inbox shows as its label rather than an empty bubble.
+        $items = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $row['body'] ??= self::TYPE_LABELS[$row['type']] ?? '';
+            unset($row['type']);
+            $items[] = $row;
+        }
+
+        Response::ok(['items' => $items]);
     }
 
     /**
@@ -207,7 +230,7 @@ final class MessageController
         }
         Acl::require(Acl::canMessage($user['id'], $recipientId), 'You cannot message this person.');
 
-        self::insertMessage($user, $recipientId, (string) $data['body'], $kind, $params['id']);
+        self::insertMessage($user, $recipientId, 'text', (string) $data['body'], null, null, $kind, $params['id']);
     }
 
     private static function planOr404(string $kind, string $id): array
@@ -234,14 +257,37 @@ final class MessageController
     public static function send(): void
     {
         $user = Auth::requireUser();
-        $data = Validate::required(Validate::body(), ['recipient_id', 'body']);
+        $data = Validate::required(Validate::body(), ['recipient_id']);
 
         $recipientId = (string) $data['recipient_id'];
-        $body = trim((string) $data['body']);
-
-        if ($body === '' || mb_strlen($body) > self::MAX_BODY) {
-            Response::error(400, 'invalid_body', 'A message must be between 1 and 1000 characters.');
+        $type = (string) ($data['type'] ?? 'text');
+        if (!in_array($type, self::TYPES, true)) {
+            Response::error(400, 'invalid_type', 'Unknown message type.');
             return;
+        }
+
+        $body = trim((string) ($data['body'] ?? ''));
+        $mediaUrl = null;
+        $mediaName = null;
+
+        if ($type === 'text') {
+            if ($body === '' || mb_strlen($body) > self::MAX_BODY) {
+                Response::error(400, 'invalid_body', 'A message must be between 1 and 1000 characters.');
+                return;
+            }
+        } else {
+            if (mb_strlen($body) > self::MAX_BODY) {
+                Response::error(400, 'invalid_body', 'A message must be at most 1000 characters.');
+                return;
+            }
+            $mediaUrl = trim((string) ($data['media_url'] ?? ''));
+            if ($mediaUrl === '' || mb_strlen($mediaUrl) > 1024
+                || !UploadController::ownsMessageMedia($mediaUrl, $user['id'], $type)) {
+                Response::error(400, 'invalid_media', 'media_url must be a file you uploaded for this message type.');
+                return;
+            }
+            $name = trim((string) ($data['media_name'] ?? ''));
+            $mediaName = $name === '' ? null : mb_substr($name, 0, 255);
         }
         Acl::require(Acl::canMessage($user['id'], $recipientId), 'You cannot message this person.');
 
@@ -259,19 +305,22 @@ final class MessageController
             );
         }
 
-        self::insertMessage($user, $recipientId, $body, $planKind, $planId);
+        self::insertMessage($user, $recipientId, $type, $body, $mediaUrl, $mediaName, $planKind, $planId);
     }
 
     /** Shared by the direct composer and the per-plan thread. */
     private static function insertMessage(
         array $user,
         string $recipientId,
+        string $type,
         string $rawBody,
+        ?string $mediaUrl,
+        ?string $mediaName,
         ?string $planKind,
         ?string $planId
     ): void {
         $body = trim($rawBody);
-        if ($body === '' || mb_strlen($body) > self::MAX_BODY) {
+        if (($type === 'text' && $body === '') || mb_strlen($body) > self::MAX_BODY) {
             Response::error(400, 'invalid_body', 'A message must be between 1 and 1000 characters.');
             return;
         }
@@ -280,13 +329,16 @@ final class MessageController
         $id = Uuid::v4();
 
         $pdo->prepare(
-            'INSERT INTO messages (id, sender_id, recipient_id, body, plan_kind, plan_id)
-             VALUES (:id, :sender_id, :recipient_id, :body, :plan_kind, :plan_id)'
+            'INSERT INTO messages (id, sender_id, recipient_id, body, type, media_url, media_name, plan_kind, plan_id)
+             VALUES (:id, :sender_id, :recipient_id, :body, :type, :media_url, :media_name, :plan_kind, :plan_id)'
         )->execute([
             'id'           => $id,
             'sender_id'    => $user['id'],
             'recipient_id' => $recipientId,
-            'body'         => $body,
+            'body'         => $body === '' ? null : $body,
+            'type'         => $type,
+            'media_url'    => $mediaUrl,
+            'media_name'   => $mediaName,
             'plan_kind'    => $planKind,
             'plan_id'      => $planId,
         ]);
@@ -298,11 +350,64 @@ final class MessageController
             $user['id'],
             'message',
             'پیام جدید',
-            trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) . ': ' . mb_substr($body, 0, 80),
+            trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) . ': '
+                . ($type === 'text' ? mb_substr($body, 0, 80) : self::TYPE_LABELS[$type]),
             '/messages/' . $user['id']
         );
 
         Response::ok(['id' => $id], 201);
+    }
+
+    /**
+     * Hides one conversation from the caller's main list. One-sided by design
+     * — the counterpart's list and every message are untouched — and
+     * idempotent, so archiving twice is not an error.
+     */
+    public static function archive(array $params): void
+    {
+        $user = Auth::requireUser();
+        $counterpartId = $params['id'];
+
+        if ($counterpartId === $user['id']) {
+            Response::error(400, 'invalid_counterpart', 'You cannot archive a conversation with yourself.');
+            return;
+        }
+        $stmt = Database::connection()->prepare('SELECT 1 FROM profiles WHERE id = :id');
+        $stmt->execute(['id' => $counterpartId]);
+        if ($stmt->fetch() === false) {
+            Response::error(404, 'not_found', 'Person not found.');
+            return;
+        }
+
+        Database::connection()->prepare(
+            'INSERT INTO conversation_archives (id, user_id, counterpart_id)
+             VALUES (:id, :user, :counterpart)
+             ON DUPLICATE KEY UPDATE archived_at = archived_at'
+        )->execute(['id' => Uuid::v4(), 'user' => $user['id'], 'counterpart' => $counterpartId]);
+
+        Response::ok(['ok' => true]);
+    }
+
+    public static function unarchive(array $params): void
+    {
+        $user = Auth::requireUser();
+
+        Database::connection()->prepare(
+            'DELETE FROM conversation_archives WHERE user_id = :user AND counterpart_id = :counterpart'
+        )->execute(['user' => $user['id'], 'counterpart' => $params['id']]);
+
+        Response::ok(['ok' => true]);
+    }
+
+    /** @return array<string, true> counterpart ids this user has archived. */
+    private static function archivedIds(string $userId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT counterpart_id FROM conversation_archives WHERE user_id = :user'
+        );
+        $stmt->execute(['user' => $userId]);
+
+        return array_fill_keys($stmt->fetchAll(\PDO::FETCH_COLUMN), true);
     }
 
     /**
@@ -374,7 +479,7 @@ final class MessageController
         $scope = "((sender_id = ? AND recipient_id IN ({$in})) OR (recipient_id = ? AND sender_id IN ({$in})))";
 
         $stmt = Database::connection()->prepare(
-            "SELECT {$pair} AS counterpart_id, m.body, m.sender_id, m.created_at
+            "SELECT {$pair} AS counterpart_id, m.body, m.type, m.sender_id, m.created_at
              FROM messages m
              JOIN (
                 SELECT {$pair} AS counterpart_id, MAX(created_at) AS newest
