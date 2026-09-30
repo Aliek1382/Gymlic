@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatAge, formatPersianDate } from "@/lib/persian";
+import { NoteList } from "@/features/notes";
 import { SessionPackagesPanel } from "@/features/session-packages";
 import { SupplementPlansPanel } from "@/features/supplements";
 import { ProgressPageContent } from "@/features/progress/components/progress-page-content";
@@ -100,6 +101,12 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
       <SupplementPlansPanel athleteId={athleteId} />
 
       <SessionPackagesPanel athleteId={athleteId} />
+
+      <NoteList
+        athleteId={athleteId}
+        title="یادداشت‌های من دربارهٔ این ورزشکار"
+        description="فقط خودتان این یادداشت‌ها را می‌بینید — ورزشکار به آن‌ها دسترسی ندارد."
+      />
 
       <ProgressPageContent athleteId={athleteId} />
     </div>

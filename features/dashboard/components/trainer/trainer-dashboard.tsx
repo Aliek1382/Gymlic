@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Apple, CheckCircle2, Dumbbell, LineChart, UserPlus, Users, Wallet } from "lucide-react";
 
 import { toPersianDigits } from "@/lib/persian";
+import { NoteList } from "@/features/notes";
 import { MonthlyEarningsCard } from "@/features/earnings/components/monthly-earnings-card";
 import { useTrainerEarningsSeries } from "@/features/earnings/hooks/use-trainer-earnings-series";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
@@ -142,6 +143,12 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
       ) : (
         <TrainerDraftPlans drafts={draftPlans.data ?? []} />
       )}
+
+      <NoteList
+        athleteId={null}
+        title="یادداشت‌های من"
+        description="یادداشت‌های شخصی شما که به ورزشکار خاصی مربوط نیستند. فقط خودتان می‌بینید."
+      />
 
       <QuickActions actions={QUICK_ACTIONS} />
     </div>

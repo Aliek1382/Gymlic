@@ -36,6 +36,7 @@ use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
 use Gymlic\Controllers\InvitationController;
+use Gymlic\Controllers\NoteController;
 use Gymlic\Controllers\NotificationController;
 use Gymlic\Controllers\ProfileController;
 use Gymlic\Controllers\ProgressController;
@@ -129,6 +130,11 @@ $router->get('/session-packages', fn () => SessionPackageController::list());
 $router->get('/session-packages/mine', fn () => SessionPackageController::listMine());
 $router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
 $router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
+
+$router->get('/notes', fn () => NoteController::list());
+$router->post('/notes', fn () => NoteController::create());
+$router->patch('/notes/{id}', fn (array $p) => NoteController::update($p));
+$router->delete('/notes/{id}', fn (array $p) => NoteController::delete($p));
 
 $router->post('/supplement-plans', fn () => SupplementController::create());
 $router->get('/supplement-plans', fn () => SupplementController::list());
