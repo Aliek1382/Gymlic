@@ -28,6 +28,8 @@ final class AuthController
             'carbs_percent'     => isset($p['carbs_percent']) ? (int) $p['carbs_percent'] : null,
             'fat_percent'       => isset($p['fat_percent']) ? (int) $p['fat_percent'] : null,
             'is_platform_admin' => (bool) $p['is_platform_admin'],
+            'notify_sms'        => (bool) ($p['notify_sms'] ?? 0),
+            'notify_email'      => (bool) ($p['notify_email'] ?? 0),
         ];
     }
 
@@ -232,5 +234,38 @@ final class AuthController
 
         // Also a phone/desktop push, sent after the response (see PushController).
         PushController::queueAfterResponse($id);
+
+        self::queueChannels($pdo, $id, $recipientId);
+    }
+
+    /**
+     * SMS / email copies of a notification, for a recipient who opted in. Only
+     * queues rows in notification_deliveries; cron/notification-dispatch.php
+     * sends them, so the request that raised the notification never waits on
+     * a provider. Must never break the caller (and must not, if the columns
+     * are not there yet), hence the catch.
+     */
+    private static function queueChannels(PDO $pdo, string $notificationId, string $recipientId): void
+    {
+        try {
+            $stmt = $pdo->prepare('SELECT phone, email, notify_sms, notify_email FROM profiles WHERE id = :id');
+            $stmt->execute(['id' => $recipientId]);
+            $p = $stmt->fetch();
+            if ($p === false) {
+                return;
+            }
+
+            $insert = $pdo->prepare(
+                'INSERT INTO notification_deliveries (id, notification_id, channel) VALUES (:id, :notification_id, :channel)'
+            );
+            if ((int) $p['notify_sms'] === 1 && trim((string) $p['phone']) !== '') {
+                $insert->execute(['id' => Uuid::v4(), 'notification_id' => $notificationId, 'channel' => 'sms']);
+            }
+            if ((int) $p['notify_email'] === 1 && trim((string) $p['email']) !== '') {
+                $insert->execute(['id' => Uuid::v4(), 'notification_id' => $notificationId, 'channel' => 'email']);
+            }
+        } catch (\Throwable $e) {
+            error_log('notify channels: ' . $e->getMessage());
+        }
     }
 }
