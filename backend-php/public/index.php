@@ -37,6 +37,7 @@ use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
 use Gymlic\Controllers\InvitationController;
+use Gymlic\Controllers\NewsController;
 use Gymlic\Controllers\NoteController;
 use Gymlic\Controllers\NotificationController;
 use Gymlic\Controllers\ProfileController;
@@ -132,6 +133,8 @@ $router->get('/session-packages/mine', fn () => SessionPackageController::listMi
 $router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
 $router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
 
+$router->get('/news', fn () => NewsController::list());
+$router->get('/news/{id}', fn (array $p) => NewsController::get($p));
 $router->get('/points/me', fn () => PointsController::me());
 $router->get('/notes', fn () => NoteController::list());
 $router->post('/notes', fn () => NoteController::create());
@@ -246,6 +249,12 @@ $router->post('/admin/payment-requests/{id}/approve', fn (array $p) => AdminCont
 $router->post('/admin/payment-requests/{id}/reject', fn (array $p) => AdminController::rejectPaymentRequest($p));
 $router->post('/admin/plans', fn () => AdminController::createPlan());
 $router->patch('/admin/plans/{id}', fn (array $p) => AdminController::updatePlan($p));
+
+$router->get('/admin/news', fn () => NewsController::adminList());
+$router->post('/admin/news', fn () => NewsController::create());
+$router->get('/admin/news/{id}', fn (array $p) => NewsController::adminGet($p));
+$router->patch('/admin/news/{id}', fn (array $p) => NewsController::update($p));
+$router->delete('/admin/news/{id}', fn (array $p) => NewsController::delete($p));
 
 $router->get('/messages/threads', fn () => MessageController::threads());
 $router->get('/messages/conversation/{id}', fn (array $p) => MessageController::conversation($p));

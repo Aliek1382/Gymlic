@@ -5,6 +5,7 @@ import {
   History,
   LayoutGrid,
   Megaphone,
+  Newspaper,
   ReceiptText,
   Tags,
   Users,
@@ -25,6 +26,7 @@ export const ADMIN_SIDEBAR_NAV: AdminNavItem[] = [
   { label: "درخواست‌های پرداخت", href: "/admin/payments", icon: ReceiptText },
   { label: "پلن‌ها", href: "/admin/plans", icon: Tags },
   { label: "گزارش مالی", href: "/admin/reports", icon: Banknote },
+  { label: "اخبار", href: "/admin/news", icon: Newspaper },
   { label: "اعلان همگانی", href: "/admin/notifications", icon: Megaphone },
   { label: "لاگ فعالیت", href: "/admin/activity", icon: History },
 ];
