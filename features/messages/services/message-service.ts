@@ -1,3 +1,4 @@
+import type { Queued } from "@/lib/offline-queue";
 import { api, fullName, type ListResponse } from "@/lib/api/client";
 import type { PlanKind } from "@/features/athletes/types/athlete-types";
 import type {
@@ -113,8 +114,8 @@ export async function sendMessage(
   recipientId: string,
   message: OutgoingMessage,
   plan?: { kind: PlanKind; id: string } | null
-): Promise<void> {
-  await api.post("/messages", {
+): Promise<void | Queued> {
+  return api.queueable.post("/messages", {
     recipient_id: recipientId,
     type: message.type,
     body: message.type === "text" ? message.body : null,

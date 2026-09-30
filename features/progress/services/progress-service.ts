@@ -1,3 +1,4 @@
+import type { Queued } from "@/lib/offline-queue";
 import { api, type ListResponse } from "@/lib/api/client";
 import type { MeasurementEntry, MeasurementInput } from "../types/progress-types";
 
@@ -51,8 +52,8 @@ export async function listMeasurements(athleteId: string): Promise<MeasurementEn
 export async function addMeasurement(
   athleteId: string,
   input: MeasurementInput
-): Promise<{ id: string }> {
-  return api.post<{ id: string }>(`/athletes/${athleteId}/measurements`, toPayload(input));
+): Promise<{ id: string } | Queued> {
+  return api.queueable.post<{ id: string }>(`/athletes/${athleteId}/measurements`, toPayload(input));
 }
 
 export async function updateMeasurement(

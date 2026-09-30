@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyIfQueued } from "@/lib/offline-sync";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { PlanKind } from "@/features/athletes/types/athlete-types";
@@ -22,7 +23,8 @@ export function useSendMessage(counterpartId: string | null) {
       message: OutgoingMessage;
       plan?: { kind: PlanKind; id: string } | null;
     }) => sendMessage(counterpartId as string, message, plan),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (notifyIfQueued(result)) return;
       queryClient.invalidateQueries({ queryKey: conversationQueryKey(counterpartId) });
       queryClient.invalidateQueries({ queryKey: messageThreadsQueryKey() });
       // The per-plan thread renders the same rows.

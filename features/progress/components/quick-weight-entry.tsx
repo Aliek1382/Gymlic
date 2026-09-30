@@ -1,5 +1,6 @@
 "use client";
 
+import { isQueued } from "@/lib/offline-queue";
 import { useState, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +32,7 @@ export function QuickWeightEntry({ athleteId }: { athleteId: string }) {
     }
 
     try {
-      await addMeasurement.mutateAsync({
+      const result = await addMeasurement.mutateAsync({
         heightCm: null,
         weightKg: Number(trimmed),
         bodyFatPercent: null,
@@ -39,7 +40,7 @@ export function QuickWeightEntry({ athleteId }: { athleteId: string }) {
         chestCm: null,
         note: null,
       });
-      toast.success("وزن امروز ثبت شد.");
+      if (!isQueued(result)) toast.success("وزن امروز ثبت شد.");
       setValue("");
     } catch (error) {
       toast.error(getErrorMessage(error, "ثبت وزن با خطا مواجه شد."));

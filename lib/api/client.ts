@@ -8,6 +8,8 @@
  * of the same host, where cross-site cookies are unreliable.
  */
 
+import { clearQueue, enqueue, isQueueable, type Queued } from "@/lib/offline-queue";
+
 const TOKEN_STORAGE_KEY = "gymlic.token";
 
 export function getApiBaseUrl(): string {
@@ -41,6 +43,10 @@ export function getToken(): string | null {
 
 export function setToken(token: string | null): void {
   if (typeof window === "undefined") return;
+  // A queued write belongs to the session that made it. On logout, or when a
+  // different token replaces this one, the queue goes — the next person on
+  // this browser must neither see it nor cause it to be sent.
+  if (token !== getToken()) void clearQueue();
   try {
     if (token === null) {
       window.localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -73,8 +79,8 @@ const FALLBACK_MESSAGE_BY_STATUS: Record<number, string> = {
 async function request<T>(
   method: string,
   path: string,
-  options: { body?: unknown; formData?: FormData } = {}
-): Promise<T> {
+  options: { body?: unknown; formData?: FormData; queueable?: boolean } = {}
+): Promise<T | Queued> {
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -92,6 +98,17 @@ async function request<T>(
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, { method, headers, body });
   } catch {
+    // Only a network failure (fetch rejecting) is queued, never an HTTP
+    // error response, and only for the allow-listed writes.
+    if (
+      options.queueable &&
+      method !== "GET" &&
+      !options.formData &&
+      isQueueable(method, path, options.body) &&
+      (await enqueue({ method, url: path, body: options.body, token }))
+    ) {
+      return { queued: true };
+    }
     throw new ApiError(
       "ارتباط با سرور برقرار نشد. اتصال اینترنت خود را بررسی کنید.",
       0,
@@ -116,18 +133,29 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>("GET", path),
-  post: <T>(path: string, body?: unknown) => request<T>("POST", path, { body }),
-  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }),
-  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }),
-  delete: <T>(path: string) => request<T>("DELETE", path),
+  get: <T>(path: string) => request<T>("GET", path) as Promise<T>,
+  post: <T>(path: string, body?: unknown) => request<T>("POST", path, { body }) as Promise<T>,
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }) as Promise<T>,
+  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }) as Promise<T>,
+  delete: <T>(path: string) => request<T>("DELETE", path) as Promise<T>,
+  /**
+   * For the few writes that may wait in the offline queue (see
+   * lib/offline-queue.ts). Resolves to `{ queued: true }` if the network was
+   * down; the caller must not treat that as a confirmed save.
+   */
+  queueable: {
+    post: <T>(path: string, body?: unknown) =>
+      request<T>("POST", path, { body, queueable: true }),
+    patch: <T>(path: string, body?: unknown) =>
+      request<T>("PATCH", path, { body, queueable: true }),
+  },
   upload: <T>(path: string, file: File, fields?: Record<string, string>) => {
     const formData = new FormData();
     formData.append("file", file);
     for (const [key, value] of Object.entries(fields ?? {})) {
       formData.append(key, value);
     }
-    return request<T>("POST", path, { formData });
+    return request<T>("POST", path, { formData }) as Promise<T>;
   },
 };
 

@@ -1,12 +1,17 @@
 "use client";
 
+import { notifyIfQueued } from "@/lib/offline-sync";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { createNote, deleteNote, updateNote } from "../services/note-service";
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ["notes"] });
+  return (result?: unknown) => {
+    // Queued offline: there is nothing new on the server to refetch yet.
+    if (notifyIfQueued(result)) return;
+    return queryClient.invalidateQueries({ queryKey: ["notes"] });
+  };
 }
 
 export function useCreateNote() {
