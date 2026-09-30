@@ -223,17 +223,12 @@ final class NewsController
             if (++$seen > self::MAX_FEED_ITEMS) {
                 break;
             }
-            // One article the database refuses must not cost the rest of the feed.
-            try {
-                $row = self::feedItemRow($item);
-                if ($row === null) {
-                    continue;
-                }
-                $insert->execute($row + ['id' => Uuid::v4()]);
-                $added += $insert->rowCount();
-            } catch (Throwable $e) {
-                fwrite(STDERR, 'news item skipped: ' . $e->getMessage() . "\n");
+            $row = self::feedItemRow($item);
+            if ($row === null) {
+                continue;
             }
+            $insert->execute($row + ['id' => Uuid::v4()]);
+            $added += $insert->rowCount();
         }
 
         return $added;
@@ -245,9 +240,6 @@ final class NewsController
         if (!preg_match('#^https?://#i', $url)) {
             throw new \RuntimeException('feed url must be http(s)');
         }
-        if (!function_exists('curl_init')) {
-            throw new \RuntimeException('the PHP curl extension is not enabled on this host');
-        }
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -256,7 +248,6 @@ final class NewsController
             CURLOPT_MAXREDIRS      => 3,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT        => 20,
-            CURLOPT_ENCODING       => '', // accept gzip/deflate and decode it
             CURLOPT_USERAGENT      => 'GymlicNewsFetcher/1.0',
             CURLOPT_HTTPHEADER     => ['Accept: application/rss+xml, application/xml;q=0.9, */*;q=0.5'],
             CURLOPT_PROTOCOLS      => CURLPROTO_HTTP | CURLPROTO_HTTPS,
