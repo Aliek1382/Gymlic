@@ -18,6 +18,7 @@ import {
   Salad,
   Settings,
   Ticket,
+  Trophy,
   User,
   UserCircle,
   UserPen,
@@ -86,6 +87,12 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
       icon: Wallet,
       description:
         "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
+    },
+    {
+      label: "امتیاز من",
+      href: "/points",
+      icon: Trophy,
+      description: "امتیاز و سطح خود را ببینید و بدانید هر امتیاز را برای چه کاری گرفته‌اید.",
     },
     {
       label: "پرسشنامه‌ها",

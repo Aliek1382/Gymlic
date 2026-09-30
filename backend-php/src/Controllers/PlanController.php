@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -190,6 +191,10 @@ final class PlanController
             'description'   => Validate::nullableString($data['description'] ?? null),
             'status'        => $status,
         ]);
+
+        // Only brand-new plans earn points; the edit and draft-to-active
+        // branch above returns before reaching here.
+        PointsService::award($user['id'], $kind === 'nutrition' ? 'nutrition_plan_created' : 'workout_plan_created');
 
         if ($status !== 'draft' && $athleteId !== null) {
             self::notifyAssigned($user, $kind, $athleteId, (string) $data['title']);
