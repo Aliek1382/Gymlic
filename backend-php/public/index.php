@@ -15,6 +15,8 @@ spl_autoload_register(static function (string $class): void {
 
 use Gymlic\Controllers\AthleteController;
 use Gymlic\Controllers\AdminController;
+use Gymlic\Controllers\AdminLibraryController;
+use Gymlic\Controllers\AdminPointsController;
 use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\CalendarController;
 use Gymlic\Controllers\DashboardController;
@@ -252,6 +254,14 @@ $router->post('/admin/plans', fn () => AdminController::createPlan());
 $router->patch('/admin/plans/{id}', fn (array $p) => AdminController::updatePlan($p));
 $router->get('/admin/settings', fn () => SettingsController::adminGet());
 $router->put('/admin/settings/{key}', fn (array $p) => SettingsController::adminUpdate($p));
+$router->get('/admin/library/{kind}', fn (array $p) => AdminLibraryController::list($p));
+$router->post('/admin/library/{kind}', fn (array $p) => AdminLibraryController::create($p));
+$router->patch('/admin/library/{kind}/{id}', fn (array $p) => AdminLibraryController::update($p));
+$router->delete('/admin/library/{kind}/{id}', fn (array $p) => AdminLibraryController::delete($p));
+$router->post('/admin/library/{kind}/{id}/publish', fn (array $p) => AdminLibraryController::publish($p));
+$router->get('/admin/points', fn () => AdminPointsController::overview());
+$router->patch('/admin/points/rules/{action}', fn (array $p) => AdminPointsController::updateRule($p));
+$router->post('/admin/points/adjust', fn () => AdminPointsController::adjust());
 
 $router->get('/messages/threads', fn () => MessageController::threads());
 $router->get('/messages/conversation/{id}', fn (array $p) => MessageController::conversation($p));

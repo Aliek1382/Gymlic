@@ -28,6 +28,12 @@ const ADMIN_ACTIONS = [
   "profile_suspension_changed",
   "profile_updated",
   "settings_updated",
+  "library_item_created",
+  "library_item_updated",
+  "library_item_deleted",
+  "library_item_published",
+  "point_rule_updated",
+  "points_adjusted",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -39,6 +45,12 @@ const ACTION_LABEL: Record<string, string> = {
   profile_suspension_changed: "تغییر وضعیت مسدودی حساب",
   profile_updated: "ویرایش پروفایل توسط مدیر",
   settings_updated: "تغییر تنظیمات سایت",
+  library_item_created: "افزودن به کتابخانه",
+  library_item_updated: "ویرایش مورد کتابخانه",
+  library_item_deleted: "حذف از کتابخانه",
+  library_item_published: "انتقال به بانک عمومی",
+  point_rule_updated: "تغییر قانون امتیاز",
+  points_adjusted: "امتیاز دستی به مربی",
 };
 
 const SETTINGS_GROUP_LABEL: Record<string, string> = {
@@ -47,6 +59,7 @@ const SETTINGS_GROUP_LABEL: Record<string, string> = {
   announcement: "اطلاعیهٔ پنل",
   support: "پشتیبانی",
   features: "مدیریت بخش‌ها",
+  points_levels: "سطح‌های امتیاز",
 };
 
 export function AdminActivityPage() {
@@ -100,9 +113,14 @@ export function AdminActivityPage() {
               {rows.map((log) => {
                 const settingsGroup =
                   log.action === "settings_updated" ? String(log.metadata?.key ?? "") : "";
+                // Library actions have no person as subject: show the entry's name.
+                const libraryItem = log.action.startsWith("library_item_")
+                  ? String(log.metadata?.name ?? "")
+                  : "";
                 const subjectName =
                   SETTINGS_GROUP_LABEL[settingsGroup] ??
-                  [log.subject_first_name, log.subject_last_name].filter(Boolean).join(" ");
+                  (libraryItem ||
+                  [log.subject_first_name, log.subject_last_name].filter(Boolean).join(" "));
                 return (
                   <TableRow key={log.id}>
                     <TableCell className="font-medium text-foreground">

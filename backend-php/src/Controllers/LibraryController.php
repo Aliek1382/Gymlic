@@ -51,7 +51,7 @@ final class LibraryController
         $stmt = Database::connection()->prepare(
             "SELECT id, name, name_en, description, {$kind['extra']}, created_by, created_at
              FROM {$kind['table']}
-             WHERE created_by IS NULL OR created_by = :user_id
+             WHERE (created_by IS NULL OR created_by = :user_id)" . self::notHidden($kind['table'], $kind['table']) . "
              ORDER BY name ASC"
         );
         $stmt->execute(['user_id' => $user['id']]);
@@ -71,7 +71,7 @@ final class LibraryController
              FROM {$kind['table']} l
              LEFT JOIN {$kind['usage_table']} u
                ON u.{$kind['usage_key']} = l.id AND u.trainer_id = :user_id
-             WHERE l.created_by IS NULL OR l.created_by = :user_id2
+             WHERE (l.created_by IS NULL OR l.created_by = :user_id2)" . self::notHidden($kind['table'], 'l') . "
              ORDER BY usage_count DESC, l.name ASC"
         );
         $stmt->execute(['user_id' => $user['id'], 'user_id2' => $user['id']]);
@@ -161,6 +161,15 @@ final class LibraryController
         }
 
         Response::ok(['id' => $id], 201);
+    }
+
+    /**
+     * Leaves out what the admin hid from /admin/library. Plans that already
+     * use a hidden entry still show it: they join it by id, not through here.
+     */
+    private static function notHidden(string $table, string $alias): string
+    {
+        return Database::hasColumn($table, 'is_hidden') ? " AND {$alias}.is_hidden = 0" : '';
     }
 
     /** @param array<int, array<string, mixed>> $rows */

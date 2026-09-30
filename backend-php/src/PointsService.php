@@ -7,19 +7,12 @@ use Throwable;
 
 /**
  * Coach gamification: points for defined actions, and a level derived from the
- * running total. The per-action numbers live in the `point_rules` table so the
- * owner can change or switch one off from phpMyAdmin without a deploy; the
- * level thresholds are fixed here because nobody edits them regularly.
+ * running total. The per-action numbers live in the `point_rules` table and the
+ * levels in app_settings (`points_levels`); the admin edits both from
+ * /admin/points without a deploy.
  */
 final class PointsService
 {
-    private const LEVELS = [
-        ['name' => 'تازه‌کار', 'min_points' => 0],
-        ['name' => 'مربی فعال', 'min_points' => 100],
-        ['name' => 'مربی حرفه‌ای', 'min_points' => 500],
-        ['name' => 'مربی برتر', 'min_points' => 2000],
-    ];
-
     /**
      * Logs one point row for the coach. Never throws: a missing or inactive
      * rule is a no-op, and any database error (including the tables not
@@ -61,18 +54,20 @@ final class PointsService
      */
     public static function currentLevel(int $totalPoints): array
     {
+        $levels = Settings::get('points_levels')['levels'];
+
         $index = 0;
-        foreach (self::LEVELS as $i => $level) {
+        foreach ($levels as $i => $level) {
             if ($totalPoints >= $level['min_points']) {
                 $index = $i;
             }
         }
 
-        $next = self::LEVELS[$index + 1] ?? null;
+        $next = $levels[$index + 1] ?? null;
 
         return [
-            'name'                 => self::LEVELS[$index]['name'],
-            'min_points'           => self::LEVELS[$index]['min_points'],
+            'name'                 => $levels[$index]['name'],
+            'min_points'           => $levels[$index]['min_points'],
             'next_level'           => $next['name'] ?? null,
             'next_min_points'      => $next['min_points'] ?? null,
             'points_to_next_level' => $next !== null ? $next['min_points'] - $totalPoints : null,
