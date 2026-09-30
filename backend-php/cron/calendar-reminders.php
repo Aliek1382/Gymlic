@@ -23,7 +23,16 @@ spl_autoload_register(static function (string $class): void {
 });
 
 $sent = Gymlic\Controllers\CalendarController::sendDueReminders();
+// Supplement-plan reminders ride the same cron. Guarded so that a host whose
+// supplement tables don't exist yet (backend deployed before the SQL ran) still
+// sends calendar reminders and pushes.
+try {
+    $supplements = Gymlic\Controllers\SupplementController::sendDueReminders();
+} catch (Throwable $e) {
+    $supplements = 0;
+    fwrite(STDERR, 'supplement reminders failed: ' . $e->getMessage() . "\n");
+}
 // Every notification is also pushed to phones and desktops; this sweep delivers
 // the ones nothing pushed at creation time (admin broadcasts, or a push that never ran).
 $pushed = Gymlic\Controllers\PushController::deliverPending();
-echo date('Y-m-d H:i:s'), " reminders sent: {$sent}, notifications pushed: {$pushed}\n";
+echo date('Y-m-d H:i:s'), " reminders sent: {$sent}, supplement reminders: {$supplements}, notifications pushed: {$pushed}\n";

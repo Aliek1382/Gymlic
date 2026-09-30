@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   LineChart,
   MessageCircle,
+  Pill,
   Receipt,
   Ruler,
   Salad,
@@ -70,6 +71,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     },
     { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
     { label: "کتابخانه غذاها", href: "/foods", icon: Salad },
+    { label: "کتابخانه مکمل‌ها", href: "/supplements", icon: Pill },
     {
       label: "پیشرفت ورزشکاران",
       href: "/progress",

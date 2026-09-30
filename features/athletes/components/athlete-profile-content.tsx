@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatAge, formatPersianDate } from "@/lib/persian";
 import { SessionPackagesPanel } from "@/features/session-packages";
+import { SupplementPlansPanel } from "@/features/supplements";
 import { ProgressPageContent } from "@/features/progress/components/progress-page-content";
 import { useAthleteProfile } from "../hooks/use-athlete-profile";
 import { useRemoveAthlete } from "../hooks/use-remove-athlete";
@@ -95,6 +96,8 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
       <AthleteProfileNote athleteId={athleteId} initialNote={athlete.note} />
 
       <AthleteNutritionGoal athleteId={athleteId} athlete={athlete} />
+
+      <SupplementPlansPanel athleteId={athleteId} />
 
       <SessionPackagesPanel athleteId={athleteId} />
 
