@@ -2,6 +2,7 @@
 
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { MySupplementPlans } from "@/features/supplements";
+import { useFeatureEnabled } from "@/features/site-settings";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { MyPlanList } from "./my-plan-list";
 
@@ -22,6 +23,7 @@ const COPY = {
 export function MyPlanPage({ kind }: { kind: "workout" | "nutrition" }) {
   const { data: context } = useAuthContext();
   const copy = COPY[kind];
+  const showSupplements = useFeatureEnabled("supplements");
   const athleteName =
     [context?.firstName, context?.lastName].filter(Boolean).join(" ") || null;
 
@@ -47,7 +49,7 @@ export function MyPlanPage({ kind }: { kind: "workout" | "nutrition" }) {
           />
         )}
 
-        {kind === "nutrition" && <MySupplementPlans />}
+        {kind === "nutrition" && showSupplements && <MySupplementPlans />}
       </div>
     </RoleGate>
   );

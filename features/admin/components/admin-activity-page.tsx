@@ -23,6 +23,11 @@ const ADMIN_ACTIONS = [
   "club_status_changed",
   "profile_suspended_changed",
   "profile_edited_by_admin",
+  // What the backend actually writes for these two; the names above never
+  // matched, so suspensions and profile edits were missing from this page.
+  "profile_suspension_changed",
+  "profile_updated",
+  "settings_updated",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -31,6 +36,17 @@ const ACTION_LABEL: Record<string, string> = {
   club_status_changed: "تغییر وضعیت باشگاه",
   profile_suspended_changed: "تغییر وضعیت مسدودی حساب",
   profile_edited_by_admin: "ویرایش پروفایل توسط مدیر",
+  profile_suspension_changed: "تغییر وضعیت مسدودی حساب",
+  profile_updated: "ویرایش پروفایل توسط مدیر",
+  settings_updated: "تغییر تنظیمات سایت",
+};
+
+const SETTINGS_GROUP_LABEL: Record<string, string> = {
+  maintenance: "حالت تعمیر",
+  signup: "ثبت‌نام",
+  announcement: "اطلاعیهٔ پنل",
+  support: "پشتیبانی",
+  features: "مدیریت بخش‌ها",
 };
 
 export function AdminActivityPage() {
@@ -82,7 +98,10 @@ export function AdminActivityPage() {
             </TableHeader>
             <TableBody>
               {rows.map((log) => {
+                const settingsGroup =
+                  log.action === "settings_updated" ? String(log.metadata?.key ?? "") : "";
                 const subjectName =
+                  SETTINGS_GROUP_LABEL[settingsGroup] ??
                   [log.subject_first_name, log.subject_last_name].filter(Boolean).join(" ");
                 return (
                   <TableRow key={log.id}>

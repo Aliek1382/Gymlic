@@ -2,13 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, ShieldAlert } from "lucide-react";
+import { Clock, Construction, ShieldAlert } from "lucide-react";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { RouteLoading } from "@/components/layout/route-loading";
 import { ROLE_LABEL } from "@/components/layout/sidebar-nav";
 import { AccessBlockedNotice } from "@/components/access-blocked-notice";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
+import { usePublicSettings } from "@/features/site-settings";
 
 export default function DashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { data: context, isPending } = useAuthContext();
+  const { maintenance } = usePublicSettings();
 
   // The Redirect Rules used to run in a Server Component, before any HTML was
   // sent. Under `output: "export"` the shell is already in the browser by the
@@ -52,6 +54,21 @@ export default function DashboardLayout({
   }, [context, isPending, router]);
 
   if (isPending || !context) return <RouteLoading />;
+
+  // Maintenance mode, switched on from /admin/settings. The API refuses
+  // everyone but platform admins meanwhile, so the panel would only fail.
+  if (maintenance.enabled && !context.isPlatformAdmin) {
+    return (
+      <AccessBlockedNotice
+        icon={Construction}
+        title="جیم‌لیک در حال به‌روزرسانی است"
+        description={
+          maintenance.message ||
+          "در حال انجام کارهای فنی روی سایت هستیم. لطفاً کمی بعد دوباره سر بزنید."
+        }
+      />
+    );
+  }
 
   // A platform admin can suspend any account — block the panel entirely
   // rather than letting a suspended user reach a half-working dashboard.

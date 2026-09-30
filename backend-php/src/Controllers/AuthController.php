@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Settings;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use PDO;
@@ -49,6 +50,14 @@ final class AuthController
         }
 
         $pdo = Database::connection();
+
+        // With sign-up closed by the admin, only someone holding a live
+        // invitation may still create an account — invitees are how clubs and
+        // trainers bring people in, and that must keep working.
+        if (!Settings::get('signup')['open'] && !self::hasPendingInvitation($pdo, (string) ($data['invitation_code'] ?? ''))) {
+            Response::error(403, 'signup_closed', 'ثبت‌نام در حال حاضر بسته است. اگر لینک دعوت دارید، از همان لینک وارد شوید.');
+            return;
+        }
 
         $exists = $pdo->prepare('SELECT id FROM profiles WHERE email = :email');
         $exists->execute(['email' => $email]);
@@ -160,6 +169,13 @@ final class AuthController
         $pdo = Database::connection();
         $wasUnset = $user['account_type'] === null;
 
+        // A role the admin closed to self sign-up can't be picked here; an
+        // invitation assigns its role through its own endpoint instead.
+        if ($wasUnset && !Settings::get('signup')['roles'][$role] && (int) $user['is_platform_admin'] !== 1) {
+            Response::error(403, 'role_closed', 'ثبت‌نام با این نقش در حال حاضر بسته است.');
+            return;
+        }
+
         $stmt = $pdo->prepare(
             'UPDATE profiles SET account_type = :role,
                first_name = COALESCE(:first_name, first_name),
@@ -205,6 +221,18 @@ final class AuthController
         }
 
         Response::ok($row);
+    }
+
+    private static function hasPendingInvitation(PDO $pdo, string $code): bool
+    {
+        if ($code === '') {
+            return false;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT 1 FROM invitations WHERE code = :code AND status = 'pending' AND expires_at > NOW()"
+        );
+        $stmt->execute(['code' => $code]);
+        return $stmt->fetch() !== false;
     }
 
     private static function fetchProfile(string $id): array

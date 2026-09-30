@@ -1,6 +1,7 @@
 import { Sidebar } from "./sidebar";
 import { DashboardHeader } from "./dashboard-header";
 import { InstallAppPrompt } from "@/components/pwa/install-app-prompt";
+import { FeatureRouteGate, SiteBanners } from "@/features/site-settings";
 import type { AccountType } from "@/types/database.types";
 
 interface DashboardShellProps {
@@ -41,11 +42,9 @@ export function DashboardShell({
         {/* py-6 is split so the bottom keeps its 1.5rem above whatever the
             home indicator reserves, instead of being overlapped by it. */}
         <main className="flex-1 px-4 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+          <SiteBanners accountType={accountType} />
           <InstallAppPrompt />
-          {/* Next hands a page down as an array of segment elements. Listed
-              beside a sibling, React checks that array for keys in dev and
-              blames this component; a fragment makes it one child instead. */}
-          <>{children}</>
+          <FeatureRouteGate>{children}</FeatureRouteGate>
         </main>
       </div>
     </div>

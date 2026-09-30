@@ -11,6 +11,7 @@ import { NoteList } from "@/features/notes";
 import { SessionPackagesPanel } from "@/features/session-packages";
 import { SupplementPlansPanel } from "@/features/supplements";
 import { ProgressPageContent } from "@/features/progress/components/progress-page-content";
+import { useFeatureCheck } from "@/features/site-settings";
 import { useAthleteProfile } from "../hooks/use-athlete-profile";
 import { useRemoveAthlete } from "../hooks/use-remove-athlete";
 import { AthleteNutritionGoal } from "./athlete-nutrition-goal";
@@ -22,6 +23,7 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
   const profile = useAthleteProfile(athleteId);
   const removeAthlete = useRemoveAthlete();
   const router = useRouter();
+  const isEnabled = useFeatureCheck();
 
   if (profile.isLoading) {
     return (
@@ -77,11 +79,13 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
               target={{ athleteId }}
               athleteName={athlete.name}
             />
-            <PlanDialog
-              kind="nutrition"
-              target={{ athleteId }}
-              athleteName={athlete.name}
-            />
+            {isEnabled("nutrition") && (
+              <PlanDialog
+                kind="nutrition"
+                target={{ athleteId }}
+                athleteName={athlete.name}
+              />
+            )}
             <RemoveAthleteButton
               athleteName={athlete.name}
               description="این ورزشکار از لیست شما حذف می‌شود. برنامه‌های قبلی او حذف نخواهند شد."
@@ -96,19 +100,23 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
 
       <AthleteProfileNote athleteId={athleteId} initialNote={athlete.note} />
 
-      <AthleteNutritionGoal athleteId={athleteId} athlete={athlete} />
+      {isEnabled("nutrition") && (
+        <AthleteNutritionGoal athleteId={athleteId} athlete={athlete} />
+      )}
 
-      <SupplementPlansPanel athleteId={athleteId} />
+      {isEnabled("supplements") && <SupplementPlansPanel athleteId={athleteId} />}
 
-      <SessionPackagesPanel athleteId={athleteId} />
+      {isEnabled("session_packages") && <SessionPackagesPanel athleteId={athleteId} />}
 
-      <NoteList
-        athleteId={athleteId}
-        title="یادداشت‌های من دربارهٔ این ورزشکار"
-        description="فقط خودتان این یادداشت‌ها را می‌بینید — ورزشکار به آن‌ها دسترسی ندارد."
-      />
+      {isEnabled("notes") && (
+        <NoteList
+          athleteId={athleteId}
+          title="یادداشت‌های من دربارهٔ این ورزشکار"
+          description="فقط خودتان این یادداشت‌ها را می‌بینید — ورزشکار به آن‌ها دسترسی ندارد."
+        />
+      )}
 
-      <ProgressPageContent athleteId={athleteId} />
+      {isEnabled("progress") && <ProgressPageContent athleteId={athleteId} />}
     </div>
   );
 }

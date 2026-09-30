@@ -962,3 +962,15 @@ CREATE TABLE assessment_reminders (
   CONSTRAINT fk_ar_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT chk_ar_interval CHECK (interval_weeks > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- app_settings: what the platform admin edits from /admin — one JSON value
+-- per settings group. A missing row means that group's defaults (see
+-- src/Settings.php), so the table starts empty.
+-- =========================================================================
+CREATE TABLE app_settings (
+  setting_key VARCHAR(100) NOT NULL PRIMARY KEY,
+  value       MEDIUMTEXT NOT NULL,
+  updated_by  CHAR(36) NULL,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

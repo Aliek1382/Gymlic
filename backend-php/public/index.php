@@ -43,9 +43,11 @@ use Gymlic\Controllers\ProfileController;
 use Gymlic\Controllers\ProgressController;
 use Gymlic\Controllers\PushController;
 use Gymlic\Controllers\QuestionnaireController;
+use Gymlic\Controllers\SettingsController;
 use Gymlic\Controllers\TrainerProfileController;
 use Gymlic\Controllers\UploadController;
 use Gymlic\Controllers\WorkoutPlanBuilderController;
+use Gymlic\Gate;
 use Gymlic\Response;
 use Gymlic\Router;
 
@@ -74,6 +76,8 @@ $path = preg_replace('#^/api#', '', $path) ?: '/';
 $router = new Router();
 
 $router->get('/health', fn () => HealthController::check());
+
+$router->get('/settings/public', fn () => SettingsController::publicSettings());
 
 $router->post('/auth/signup', fn () => AuthController::signup());
 $router->post('/auth/login', fn () => AuthController::login());
@@ -246,6 +250,8 @@ $router->post('/admin/payment-requests/{id}/approve', fn (array $p) => AdminCont
 $router->post('/admin/payment-requests/{id}/reject', fn (array $p) => AdminController::rejectPaymentRequest($p));
 $router->post('/admin/plans', fn () => AdminController::createPlan());
 $router->patch('/admin/plans/{id}', fn (array $p) => AdminController::updatePlan($p));
+$router->get('/admin/settings', fn () => SettingsController::adminGet());
+$router->put('/admin/settings/{key}', fn (array $p) => SettingsController::adminUpdate($p));
 
 $router->get('/messages/threads', fn () => MessageController::threads());
 $router->get('/messages/conversation/{id}', fn (array $p) => MessageController::conversation($p));
@@ -289,6 +295,8 @@ $router->post('/notifications/read-all', fn () => NotificationController::markAl
 $router->post('/admin/notifications/broadcast', fn () => NotificationController::broadcast());
 
 try {
+    // Maintenance mode and switched-off sections, before any endpoint runs.
+    Gate::enforce('/' . trim($path, '/'));
     $router->dispatch($_SERVER['REQUEST_METHOD'], $path);
 } catch (PDOException $e) {
     Response::error(500, 'db_connection_failed', 'Could not reach the database.');
