@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { useMessageThreads } from "../hooks/use-message-threads";
+import { messagePreview } from "../types/message-types";
 
 // The athlete dashboard's window into the inbox: who wrote last, what they
 // said, and one tap into the conversation itself.
@@ -19,7 +20,9 @@ const PREVIEW_COUNT = 3;
 export function CoachMessageCard({ currentUserId }: { currentUserId: string }) {
   const threads = useMessageThreads();
 
-  const items = (threads.data ?? []).slice(0, PREVIEW_COUNT);
+  const items = (threads.data ?? [])
+    .filter((thread) => !thread.isArchived)
+    .slice(0, PREVIEW_COUNT);
 
   return (
     <Card className="gap-4 py-5">
@@ -84,8 +87,8 @@ export function CoachMessageCard({ currentUserId }: { currentUserId: string }) {
                             : "text-muted-foreground"
                         )}
                       >
-                        {thread.lastMessageBody
-                          ? `${isOwnLastMessage ? "شما: " : ""}${thread.lastMessageBody}`
+                        {messagePreview(thread.lastMessageType, thread.lastMessageBody)
+                          ? `${isOwnLastMessage ? "شما: " : ""}${messagePreview(thread.lastMessageType, thread.lastMessageBody)}`
                           : "هنوز پیامی رد و بدل نشده — اولین پیام را شما بنویسید."}
                       </p>
                     </div>

@@ -24,5 +24,10 @@ export function useMessageThreads() {
 /** Total unread messages across every conversation — the sidebar badge. */
 export function useUnreadMessageCount(): number {
   const threads = useMessageThreads();
-  return (threads.data ?? []).reduce((total, thread) => total + thread.unreadCount, 0);
+  // Archived conversations are out of the main list, so they stay out of the
+  // badge too; the inbox's archive tab carries its own count.
+  return (threads.data ?? []).reduce(
+    (total, thread) => total + (thread.isArchived ? 0 : thread.unreadCount),
+    0
+  );
 }

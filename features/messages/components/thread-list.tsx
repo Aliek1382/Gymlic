@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageCircle, Search } from "lucide-react";
+import { Archive, ArchiveRestore, MessageCircle, Search } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime, toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
-import type { MessageThread } from "../types/message-types";
+import { messagePreview, type MessageThread } from "../types/message-types";
 
 // A trainer's inbox can get long (one row per athlete they've written a
 // plan for), an athlete's is usually a single row — so the filter box only
@@ -21,6 +21,7 @@ export function ThreadList({
   isLoading,
   selectedId,
   onSelect,
+  onToggleArchive,
   emptyTitle,
   emptyDescription,
 }: {
@@ -28,6 +29,8 @@ export function ThreadList({
   isLoading: boolean;
   selectedId: string | null;
   onSelect: (counterpartId: string) => void;
+  // Archives a conversation, or brings it back when it is already archived.
+  onToggleArchive: (thread: MessageThread) => void;
   emptyTitle: string;
   emptyDescription: string;
 }) {
@@ -75,7 +78,7 @@ export function ThreadList({
       ) : (
         <ul className="min-h-0 flex-1 overflow-y-auto">
           {visible.map((thread) => (
-            <li key={thread.counterpartId}>
+            <li key={thread.counterpartId} className="group relative">
               <button
                 type="button"
                 onClick={() => onSelect(thread.counterpartId)}
@@ -110,7 +113,8 @@ export function ThreadList({
                         : "text-muted-foreground"
                     )}
                   >
-                    {thread.lastMessageBody ?? "هنوز پیامی رد و بدل نشده است."}
+                    {messagePreview(thread.lastMessageType, thread.lastMessageBody) ??
+                      "هنوز پیامی رد و بدل نشده است."}
                   </p>
                 </div>
 
@@ -118,6 +122,21 @@ export function ThreadList({
                   <span className="mt-1 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-medium leading-none text-primary-foreground">
                     {toPersianDigits(thread.unreadCount)}
                   </span>
+                )}
+                {/* Reserves the corner the archive button sits in. */}
+                <span className="w-7 shrink-0" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => onToggleArchive(thread)}
+                title={thread.isArchived ? "خروج از آرشیو" : "آرشیو"}
+                aria-label={thread.isArchived ? "خروج از آرشیو" : "آرشیو"}
+                className="absolute bottom-2 left-3 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              >
+                {thread.isArchived ? (
+                  <ArchiveRestore className="size-4" />
+                ) : (
+                  <Archive className="size-4" />
                 )}
               </button>
             </li>

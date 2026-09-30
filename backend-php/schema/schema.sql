@@ -546,7 +546,10 @@ CREATE TABLE messages (
   id            CHAR(36) NOT NULL PRIMARY KEY,
   sender_id     CHAR(36) NOT NULL,
   recipient_id  CHAR(36) NOT NULL,
-  body          VARCHAR(1000) NOT NULL,
+  body          VARCHAR(1000) NULL,
+  type          ENUM('text','voice','image','video','file') NOT NULL DEFAULT 'text',
+  media_url     VARCHAR(1024) NULL,
+  media_name    VARCHAR(255) NULL,
   plan_kind     ENUM('workout','nutrition') NULL,
   plan_id       CHAR(36) NULL,
   read_at       DATETIME NULL,
@@ -558,6 +561,18 @@ CREATE TABLE messages (
   CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_messages_recipient FOREIGN KEY (recipient_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT chk_messages_pair CHECK (sender_id <> recipient_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One-sided, like archiving an email: it hides the thread from this user's
+-- main list only. The counterpart's list is untouched.
+CREATE TABLE conversation_archives (
+  id             CHAR(36) NOT NULL PRIMARY KEY,
+  user_id        CHAR(36) NOT NULL,
+  counterpart_id CHAR(36) NOT NULL,
+  archived_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_ca_pair (user_id, counterpart_id),
+  CONSTRAINT fk_ca_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ca_counterpart FOREIGN KEY (counterpart_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================

@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { useMarkConversationRead } from "../hooks/use-mark-conversation-read";
+import { useArchiveConversation } from "../hooks/use-archive-conversation";
 import { useMessageThreads } from "../hooks/use-message-threads";
 import { ConversationView } from "./conversation-view";
 import { ThreadList } from "./thread-list";
@@ -43,6 +45,8 @@ export function MessageInbox({
 }) {
   const threads = useMessageThreads();
   const markRead = useMarkConversationRead();
+  const archive = useArchiveConversation();
+  const [tab, setTab] = useState<"inbox" | "archived">("inbox");
   const [selectedId, setSelectedId] = useState<string | null>(
     initialCounterpartId ?? null
   );
@@ -53,6 +57,19 @@ export function MessageInbox({
   // array identity on every render.
   const items = useMemo(() => threads.data ?? [], [threads.data]);
   const selected = items.find((thread) => thread.counterpartId === selectedId) ?? null;
+  const archivedItems = useMemo(() => items.filter((thread) => thread.isArchived), [items]);
+  const activeItems = useMemo(() => items.filter((thread) => !thread.isArchived), [items]);
+  const archivedUnread = archivedItems.reduce((total, thread) => total + thread.unreadCount, 0);
+
+  // Opening a conversation from outside (a notification link, the dashboard)
+  // lands on the tab it lives in. Keyed on the selection alone, so archiving
+  // the open thread doesn't yank the list to the other tab.
+  const selectedIsArchived = selected?.isArchived;
+  useEffect(() => {
+    if (selectedId === null || selectedIsArchived === undefined) return;
+    setTab(selectedIsArchived ? "archived" : "inbox");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   // With both panes visible there is no reason to show an empty right-hand
   // side, so the newest conversation opens on its own. On a phone that
@@ -103,13 +120,49 @@ export function MessageInbox({
           selected ? "hidden lg:flex" : "flex"
         )}
       >
+        <div className="grid grid-cols-2 border-b border-border text-sm" role="tablist">
+          {(
+            [
+              ["inbox", "پیام‌ها", 0],
+              ["archived", "آرشیو", archivedUnread],
+            ] as const
+          ).map(([key, label, unread]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={cn(
+                "flex items-center justify-center gap-1.5 py-2.5 transition-colors",
+                tab === key
+                  ? "border-b-2 border-primary font-medium text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {label}
+              {unread > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none text-primary-foreground">
+                  {toPersianDigits(unread)}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
         <ThreadList
-          threads={items}
+          threads={tab === "archived" ? archivedItems : activeItems}
           isLoading={threads.isLoading}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          emptyTitle={COPY[role].emptyTitle}
-          emptyDescription={COPY[role].emptyDescription}
+          onToggleArchive={(thread) =>
+            archive.mutate({ counterpartId: thread.counterpartId, archived: !thread.isArchived })
+          }
+          emptyTitle={tab === "archived" ? "آرشیو خالی است." : COPY[role].emptyTitle}
+          emptyDescription={
+            tab === "archived"
+              ? "گفتگوهای آرشیوشده اینجا می‌مانند و هیچ پیامی حذف نمی‌شود."
+              : COPY[role].emptyDescription
+          }
         />
       </div>
 
