@@ -29,6 +29,7 @@ use Gymlic\Controllers\TicketController;
 use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\NutritionPlanBuilderController;
 use Gymlic\Controllers\PlanController;
+use Gymlic\Controllers\PointsController;
 use Gymlic\Controllers\SessionPackageController;
 use Gymlic\Controllers\SupplementController;
 use Gymlic\Controllers\TechniqueController;
@@ -131,6 +132,7 @@ $router->get('/session-packages/mine', fn () => SessionPackageController::listMi
 $router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
 $router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
 
+$router->get('/points/me', fn () => PointsController::me());
 $router->get('/notes', fn () => NoteController::list());
 $router->post('/notes', fn () => NoteController::create());
 $router->patch('/notes/{id}', fn (array $p) => NoteController::update($p));

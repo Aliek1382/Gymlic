@@ -6,6 +6,7 @@ import { Apple, CheckCircle2, Dumbbell, LineChart, UserPlus, Users, Wallet } fro
 
 import { toPersianDigits } from "@/lib/persian";
 import { NoteList } from "@/features/notes";
+import { PointsWidget } from "@/features/points";
 import { MonthlyEarningsCard } from "@/features/earnings/components/monthly-earnings-card";
 import { useTrainerEarningsSeries } from "@/features/earnings/hooks/use-trainer-earnings-series";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
@@ -57,6 +58,8 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
         name={trainerName}
         subtitle="امروز چه شاگردهایی و چه برنامه‌هایی در انتظار شما هستند را ببینید."
       />
+
+      <PointsWidget />
 
       <StatisticsGrid>
         {statistics.isLoading ? (

@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -194,7 +195,20 @@ final class TicketController
         }
 
         $pdo = Database::connection();
+
+        // Read before the insert: only the trainer's first reply on a ticket
+        // earns points, so back-and-forth chat can't farm them.
+        $isFirstTrainerReply = false;
+        if ($ticket['trainer_id'] === $user['id']) {
+            $prior = $pdo->prepare('SELECT 1 FROM ticket_messages WHERE ticket_id = :id AND sender_id = :sender LIMIT 1');
+            $prior->execute(['id' => $ticket['id'], 'sender' => $user['id']]);
+            $isFirstTrainerReply = $prior->fetchColumn() === false;
+        }
+
         $messageId = self::insertMessage($ticket['id'], $user['id'], $body);
+        if ($isFirstTrainerReply) {
+            PointsService::award($user['id'], 'ticket_answered');
+        }
 
         // Closing a ticket doesn't lock it: new activity reopens it. MySQL
         // applies SET left to right, so closed_at must be read before status

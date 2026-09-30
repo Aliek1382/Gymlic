@@ -5,6 +5,7 @@ namespace Gymlic\Controllers;
 
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -61,17 +62,22 @@ final class InvitationController
             ]);
 
             // trainer_athletes upsert
+            $newRelationship = false;
             if ($invite['trainer_id'] !== null) {
-                $pdo->prepare(
+                $link = $pdo->prepare(
                     'INSERT INTO trainer_athletes (id, trainer_id, athlete_id, club_id, status)
                      VALUES (:id, :trainer_id, :athlete_id, :club_id, "active")
                      ON DUPLICATE KEY UPDATE club_id = VALUES(club_id), status = "active"'
-                )->execute([
+                );
+                $link->execute([
                     'id'         => Uuid::v4(),
                     'trainer_id' => $invite['trainer_id'],
                     'athlete_id' => $user['id'],
                     'club_id'    => $invite['club_id'],
                 ]);
+                // MySQL reports 1 for a fresh row, 2 for an updated one: a
+                // re-accepted or re-activated link is not a new athlete.
+                $newRelationship = $link->rowCount() === 1;
             }
 
             // memberships upsert (club case) with expiry from the chosen plan
@@ -149,6 +155,9 @@ final class InvitationController
             }
 
             $pdo->commit();
+            if ($newRelationship) {
+                PointsService::award($invite['trainer_id'], 'athlete_added');
+            }
             Response::ok(['ok' => true]);
         } catch (Throwable $e) {
             $pdo->rollBack();
