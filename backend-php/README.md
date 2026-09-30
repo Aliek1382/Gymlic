@@ -117,3 +117,22 @@ One cron entry can run both scripts:
 The database step is `schema/notification-channels-update.sql` (run by hand in
 phpMyAdmin before deploying the backend), and `config.php` on the host needs the
 new `sms` and `mail` keys copied in by hand.
+
+## Cron: assessment (measurement) reminders
+
+A trainer can ask to be reminded, per athlete, to have measurements re-recorded
+every 2/4/6/8 weeks (`assessment_reminders`). `cron/assessment-reminders.php`
+notifies the athlete (`type = assessment_reminder`, link `/progress`) once the
+latest measurement is older than the interval, and not again within the same
+interval. Once a day is enough:
+
+```
+0 8 * * * php /home/USER/path/to/backend-php/cron/assessment-reminders.php
+```
+
+It can also be chained onto the existing entry
+(`php .../calendar-reminders.php; php .../assessment-reminders.php`) — it is
+cheap, and the interval guard makes extra runs harmless. The database step is
+`schema/assessment-reminders-update.sql` (run by hand in phpMyAdmin before
+deploying the backend). If the athlete has opted in to SMS/email, the copy goes
+out through the notification-dispatch cron like any other notification.

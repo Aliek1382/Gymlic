@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
 import { useAthletes } from "@/features/athletes";
+import { AssessmentReminderCard } from "./assessment-reminder-card";
 import { ProgressPageContent } from "./progress-page-content";
 
 export function TrainerProgressBrowser() {
@@ -41,6 +42,7 @@ export function TrainerProgressBrowser() {
         <p className="text-sm text-muted-foreground">
           روند پیشرفت <span className="font-medium text-foreground">{selectedAthlete.name}</span>
         </p>
+        <AssessmentReminderCard athleteId={selectedAthlete.id} />
         <ProgressPageContent athleteId={selectedAthlete.id} />
       </div>
     );
