@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Apple, ArrowRight, Dumbbell, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { Apple, Archive, ArchiveRestore, ArrowRight, Dumbbell, FileText, MessageCircle } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -10,14 +11,65 @@ import { formatRelativeTime, toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
+import { useArchiveConversation } from "../hooks/use-archive-conversation";
 import { useConversation } from "../hooks/use-conversation";
 import { useSendMessage } from "../hooks/use-send-message";
 import { MessageComposer } from "./message-composer";
-import type { MessageThread } from "../types/message-types";
+import type { ConversationMessage, MessageThread } from "../types/message-types";
 
 const PLAN_ICON = { workout: Dumbbell, nutrition: Apple } as const;
 
 const ROLE_LABEL = { trainer: "مربی شما", athlete: "ورزشکار" } as const;
+
+function MessageContent({ message }: { message: ConversationMessage }) {
+  const [zoomed, setZoomed] = useState(false);
+  const url = message.mediaUrl;
+
+  return (
+    <>
+      {url && message.type === "voice" && <audio controls preload="none" src={url} className="max-w-full" />}
+      {url && message.type === "image" && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- user upload on the API host */}
+          <img
+            src={url}
+            alt=""
+            loading="lazy"
+            onClick={() => setZoomed(true)}
+            className="max-h-64 cursor-zoom-in rounded-lg"
+          />
+          {zoomed && (
+            <div
+              role="dialog"
+              aria-label="نمایش عکس"
+              onClick={() => setZoomed(false)}
+              className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-4"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="max-h-full max-w-full rounded-lg" />
+            </div>
+          )}
+        </>
+      )}
+      {url && message.type === "video" && (
+        <video controls preload="metadata" src={url} className="max-h-64 max-w-full rounded-lg" />
+      )}
+      {url && message.type === "file" && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          download={message.mediaName ?? undefined}
+          className="flex items-center gap-2 underline-offset-2 hover:underline"
+        >
+          <FileText className="size-4 shrink-0" />
+          <span className="truncate">{message.mediaName ?? "دانلود فایل"}</span>
+        </a>
+      )}
+      {message.body && <p className="whitespace-pre-line break-words">{message.body}</p>}
+    </>
+  );
+}
 
 export function ConversationView({
   thread,
@@ -30,6 +82,7 @@ export function ConversationView({
 }) {
   const conversation = useConversation(thread.counterpartId);
   const sendMessage = useSendMessage(thread.counterpartId);
+  const archive = useArchiveConversation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const messages = conversation.data?.messages ?? [];
@@ -70,6 +123,19 @@ export function ConversationView({
               : " · هنوز برنامه‌ای ثبت نشده"}
           </p>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mr-auto shrink-0 gap-1.5 text-xs"
+          disabled={archive.isPending}
+          onClick={() =>
+            archive.mutate({ counterpartId: thread.counterpartId, archived: !thread.isArchived })
+          }
+        >
+          {thread.isArchived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+          {thread.isArchived ? "خروج از آرشیو" : "آرشیو"}
+        </Button>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -133,7 +199,7 @@ export function ConversationView({
                         <span className="font-medium">{message.authorName}</span>
                         <span>{formatRelativeTime(new Date(message.createdAt))}</span>
                       </div>
-                      <p className="whitespace-pre-line break-words">{message.body}</p>
+                      <MessageContent message={message} />
                     </div>
                   </div>
                 </li>

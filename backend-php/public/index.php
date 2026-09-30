@@ -248,6 +248,9 @@ $router->get('/messages/threads', fn () => MessageController::threads());
 $router->get('/messages/conversation/{id}', fn (array $p) => MessageController::conversation($p));
 $router->post('/messages/conversation/{id}/read', fn (array $p) => MessageController::markRead($p));
 $router->post('/messages', fn () => MessageController::send());
+$router->post('/messages/archive/{id}', fn (array $p) => MessageController::archive($p));
+$router->delete('/messages/archive/{id}', fn (array $p) => MessageController::unarchive($p));
+$router->post('/uploads/message-media', fn () => UploadController::messageMedia());
 $router->get('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::planComments($p));
 $router->post('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::addPlanComment($p));
 
