@@ -269,6 +269,14 @@ function WorkoutPlanSections({
   if (builderMode === "structured" && structuredDays.isLoading) {
     return <p className="text-sm text-muted-foreground">در حال بارگذاری برنامه...</p>;
   }
+  // Without this a failed request looked like an empty plan: a blank card.
+  if (builderMode === "structured" && structuredDays.isError) {
+    return (
+      <p className="text-sm text-destructive">
+        دریافت برنامه تمرینی با خطا مواجه شد. صفحه را دوباره بارگذاری کنید.
+      </p>
+    );
+  }
   if (sections.length === 0) return null;
 
   // Only headed sections are tickable — the heading is the day_key.

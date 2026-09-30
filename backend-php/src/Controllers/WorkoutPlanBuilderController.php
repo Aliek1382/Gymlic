@@ -17,7 +17,10 @@ use Gymlic\Validate;
  * A plan is either fully text (description, no rows here) or fully
  * structured (rows here, description left as whatever it was) — never both,
  * so every write here flips builder_mode to 'structured' and never touches
- * description. Every endpoint is trainer-only, same as PlanController::save.
+ * description. Every write is trainer-only, same as PlanController::save;
+ * listing the days is also open to whoever may view the plan — the athlete
+ * above all, whose own screen reads its program from here — except that an
+ * athlete never gets a draft or a plan an unpaid invoice locks.
  */
 final class WorkoutPlanBuilderController
 {
@@ -27,7 +30,13 @@ final class WorkoutPlanBuilderController
     {
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
-        Acl::require($assignment['trainer_id'] === $user['id']);
+
+        if ($assignment['trainer_id'] !== $user['id']) {
+            Acl::require(Acl::canViewPlan($user, $assignment));
+            if ($assignment['athlete_id'] === $user['id']) {
+                self::requireReleasedToAthlete($assignment);
+            }
+        }
 
         Response::ok(['items' => self::daysWithExercises($params['id'])]);
     }
@@ -352,6 +361,24 @@ final class WorkoutPlanBuilderController
         unset($day);
 
         return $days;
+    }
+
+    /**
+     * What PlanController::get and listMine already enforce for the athlete:
+     * no drafts, and no content while an unpaid invoice locks the plan.
+     */
+    private static function requireReleasedToAthlete(array $assignment): void
+    {
+        if ($assignment['status'] === 'draft') {
+            Response::error(404, 'not_found', 'Plan not found.');
+            exit;
+        }
+
+        $pending = InvoiceController::pendingByItem(InvoiceController::itemTypeFor('workout'), [$assignment['id']]);
+        if (isset($pending[$assignment['id']])) {
+            Response::error(403, 'plan_locked', 'This plan is locked until its invoice is paid.');
+            exit;
+        }
     }
 
     private static function assignmentOr404(string $id): array

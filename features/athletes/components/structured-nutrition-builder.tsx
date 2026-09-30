@@ -23,7 +23,14 @@ import { useAutosavePatch } from "../hooks/use-autosave-patch";
 import { useNutritionPlanBuilder } from "../hooks/use-nutrition-plan-builder";
 import { useNutritionPlanMeals } from "../hooks/use-nutrition-plan-meals";
 import { useNutritionTotals } from "../hooks/use-nutrition-totals";
-import { itemIssue, itemMacros, itemUnit, suggestAmount, toNutritionGoal } from "../utils/nutrition-macros";
+import {
+  DEFAULT_MEALS_PER_DAY,
+  itemIssue,
+  itemMacros,
+  itemUnit,
+  suggestAmount,
+  toNutritionGoal,
+} from "../utils/nutrition-macros";
 import { MEALS } from "../utils/nutrition-plan-text";
 import type {
   NutritionGoal,
@@ -239,7 +246,7 @@ function ItemRow({
 
 function MealCard({
   meal,
-  mealCount,
+  mealsPerDay,
   goal,
   totals,
   suggestedIds,
@@ -248,7 +255,7 @@ function MealCard({
   report,
 }: {
   meal: NutritionPlanMeal;
-  mealCount: number;
+  mealsPerDay: number;
   goal: NutritionGoal | null;
   totals: ReturnType<typeof useNutritionTotals>["byMeal"][string];
   suggestedIds: Set<string>;
@@ -283,7 +290,7 @@ function MealCard({
     setAdding(true);
     // The suggestion is an editable head start; a food it can't be worked out
     // for starts at one unit so the row exists and can be adjusted.
-    const suggestion = suggestAmount(food, goal, mealCount);
+    const suggestion = suggestAmount(food, goal, mealsPerDay);
     try {
       const created = await builder.addItem.mutateAsync({
         mealId: meal.id,
@@ -424,10 +431,16 @@ export function StructuredNutritionBuilder({
   const athlete = useAthleteProfile(athleteId);
   const tracker = useSaveTracker();
   const [suggestedIds, setSuggestedIds] = useState<Set<string>>(new Set());
+  // How many meals the day is split into for suggestions. Until the trainer
+  // says, it follows the plan (never below the usual three), so the first
+  // food added to a new plan doesn't get the whole day's share.
+  const [chosenMealsPerDay, setChosenMealsPerDay] = useState<number | null>(null);
 
   const list = meals.data ?? NO_MEALS;
   const totals = useNutritionTotals(list);
   const goal = useMemo(() => (athlete.data ? toNutritionGoal(athlete.data) : null), [athlete.data]);
+
+  const mealsPerDay = chosenMealsPerDay ?? Math.max(DEFAULT_MEALS_PER_DAY, list.length);
 
   const unusedMeals = MEALS.filter((name) => !list.some((meal) => meal.mealName === name));
 
@@ -466,17 +479,38 @@ export function StructuredNutritionBuilder({
         </p>
       </div>
 
-      <p className="text-[11px] leading-5 text-muted-foreground">
-        {goal ? (
-          <>
-            مقدار پیشنهادی هر غذا از روی هدف {formatNumber(goal.dailyCalories)} کالری (پروتئین{" "}
+      {goal ? (
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-x-3">
+          <p className="min-w-0 flex-1 text-[11px] leading-5 text-muted-foreground">
+            مقدار پیشنهادی از روی هدف {formatNumber(goal.dailyCalories)} کالری (پروتئین{" "}
             {toPersianDigits(goal.proteinPercent)}٪ · کربو {toPersianDigits(goal.carbsPercent)}٪ ·
-            چربی {toPersianDigits(goal.fatPercent)}٪) تقسیم بر تعداد وعده‌ها (حداقل ۳) محاسبه می‌شود.
-          </>
-        ) : (
-          "برای پیشنهاد خودکار مقدار، هدف کالری و درصد درشت‌مغذی ورزشکار را در پروفایلش ثبت کنید."
-        )}
-      </p>
+            چربی {toPersianDigits(goal.fatPercent)}٪) محاسبه می‌شود.
+          </p>
+          <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+            روز را به
+            <Select
+              value={String(mealsPerDay)}
+              onValueChange={(value) => setChosenMealsPerDay(Number(value))}
+            >
+              <SelectTrigger className="h-8 w-16 justify-center px-2 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((count) => (
+                  <SelectItem key={count} value={String(count)}>
+                    {toPersianDigits(count)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            وعده تقسیم کن
+          </label>
+        </div>
+      ) : (
+        <p className="text-[11px] leading-5 text-muted-foreground">
+          برای پیشنهاد خودکار مقدار، هدف کالری و درصد درشت‌مغذی ورزشکار را در پروفایلش ثبت کنید.
+        </p>
+      )}
 
       {list.length === 0 && (
         <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
@@ -489,7 +523,7 @@ export function StructuredNutritionBuilder({
           <MealCard
             key={meal.id}
             meal={meal}
-            mealCount={list.length}
+            mealsPerDay={mealsPerDay}
             goal={goal}
             totals={totals.byMeal[meal.id]}
             suggestedIds={suggestedIds}

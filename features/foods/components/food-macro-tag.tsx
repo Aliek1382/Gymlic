@@ -13,7 +13,7 @@ export function FoodMacroTag({
   food,
   className,
 }: {
-  food: FoodMacros;
+  food: FoodMacros & { defaultUnit: string };
   className?: string;
 }) {
   if (!hasFoodMacros(food)) {

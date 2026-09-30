@@ -419,12 +419,13 @@ CREATE TABLE foods (
   description   TEXT NULL,
   category      VARCHAR(100) NOT NULL,
   default_unit  VARCHAR(50) NOT NULL,
-  -- Per ONE default_unit (default_unit = '100 گرم' -> these are for 100 g).
-  -- NULL = not entered yet: counted as zero in a plan and flagged in the UI.
-  calories_per_unit DECIMAL(7,2) NULL,
-  protein_g     DECIMAL(6,2) NULL,
-  carbs_g       DECIMAL(6,2) NULL,
-  fat_g         DECIMAL(6,2) NULL,
+  -- Per ONE default_unit (default_unit = 'گرم' -> these are per gram, which is
+  -- why they carry 4 decimals). NULL = not entered yet: counted as zero in a
+  -- plan and flagged in the UI.
+  calories_per_unit DECIMAL(9,4) NULL,
+  protein_g     DECIMAL(8,4) NULL,
+  carbs_g       DECIMAL(8,4) NULL,
+  fat_g         DECIMAL(8,4) NULL,
   created_by    CHAR(36) NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_foods_creator (created_by),

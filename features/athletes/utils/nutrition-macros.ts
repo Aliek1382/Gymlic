@@ -103,10 +103,11 @@ interface FoodForSuggestion {
   fatG: number | null;
 }
 
-// A plan is usually three or more meals. Dividing the day by however many
-// meals exist *right now* would hand the first food of a new plan the whole
-// day's share (800 g of rice), so the split never goes below this.
-const MIN_MEALS_TO_SPLIT = 3;
+// What a plan with no better answer is assumed to have: usually three or more
+// meals. Dividing the day by however many meals exist *right now* would hand
+// the first food of a new plan the whole day's share (800 g of rice), so the
+// builder starts from this and lets the trainer state the real number.
+export const DEFAULT_MEALS_PER_DAY = 3;
 
 // Energy per gram — used only to tell which macro a food mostly is.
 const KCAL_PER_GRAM = { protein: 4, carbs: 4, fat: 9 } as const;
@@ -115,8 +116,7 @@ const KCAL_PER_GRAM = { protein: 4, carbs: 4, fat: 9 } as const;
  * A starting amount for a food, in its default unit, from the athlete's goal:
  *
  *   share of the day's calories for the food's dominant macro
- *     ÷ meals in the plan        (one meal's slice, not the whole day's;
-                                 counted as at least MIN_MEALS_TO_SPLIT)
+ *     ÷ meals per day            (one meal's slice, not the whole day's)
  *     ÷ calories per unit of the food
  *
  * "Dominant" is the macro contributing the most calories per unit (protein
@@ -128,7 +128,7 @@ const KCAL_PER_GRAM = { protein: 4, carbs: 4, fat: 9 } as const;
 export function suggestAmount(
   food: FoodForSuggestion,
   goal: NutritionGoal | null,
-  mealCount: number
+  mealsPerDay: number
 ): number | null {
   if (!goal || food.caloriesPerUnit === null || food.caloriesPerUnit <= 0) return null;
 
@@ -148,7 +148,7 @@ export function suggestAmount(
     fat: goal.fatPercent,
   }[dominant];
 
-  const targetCalories = (goal.dailyCalories * percent) / 100 / Math.max(MIN_MEALS_TO_SPLIT, mealCount);
+  const targetCalories = (goal.dailyCalories * percent) / 100 / Math.max(1, mealsPerDay);
   return roundAmount(targetCalories / food.caloriesPerUnit);
 }
 
