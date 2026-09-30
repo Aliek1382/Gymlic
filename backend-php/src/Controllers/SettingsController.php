@@ -6,8 +6,10 @@ namespace Gymlic\Controllers;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Features;
+use Gymlic\MailGateway;
 use Gymlic\Response;
 use Gymlic\Settings;
+use Gymlic\SmsGateway;
 use Gymlic\Validate;
 use Throwable;
 
@@ -44,13 +46,27 @@ final class SettingsController
 
         $settings = [];
         foreach (Settings::KEYS as $key) {
-            $settings[$key] = Settings::get($key);
+            $settings[$key] = self::masked($key, Settings::get($key));
         }
+
+        $sms = SmsGateway::credentials();
+        $mail = MailGateway::config();
 
         Response::ok([
             'settings'        => $settings,
             'feature_catalog' => Features::catalog(),
             'storage_ready'   => Settings::storageReady(),
+            // What is actually in effect, wherever it comes from.
+            'delivery'        => [
+                'sms_api_key' => $sms['api_key_source'],
+                'sms_sender'  => $sms['sender_source'],
+                'mail'        => $mail['source'],
+            ],
+            // The host's own ceiling: no limit set here can exceed it.
+            'server'          => [
+                'upload_max_mb' => self::iniMegabytes('upload_max_filesize'),
+                'post_max_mb'   => self::iniMegabytes('post_max_size'),
+            ],
         ]);
     }
 
@@ -77,8 +93,10 @@ final class SettingsController
             return;
         }
 
+        $value = self::keepSecrets($key, $body['value'], $body['clear_secrets'] ?? []);
+
         try {
-            $saved = Settings::save($key, $body['value'], $admin['id']);
+            $saved = Settings::save($key, $value, $admin['id']);
         } catch (Throwable $e) {
             error_log('Settings::save failed: ' . $e->getMessage());
             Response::error(
@@ -93,6 +111,85 @@ final class SettingsController
             'key' => $key,
         ]);
 
-        Response::ok(['value' => $saved]);
+        Response::ok(['value' => self::masked($key, $saved)]);
+    }
+
+    /** Sends one SMS through whatever is configured, and says why not if it fails. */
+    public static function testSms(): void
+    {
+        Auth::requirePlatformAdmin();
+        $data = Validate::required(Validate::body(), ['phone']);
+
+        if (SmsGateway::send((string) $data['phone'], 'پیامک آزمایشی جیم‌لیک: تنظیمات پیامک درست کار می‌کند.')) {
+            Response::ok(['ok' => true]);
+            return;
+        }
+        Response::error(502, 'sms_failed', 'ارسال پیامک ناموفق بود: ' . SmsGateway::lastError());
+    }
+
+    public static function testMail(): void
+    {
+        Auth::requirePlatformAdmin();
+        $data = Validate::required(Validate::body(), ['email']);
+
+        $sent = MailGateway::send(
+            (string) $data['email'],
+            'ایمیل آزمایشی جیم‌لیک',
+            "این یک ایمیل آزمایشی از پنل مدیریت جیم‌لیک است.\nاگر آن را می‌بینید، تنظیمات ایمیل درست کار می‌کند."
+        );
+        if ($sent) {
+            Response::ok(['ok' => true]);
+            return;
+        }
+        Response::error(502, 'mail_failed', 'ارسال ایمیل ناموفق بود: ' . MailGateway::lastError());
+    }
+
+    /**
+     * A credential is never sent back: the field comes back empty, with
+     * `<field>_set` and the last 4 characters as `<field>_hint`.
+     */
+    private static function masked(string $key, array $value): array
+    {
+        foreach (Settings::SECRETS[$key] ?? [] as $field) {
+            $secret = (string) $value[$field];
+            $value[$field] = '';
+            $value[$field . '_set'] = $secret !== '';
+            $value[$field . '_hint'] = $secret !== '' ? '…' . mb_substr($secret, -4) : '';
+        }
+        return $value;
+    }
+
+    /**
+     * The admin screen never has a stored credential to send back, so an
+     * empty one means "unchanged"; clearing one is asked for by name in
+     * clear_secrets.
+     */
+    private static function keepSecrets(string $key, array $value, mixed $clear): array
+    {
+        $clear = is_array($clear) ? $clear : [];
+        $stored = Settings::get($key);
+        foreach (Settings::SECRETS[$key] ?? [] as $field) {
+            if (in_array($field, $clear, true)) {
+                $value[$field] = '';
+            } elseif (trim((string) ($value[$field] ?? '')) === '') {
+                $value[$field] = $stored[$field];
+            }
+        }
+        return $value;
+    }
+
+    private static function iniMegabytes(string $name): ?float
+    {
+        $raw = trim((string) ini_get($name));
+        if ($raw === '' || !preg_match('/^(\d+(?:\.\d+)?)\s*([KMG]?)/i', $raw, $m)) {
+            return null;
+        }
+        $bytes = (float) $m[1] * match (strtoupper($m[2])) {
+            'G' => 1024 ** 3,
+            'M' => 1024 ** 2,
+            'K' => 1024,
+            default => 1,
+        };
+        return round($bytes / 1024 / 1024, 1);
     }
 }

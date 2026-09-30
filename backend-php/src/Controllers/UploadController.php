@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Settings;
 use Gymlic\Uuid;
 
 /**
@@ -45,14 +46,6 @@ final class UploadController
         ]],
     ];
 
-    // Per-type ceilings in bytes. Shared-host disk is finite, so these are
-    // deliberately tighter than "as big as PHP allows".
-    private const MEDIA_MAX_BYTES = [
-        'voice' => 8 * 1024 * 1024,
-        'image' => 8 * 1024 * 1024,
-        'file'  => 8 * 1024 * 1024,
-        'video' => 50 * 1024 * 1024,
-    ];
 
     public static function avatar(): void
     {
@@ -119,9 +112,17 @@ final class UploadController
             Response::error(415, 'unsupported_type', 'That file type is not allowed.');
             return;
         }
-        if ($file['size'] > self::MEDIA_MAX_BYTES[$type]) {
-            $mb = self::MEDIA_MAX_BYTES[$type] / 1024 / 1024;
-            Response::error(413, 'file_too_large', "Files of this type must be {$mb}MB or smaller.");
+        // Per-type ceilings, set by the admin in /admin/settings (defaults
+        // 8MB, video 50MB). Shared-host disk is finite, so these are
+        // deliberately tighter than "as big as PHP allows".
+        $limits = Settings::get('limits');
+        if (!$limits['attachments'][$type]) {
+            MessageController::attachmentOff($type);
+            return;
+        }
+        $mb = $limits['upload_mb'][$type];
+        if ($file['size'] > $mb * 1024 * 1024) {
+            Response::error(413, 'file_too_large', "حجم این نوع فایل باید حداکثر {$mb} مگابایت باشد.");
             return;
         }
 

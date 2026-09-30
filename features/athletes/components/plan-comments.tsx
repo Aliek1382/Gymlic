@@ -10,12 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
+import { usePublicSettings } from "@/features/site-settings";
 import { useAddPlanComment } from "../hooks/use-add-plan-comment";
 import { usePlanComments } from "../hooks/use-plan-comments";
 import type { PlanKind } from "../types/athlete-types";
-
-// Matches the messages.body check in 0036.
-const MAX_COMMENT_LENGTH = 1000;
 
 // A small back-and-forth thread on one assigned plan — the athlete can flag
 // something ("این حرکت برام سخت بود") and the trainer can reply, right
@@ -36,6 +34,8 @@ export function PlanComments({
   isDraft?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  // Set by the admin; the API enforces the same number.
+  const maxLength = usePublicSettings().limits.message_max_chars;
   const comments = usePlanComments(kind, assignmentId);
   const addComment = useAddPlanComment(kind, assignmentId);
 
@@ -109,7 +109,7 @@ export function PlanComments({
         <div className="flex items-end gap-2">
           <textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
+            onChange={(e) => setDraft(e.target.value.slice(0, maxLength))}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

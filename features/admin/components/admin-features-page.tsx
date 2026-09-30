@@ -25,7 +25,7 @@ export function AdminFeaturesPage() {
   const update = useUpdateSiteSetting("features");
 
   function save(next: FeatureSettings, message: string) {
-    update.mutate(next, {
+    update.mutate({ value: next }, {
       onSuccess: () => toast.success(message),
       onError: (error) => toast.error(getErrorMessage(error, "ذخیرهٔ تغییر با خطا مواجه شد.")),
     });

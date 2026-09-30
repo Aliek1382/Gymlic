@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Construction, LifeBuoy, Loader2, Megaphone, UserPlus } from "lucide-react";
+import {
+  Construction,
+  Gauge,
+  LifeBuoy,
+  Loader2,
+  Mail,
+  Megaphone,
+  MessageSquareText,
+  UserPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,19 +19,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ROLE_LABEL } from "@/components/layout/sidebar-nav";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { formatNumber, parseLocaleNumber } from "@/lib/persian";
 import {
+  sendTestMail,
+  sendTestSms,
   useAdminSiteSettings,
   useUpdateSiteSetting,
+  type AdminSettingKey,
+  type AdminSiteSettings,
   type AnnouncementSettings,
   type AnnouncementTone,
+  type AttachmentType,
+  type DeliveryStatus,
+  type LimitsSettings,
+  type MailSettings,
   type MaintenanceSettings,
   type RoleSwitches,
   type SignupSettings,
-  type SiteSettingKey,
-  type SiteSettings,
+  type SmsSettings,
   type SupportSettings,
 } from "@/features/site-settings";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
@@ -42,8 +60,8 @@ export function AdminSiteSettingsPage() {
       <div>
         <h1 className="text-xl font-bold text-foreground">تنظیمات سایت</h1>
         <p className="text-sm text-muted-foreground">
-          حالت تعمیر، ثبت‌نام، اطلاعیهٔ بالای پنل و راه‌های تماس با پشتیبانی. هر کارت جداگانه ذخیره
-          می‌شود و تغییر بلافاصله روی سایت اعمال می‌شود.
+          هر کارت جداگانه ذخیره می‌شود و تغییر بلافاصله روی سایت اعمال می‌شود؛ نیازی به آپلود دوباره
+          نیست.
         </p>
       </div>
 
@@ -58,35 +76,78 @@ export function AdminSiteSettingsPage() {
       ) : isError || !data ? (
         <ErrorState message="دریافت تنظیمات با خطا مواجه شد." />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-          <MaintenanceCard initial={data.settings.maintenance} locked={!data.storageReady} />
-          <SignupCard initial={data.settings.signup} locked={!data.storageReady} />
-          <AnnouncementCard initial={data.settings.announcement} locked={!data.storageReady} />
-          <SupportCard initial={data.settings.support} locked={!data.storageReady} />
-        </div>
+        <Tabs defaultValue="general" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="general">عمومی</TabsTrigger>
+            <TabsTrigger value="limits">محدودیت‌ها</TabsTrigger>
+            <TabsTrigger value="delivery">پیامک و ایمیل</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general">
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <MaintenanceCard initial={data.settings.maintenance} locked={!data.storageReady} />
+              <SignupCard initial={data.settings.signup} locked={!data.storageReady} />
+              <AnnouncementCard initial={data.settings.announcement} locked={!data.storageReady} />
+              <SupportCard initial={data.settings.support} locked={!data.storageReady} />
+            </div>
+          </TabsContent>
+          <TabsContent value="limits">
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <LimitsCard
+                initial={data.settings.limits}
+                server={data.server}
+                locked={!data.storageReady}
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="delivery">
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <SmsCard
+                initial={data.settings.sms}
+                delivery={data.delivery}
+                locked={!data.storageReady}
+              />
+              <MailCard
+                initial={data.settings.mail}
+                delivery={data.delivery}
+                locked={!data.storageReady}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
 }
 
+type AdminValues = AdminSiteSettings["settings"];
+
 /** One settings group: its own local draft and its own save button. */
-function useDraft<K extends SiteSettingKey>(key: K, initial: SiteSettings[K]) {
+function useDraft<K extends AdminSettingKey>(key: K, initial: AdminValues[K]) {
   const [draft, setDraft] = useState(initial);
   const update = useUpdateSiteSetting(key);
 
-  function save() {
-    update.mutate(draft, {
-      onSuccess: (saved) => {
-        setDraft(saved);
-        toast.success("تغییرات ذخیره شد.");
-      },
-      onError: (error) => toast.error(getErrorMessage(error, "ذخیرهٔ تنظیمات با خطا مواجه شد.")),
-    });
+  /**
+   * overrides: fields parsed at save time. They go in with this save rather
+   * than through patch(), whose update the current draft hasn't seen yet.
+   */
+  function save(
+    options: { clearSecrets?: string[]; overrides?: Partial<AdminValues[K]> } = {}
+  ) {
+    update.mutate(
+      { value: { ...draft, ...options.overrides }, clearSecrets: options.clearSecrets ?? [] },
+      {
+        onSuccess: (saved) => {
+          setDraft(saved);
+          toast.success("تغییرات ذخیره شد.");
+        },
+        onError: (error) => toast.error(getErrorMessage(error, "ذخیرهٔ تنظیمات با خطا مواجه شد.")),
+      }
+    );
   }
 
   return {
     draft,
-    patch: (changes: Partial<SiteSettings[K]>) => setDraft((d) => ({ ...d, ...changes })),
+    patch: (changes: Partial<AdminValues[K]>) => setDraft((d) => ({ ...d, ...changes })),
     save,
     isSaving: update.isPending,
   };
@@ -98,6 +159,7 @@ function SettingsCard({
   description,
   children,
   onSave,
+  actions,
   isSaving,
   locked,
 }: {
@@ -106,6 +168,8 @@ function SettingsCard({
   description: string;
   children: React.ReactNode;
   onSave: () => void;
+  /** Extra buttons beside Save (e.g. a test send). */
+  actions?: React.ReactNode;
   isSaving: boolean;
   locked: boolean;
 }) {
@@ -121,8 +185,9 @@ function SettingsCard({
         </div>
       </div>
       <div className="space-y-4 px-6">{children}</div>
-      <div className="flex justify-end border-t border-border px-6 pt-4">
-        <Button onClick={onSave} disabled={isSaving || locked}>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-6 pt-4">
+        {actions}
+        <Button onClick={() => onSave()} disabled={isSaving || locked}>
           {isSaving && <Loader2 className="animate-spin" />}
           ذخیره
         </Button>
@@ -199,7 +264,7 @@ function MaintenanceCard({ initial, locked }: { initial: MaintenanceSettings; lo
       icon={Construction}
       title="حالت تعمیر"
       description="وقتی روشن است، جز مدیران هیچ‌کس نمی‌تواند از پنل استفاده کند و متن زیر را می‌بیند. ورود به حساب باز می‌ماند تا خودتان بتوانید وارد شوید."
-      onSave={save}
+      onSave={() => save()}
       isSaving={isSaving}
       locked={locked}
     >
@@ -240,7 +305,7 @@ function SignupCard({ initial, locked }: { initial: SignupSettings; locked: bool
       icon={UserPlus}
       title="ثبت‌نام"
       description="ثبت‌نام آزاد از صفحهٔ ورود را باز یا بسته کنید و مشخص کنید کاربر جدید چه نقش‌هایی را می‌تواند انتخاب کند. کسی که لینک دعوت دارد همیشه می‌تواند ثبت‌نام کند."
-      onSave={save}
+      onSave={() => save()}
       isSaving={isSaving}
       locked={locked}
     >
@@ -275,7 +340,7 @@ function AnnouncementCard({ initial, locked }: { initial: AnnouncementSettings; 
       icon={Megaphone}
       title="اطلاعیهٔ بالای پنل"
       description="یک نوار پیام بالای همهٔ صفحه‌های پنل. کاربر می‌تواند آن را ببندد و تا وقتی متن را عوض نکنید دوباره نمی‌بیند."
-      onSave={save}
+      onSave={() => save()}
       isSaving={isSaving}
       locked={locked}
     >
@@ -350,7 +415,7 @@ function SupportCard({ initial, locked }: { initial: SupportSettings; locked: bo
       icon={LifeBuoy}
       title="پشتیبانی"
       description="این راه‌های تماس در منوی راهنمای بالای پنل، صفحهٔ حساب مسدود، حالت تعمیر و بخش‌های خاموش نشان داده می‌شوند. هر کدام را خالی بگذارید نمایش داده نمی‌شود."
-      onSave={save}
+      onSave={() => save()}
       isSaving={isSaving}
       locked={locked}
     >
@@ -371,6 +436,410 @@ function SupportCard({ initial, locked }: { initial: SupportSettings; locked: bo
             />
           </div>
         ))}
+      </div>
+    </SettingsCard>
+  );
+}
+
+const ATTACHMENTS: { type: AttachmentType; label: string }[] = [
+  { type: "image", label: "عکس" },
+  { type: "video", label: "ویدیو" },
+  { type: "voice", label: "پیام صوتی" },
+  { type: "file", label: "فایل (PDF و Word)" },
+];
+
+function LimitsCard({
+  initial,
+  server,
+  locked,
+}: {
+  initial: LimitsSettings;
+  server: AdminSiteSettings["server"];
+  locked: boolean;
+}) {
+  const { draft, patch, save, isSaving } = useDraft("limits", initial);
+  const [maxChars, setMaxChars] = useState(String(initial.message_max_chars));
+  const [sizes, setSizes] = useState<Record<AttachmentType, string>>(() => ({
+    voice: String(initial.upload_mb.voice),
+    image: String(initial.upload_mb.image),
+    video: String(initial.upload_mb.video),
+    file: String(initial.upload_mb.file),
+  }));
+  // PHP refuses anything past the smaller of these before our code runs.
+  const hostCeiling =
+    server?.upload_max_mb != null && server.post_max_mb != null
+      ? Math.min(server.upload_max_mb, server.post_max_mb)
+      : (server?.upload_max_mb ?? null);
+
+  function submit() {
+    const chars = parseLocaleNumber(maxChars);
+    if (chars === null || !Number.isInteger(chars) || chars < 50 || chars > 1000) {
+      toast.error("سقف طول پیام باید عددی بین ۵۰ و ۱۰۰۰ باشد.");
+      return;
+    }
+    const uploadMb = { ...draft.upload_mb };
+    for (const { type, label } of ATTACHMENTS) {
+      const mb = parseLocaleNumber(sizes[type]);
+      if (mb === null || !Number.isInteger(mb) || mb < 1 || mb > 200) {
+        toast.error(`حجم ${label} باید عددی بین ۱ و ۲۰۰ مگابایت باشد.`);
+        return;
+      }
+      uploadMb[type] = mb;
+    }
+    save({ overrides: { message_max_chars: chars, upload_mb: uploadMb } });
+  }
+
+  return (
+    <SettingsCard
+      icon={Gauge}
+      title="پیام‌ها و فایل‌ها"
+      description="سقف طول پیام، نوع پیوست‌هایی که مربی و ورزشکار می‌توانند در پیام‌ها بفرستند، و حداکثر حجم هر نوع."
+      onSave={submit}
+      isSaving={isSaving}
+      locked={locked}
+    >
+      <div className="space-y-2">
+        <Label htmlFor="limits-chars">سقف طول هر پیام (حرف)</Label>
+        <Input
+          id="limits-chars"
+          dir="ltr"
+          inputMode="numeric"
+          className="w-32 text-center"
+          value={maxChars}
+          onChange={(e) => setMaxChars(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          بین ۵۰ و ۱۰۰۰؛ بیشتر از ۱۰۰۰ جا در دیتابیس ندارد.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-foreground">پیوست‌ها</p>
+        {ATTACHMENTS.map(({ type, label }) => (
+          <div
+            key={type}
+            className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-4 py-2.5"
+          >
+            <label className="flex items-center gap-3 text-sm">
+              <Switch
+                checked={draft.attachments[type]}
+                onCheckedChange={(checked) =>
+                  patch({ attachments: { ...draft.attachments, [type]: checked } })
+                }
+              />
+              {label}
+            </label>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              تا
+              <Input
+                dir="ltr"
+                inputMode="numeric"
+                className="h-8 w-16 text-center"
+                disabled={!draft.attachments[type]}
+                value={sizes[type]}
+                onChange={(e) => setSizes((s) => ({ ...s, [type]: e.target.value }))}
+                aria-label={`حداکثر حجم ${label}`}
+              />
+              مگابایت
+            </div>
+          </div>
+        ))}
+        {hostCeiling !== null && (
+          <p className="text-xs text-muted-foreground">
+            سقف آپلود خود هاست {formatNumber(hostCeiling)} مگابایت است؛ عدد بزرگ‌تر از آن اثری
+            ندارد و باید از پنل هاست (تنظیمات PHP) بالا برود.
+          </p>
+        )}
+      </div>
+    </SettingsCard>
+  );
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  panel: "از همین پنل",
+  config: "از فایل config.php",
+  none: "تنظیم نشده",
+  "mail()": "تابع mail() هاست (بدون SMTP)",
+};
+
+function SourceNote({ label, source }: { label: string; source: string | undefined }) {
+  if (!source) return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      {label}: <span className="font-medium text-foreground">{SOURCE_LABEL[source] ?? source}</span>
+    </p>
+  );
+}
+
+/**
+ * A credential input: the stored value never comes back from the API, so
+ * the field starts empty and "empty" means "keep what is saved".
+ */
+function SecretInput({
+  id,
+  label,
+  isSet,
+  hint,
+  value,
+  cleared,
+  onChange,
+  onClear,
+}: {
+  id: string;
+  label: string;
+  isSet: boolean;
+  hint: string;
+  value: string;
+  cleared: boolean;
+  onChange: (value: string) => void;
+  onClear: (cleared: boolean) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        dir="ltr"
+        type="password"
+        autoComplete="new-password"
+        value={value}
+        disabled={cleared}
+        placeholder={isSet ? `ذخیره شده (${hint}) — برای تغییر، مقدار جدید را وارد کنید` : ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {isSet && (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={cleared} onChange={(e) => onClear(e.target.checked)} />
+          پاک‌کردن مقدار ذخیره‌شده در پنل
+        </label>
+      )}
+    </div>
+  );
+}
+
+function TestSend({
+  label,
+  placeholder,
+  send,
+}: {
+  label: string;
+  placeholder: string;
+  send: (target: string) => Promise<void>;
+}) {
+  const [target, setTarget] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function run() {
+    if (!target.trim()) {
+      toast.error("مقصد ارسال آزمایشی را وارد کنید.");
+      return;
+    }
+    setSending(true);
+    try {
+      await send(target.trim());
+      toast.success("ارسال شد. مقصد را بررسی کنید.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "ارسال آزمایشی ناموفق بود."));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-1 items-center gap-2">
+      <Input
+        dir="ltr"
+        value={target}
+        placeholder={placeholder}
+        onChange={(e) => setTarget(e.target.value)}
+        className="min-w-0"
+        aria-label={label}
+      />
+      <Button variant="outline" onClick={run} disabled={sending}>
+        {sending && <Loader2 className="animate-spin" />}
+        {label}
+      </Button>
+    </div>
+  );
+}
+
+function SmsCard({
+  initial,
+  delivery,
+  locked,
+}: {
+  initial: SmsSettings;
+  delivery: DeliveryStatus | null;
+  locked: boolean;
+}) {
+  const { draft, patch, save, isSaving } = useDraft("sms", initial);
+  const [clearKey, setClearKey] = useState(false);
+
+  return (
+    <SettingsCard
+      icon={MessageSquareText}
+      title="پیامک (ملی‌پیامک)"
+      description="توکن کنسول ملی‌پیامک و شماره‌ی خط ارسال. هر فیلدی خالی بماند، مقدار فایل config.php استفاده می‌شود. توکن ذخیره‌شده هیچ‌وقت کامل نمایش داده نمی‌شود."
+      onSave={() => {
+        save({ clearSecrets: clearKey ? ["api_key"] : [] });
+        setClearKey(false);
+      }}
+      isSaving={isSaving}
+      locked={locked}
+      actions={<TestSend label="پیامک آزمایشی" placeholder="09121234567" send={sendTestSms} />}
+    >
+      <SecretInput
+        id="sms-api-key"
+        label="توکن API"
+        isSet={!!draft.api_key_set}
+        hint={draft.api_key_hint ?? ""}
+        value={draft.api_key}
+        cleared={clearKey}
+        onChange={(api_key) => patch({ api_key })}
+        onClear={setClearKey}
+      />
+      <div className="space-y-2">
+        <Label htmlFor="sms-sender">شماره‌ی خط ارسال</Label>
+        <Input
+          id="sms-sender"
+          dir="ltr"
+          value={draft.sender}
+          placeholder="50004001234567"
+          onChange={(e) => patch({ sender: e.target.value })}
+        />
+      </div>
+      <div className="space-y-1 rounded-xl bg-muted/50 px-4 py-3">
+        <SourceNote label="توکن در حال استفاده" source={delivery?.sms_api_key} />
+        <SourceNote label="خط در حال استفاده" source={delivery?.sms_sender} />
+        <p className="text-xs text-muted-foreground">
+          پیش از ارسال آزمایشی، تغییرات را ذخیره کنید.
+        </p>
+      </div>
+    </SettingsCard>
+  );
+}
+
+function MailCard({
+  initial,
+  delivery,
+  locked,
+}: {
+  initial: MailSettings;
+  delivery: DeliveryStatus | null;
+  locked: boolean;
+}) {
+  const { draft, patch, save, isSaving } = useDraft("mail", initial);
+  const [clearPass, setClearPass] = useState(false);
+  const [port, setPort] = useState(String(initial.smtp_port));
+
+  return (
+    <SettingsCard
+      icon={Mail}
+      title="ایمیل"
+      description="فرستنده‌ی ایمیل‌ها و سرور SMTP. اگر میزبان SMTP این‌جا خالی باشد، تنظیمات SMTP فایل config.php (یا در نبودِ آن، تابع mail() هاست) استفاده می‌شود."
+      onSave={() => {
+        const parsedPort = parseLocaleNumber(port);
+        if (parsedPort === null || !Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+          toast.error("پورت SMTP معتبر نیست.");
+          return;
+        }
+        save({
+          clearSecrets: clearPass ? ["smtp_pass"] : [],
+          overrides: { smtp_port: parsedPort },
+        });
+        setClearPass(false);
+      }}
+      isSaving={isSaving}
+      locked={locked}
+      actions={<TestSend label="ایمیل آزمایشی" placeholder="you@example.com" send={sendTestMail} />}
+    >
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="mail-from-address">آدرس فرستنده</Label>
+          <Input
+            id="mail-from-address"
+            dir="ltr"
+            value={draft.from_address}
+            placeholder="no-reply@gymlic-panel.ir"
+            onChange={(e) => patch({ from_address: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="mail-from-name">نام فرستنده</Label>
+          <Input
+            id="mail-from-name"
+            value={draft.from_name}
+            placeholder="جیم‌لیک"
+            onChange={(e) => patch({ from_name: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="mail-host">میزبان SMTP</Label>
+          <Input
+            id="mail-host"
+            dir="ltr"
+            value={draft.smtp_host}
+            placeholder="mail.gymlic-panel.ir"
+            onChange={(e) => patch({ smtp_host: e.target.value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="mail-port">پورت</Label>
+            <Input
+              id="mail-port"
+              dir="ltr"
+              inputMode="numeric"
+              value={port}
+              onChange={(e) => setPort(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>رمزنگاری</Label>
+            <div className="flex gap-1">
+              {(["ssl", "tls"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  data-active={draft.smtp_secure === mode}
+                  onClick={() => {
+                    patch({ smtp_secure: mode });
+                    setPort(mode === "ssl" ? "465" : "587");
+                  }}
+                  className="h-10 flex-1 rounded-xl border border-border text-xs uppercase data-[active=true]:border-primary data-[active=true]:bg-accent"
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="mail-user">نام کاربری SMTP</Label>
+          <Input
+            id="mail-user"
+            dir="ltr"
+            autoComplete="off"
+            value={draft.smtp_user}
+            onChange={(e) => patch({ smtp_user: e.target.value })}
+          />
+        </div>
+        <SecretInput
+          id="mail-pass"
+          label="رمز SMTP"
+          isSet={!!draft.smtp_pass_set}
+          hint={draft.smtp_pass_hint ?? ""}
+          value={draft.smtp_pass}
+          cleared={clearPass}
+          onChange={(smtp_pass) => patch({ smtp_pass })}
+          onClear={setClearPass}
+        />
+      </div>
+      <div className="space-y-1 rounded-xl bg-muted/50 px-4 py-3">
+        <SourceNote label="روش ارسال در حال استفاده" source={delivery?.mail} />
+        <p className="text-xs text-muted-foreground">
+          پیش از ارسال آزمایشی، تغییرات را ذخیره کنید.
+        </p>
       </div>
     </SettingsCard>
   );

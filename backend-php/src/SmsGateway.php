@@ -8,8 +8,9 @@ namespace Gymlic;
  * calls SmsGateway::send(); switching provider means rewriting deliver() here
  * and nothing else.
  *
- * Provider today: Melipayamak, the token ("console") REST API. The token is
- * config 'sms' => 'api_key'; 'sender' is the sender line number.
+ * Provider today: Melipayamak, the token ("console") REST API. The token and
+ * the sender line number come from /admin/settings when the admin set them
+ * there, otherwise from config 'sms' => 'api_key' / 'sender'.
  *
  * Never throws. On failure send() returns false and lastError() says why, so
  * the cron can store it in notification_deliveries.last_error.
@@ -22,10 +23,8 @@ final class SmsGateway
     {
         self::$lastError = '';
 
-        $config = (require __DIR__ . '/../config.php')['sms'] ?? [];
-        $apiKey = (string) ($config['api_key'] ?? '');
-        $sender = (string) ($config['sender'] ?? '');
-        if ($apiKey === '' || $apiKey === 'CHANGE_ME' || $sender === '' || $sender === 'CHANGE_ME') {
+        ['api_key' => $apiKey, 'sender' => $sender] = self::credentials();
+        if ($apiKey === '' || $sender === '') {
             self::$lastError = 'sms not configured';
             return false;
         }
@@ -42,6 +41,34 @@ final class SmsGateway
             self::$lastError = 'sms: ' . $e->getMessage();
             return false;
         }
+    }
+
+    /**
+     * Each value from the admin's settings when set there, else from
+     * config.php ('CHANGE_ME' counting as unset).
+     *
+     * @return array{api_key: string, sender: string, api_key_source: string, sender_source: string}
+     */
+    public static function credentials(): array
+    {
+        $file = (require __DIR__ . '/../config.php')['sms'] ?? [];
+        $panel = Settings::get('sms');
+
+        $out = [];
+        foreach (['api_key', 'sender'] as $field) {
+            $fromFile = (string) ($file[$field] ?? '');
+            if ($panel[$field] !== '') {
+                $out[$field] = $panel[$field];
+                $out[$field . '_source'] = 'panel';
+            } elseif ($fromFile !== '' && $fromFile !== 'CHANGE_ME') {
+                $out[$field] = $fromFile;
+                $out[$field . '_source'] = 'config';
+            } else {
+                $out[$field] = '';
+                $out[$field . '_source'] = 'none';
+            }
+        }
+        return $out;
     }
 
     /** Why the last send() returned false (empty after a success). */

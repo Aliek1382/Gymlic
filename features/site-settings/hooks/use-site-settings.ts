@@ -11,8 +11,8 @@ import {
   getPublicSettings,
   isFeatureEnabled,
   updateSiteSetting,
+  type AdminSettingKey,
   type AdminSiteSettings,
-  type SiteSettingKey,
   type SiteSettings,
 } from "../services/site-settings-service";
 
@@ -59,10 +59,11 @@ export function useAdminSiteSettings() {
   return useQuery({ queryKey: ADMIN_KEY, queryFn: getAdminSiteSettings });
 }
 
-export function useUpdateSiteSetting<K extends SiteSettingKey>(key: K) {
+export function useUpdateSiteSetting<K extends AdminSettingKey>(key: K) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (value: SiteSettings[K]) => updateSiteSetting(key, value),
+    mutationFn: ({ value, clearSecrets }: { value: AdminSiteSettings["settings"][K]; clearSecrets?: string[] }) =>
+      updateSiteSetting(key, value, clearSecrets),
     onSuccess: (saved) => {
       // Straight into the cache, not only via a refetch: the next switch the
       // admin flips builds on this value, and must not build on a stale one.
