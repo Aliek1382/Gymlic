@@ -4,6 +4,7 @@ import { Apple, Dumbbell } from "lucide-react";
 
 import { CoachMessageCard } from "@/features/messages";
 import { ProgressDashboardWidget } from "@/features/progress";
+import { useFeatureCheck } from "@/features/site-settings";
 import { useAthleteDashboard } from "../../hooks/use-athlete-dashboard";
 import { WelcomeSection } from "../shared/welcome-section";
 import { DashboardSkeleton } from "../shared/dashboard-skeleton";
@@ -21,6 +22,7 @@ export function AthleteDashboard({
   trainerName: string | null;
 }) {
   const dashboard = useAthleteDashboard(athleteId);
+  const isEnabled = useFeatureCheck();
 
   if (dashboard.isLoading) {
     return <DashboardSkeleton />;
@@ -52,19 +54,21 @@ export function AthleteDashboard({
           emptyDescription="مربی شما به‌زودی یک برنامه تمرینی برایتان تنظیم می‌کند."
           planKind="workout"
         />
-        <PlanSummaryCard
-          title="برنامه غذایی"
-          icon={Apple}
-          plan={dashboard.data.nutritionPlan}
-          emptyTitle="برنامه غذایی فعالی ندارید."
-          emptyDescription="مربی شما به‌زودی یک برنامه غذایی برایتان تنظیم می‌کند."
-          planKind="nutrition"
-        />
+        {isEnabled("nutrition") && (
+          <PlanSummaryCard
+            title="برنامه غذایی"
+            icon={Apple}
+            plan={dashboard.data.nutritionPlan}
+            emptyTitle="برنامه غذایی فعالی ندارید."
+            emptyDescription="مربی شما به‌زودی یک برنامه غذایی برایتان تنظیم می‌کند."
+            planKind="nutrition"
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ProgressDashboardWidget athleteId={athleteId} />
-        <CoachMessageCard currentUserId={athleteId} />
+        {isEnabled("progress") && <ProgressDashboardWidget athleteId={athleteId} />}
+        {isEnabled("messages") && <CoachMessageCard currentUserId={athleteId} />}
       </div>
     </div>
   );

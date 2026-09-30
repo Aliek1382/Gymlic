@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { KeyRound, Loader2, Mail, User } from "lucide-react";
+import { KeyRound, Loader2, Lock, Mail, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { SupportContact, usePublicSettings } from "@/features/site-settings";
 import { useSignInWithPassword } from "../hooks/use-sign-in-with-password";
 import { useSignUpWithPassword } from "../hooks/use-sign-up-with-password";
 import {
@@ -162,6 +163,34 @@ function LoginPanel({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
 }
 
 function SignUpPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+  const { signup } = usePublicSettings();
+  if (!signup.open) return <SignUpClosedPanel onSwitchToLogin={onSwitchToLogin} />;
+  return <SignUpForm onSwitchToLogin={onSwitchToLogin} />;
+}
+
+/** Sign-up closed from /admin/settings; invitation links still work. */
+function SignUpClosedPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+  return (
+    <div className="space-y-6 text-center">
+      <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        <Lock className="size-6" />
+      </div>
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-bold text-foreground">ثبت‌نام فعلاً بسته است</h1>
+        <p className="text-sm text-muted-foreground">
+          در حال حاضر امکان ساخت حساب جدید وجود ندارد. اگر باشگاه یا مربی‌تان برایتان لینک
+          دعوت فرستاده، از همان لینک وارد شوید.
+        </p>
+      </div>
+      <SupportContact />
+      <Button type="button" variant="outline" className="w-full" onClick={onSwitchToLogin}>
+        بازگشت به ورود
+      </Button>
+    </div>
+  );
+}
+
+function SignUpForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const router = useRouter();
   const signUp = useSignUpWithPassword();
 

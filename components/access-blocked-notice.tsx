@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
+import { SupportContact } from "@/features/site-settings";
 
 export function AccessBlockedNotice({
   icon: Icon,
@@ -25,8 +26,9 @@ export function AccessBlockedNotice({
         </div>
         <div className="space-y-1.5 px-6">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="whitespace-pre-line text-sm text-muted-foreground">{description}</p>
         </div>
+        <SupportContact className="px-6" />
         <Button
           variant="outline"
           onClick={() => signOut.mutate()}

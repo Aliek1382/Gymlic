@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
-  CircleHelp,
   LogOut,
   ShieldCheck,
   User as UserIcon,
@@ -22,6 +21,7 @@ import { OfflineQueueBadge } from "@/components/pwa/offline-queue-badge";
 import { useProfile } from "@/features/authentication/hooks/use-profile";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { NotificationBell } from "@/features/notifications";
+import { SupportMenu } from "@/features/site-settings";
 import { GlobalSearch } from "./global-search";
 import { MobileSidebar } from "./mobile-sidebar";
 import { SIDEBAR_NAV } from "./sidebar-nav";
@@ -97,13 +97,7 @@ export function DashboardHeader({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <button
-        type="button"
-        className="hidden size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted sm:flex"
-        aria-label="راهنما"
-      >
-        <CircleHelp className="size-[18px]" />
-      </button>
+      <SupportMenu />
 
       <OfflineQueueBadge />
 

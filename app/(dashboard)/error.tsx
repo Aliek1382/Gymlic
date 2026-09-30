@@ -5,6 +5,7 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { SupportContact } from "@/features/site-settings";
 
 /**
  * Panel-wide error boundary.
@@ -52,6 +53,8 @@ export default function DashboardError({
           <RotateCcw />
           تلاش دوباره
         </Button>
+
+        <SupportContact />
       </div>
     </Card>
   );

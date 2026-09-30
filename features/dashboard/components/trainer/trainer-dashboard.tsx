@@ -9,6 +9,7 @@ import { NoteList } from "@/features/notes";
 import { PointsWidget } from "@/features/points";
 import { MonthlyEarningsCard } from "@/features/earnings/components/monthly-earnings-card";
 import { useTrainerEarningsSeries } from "@/features/earnings/hooks/use-trainer-earnings-series";
+import { featureForPath, useFeatureCheck } from "@/features/site-settings";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
 import { useTrainerRecentActivities } from "../../hooks/use-trainer-recent-activities";
 import { useTrainerDraftPlans } from "../../hooks/use-trainer-draft-plans";
@@ -50,7 +51,10 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
   const statistics = useTrainerStatistics();
   const activities = useTrainerRecentActivities();
   const draftPlans = useTrainerDraftPlans();
-  const earningsSeries = useTrainerEarningsSeries(Number(earningsRange));
+  const isEnabled = useFeatureCheck();
+  const showEarnings = isEnabled("earnings");
+  const earningsSeries = useTrainerEarningsSeries(Number(earningsRange), showEarnings);
+  const quickActions = QUICK_ACTIONS.filter((action) => isEnabled(featureForPath(action.href)));
 
   return (
     <div className="space-y-6">
@@ -59,7 +63,7 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
         subtitle="امروز چه شاگردهایی و چه برنامه‌هایی در انتظار شما هستند را ببینید."
       />
 
-      <PointsWidget />
+      {isEnabled("points") && <PointsWidget />}
 
       <StatisticsGrid>
         {statistics.isLoading ? (
@@ -115,21 +119,23 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
         )}
       </StatisticsGrid>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {earningsSeries.isLoading ? (
-          <ChartCardSkeleton className="lg:col-span-2" />
-        ) : earningsSeries.isError ? (
-          <ErrorState message="خطا در دریافت نمودار درآمد" />
-        ) : (
-          <TrainerEarningsChart
-            data={earningsSeries.data ?? []}
-            range={earningsRange}
-            onRangeChange={setEarningsRange}
-          />
-        )}
+      {showEarnings && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {earningsSeries.isLoading ? (
+            <ChartCardSkeleton className="lg:col-span-2" />
+          ) : earningsSeries.isError ? (
+            <ErrorState message="خطا در دریافت نمودار درآمد" />
+          ) : (
+            <TrainerEarningsChart
+              data={earningsSeries.data ?? []}
+              range={earningsRange}
+              onRangeChange={setEarningsRange}
+            />
+          )}
 
-        <MonthlyEarningsCard />
-      </div>
+          <MonthlyEarningsCard />
+        </div>
+      )}
 
       {activities.isLoading ? (
         <TableCardSkeleton />
@@ -147,13 +153,15 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
         <TrainerDraftPlans drafts={draftPlans.data ?? []} />
       )}
 
-      <NoteList
-        athleteId={null}
-        title="یادداشت‌های من"
-        description="یادداشت‌های شخصی شما که به ورزشکار خاصی مربوط نیستند. فقط خودتان می‌بینید."
-      />
+      {isEnabled("notes") && (
+        <NoteList
+          athleteId={null}
+          title="یادداشت‌های من"
+          description="یادداشت‌های شخصی شما که به ورزشکار خاصی مربوط نیستند. فقط خودتان می‌بینید."
+        />
+      )}
 
-      <QuickActions actions={QUICK_ACTIONS} />
+      <QuickActions actions={quickActions} />
     </div>
   );
 }

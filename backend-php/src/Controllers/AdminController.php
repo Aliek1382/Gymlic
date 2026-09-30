@@ -629,7 +629,7 @@ final class AdminController
         Response::ok(['items' => Cast::json($stmt->fetchAll())]);
     }
 
-    private static function logActivity(
+    public static function logActivity(
         PDO $pdo,
         ?string $clubId,
         string $actorId,

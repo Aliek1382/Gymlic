@@ -15,6 +15,7 @@ import {
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { MessagesNavBadge } from "@/features/messages/components/messages-nav-badge";
+import { featureForPath, useFeatureCheck } from "@/features/site-settings";
 import { SIDEBAR_NAV } from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
 
@@ -27,7 +28,10 @@ export function SidebarContent({
 }) {
   const pathname = usePathname();
   const signOut = useSignOut();
-  const items = SIDEBAR_NAV[accountType];
+  const isEnabled = useFeatureCheck();
+  const items = SIDEBAR_NAV[accountType].filter((item) =>
+    isEnabled(featureForPath(item.href))
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar">

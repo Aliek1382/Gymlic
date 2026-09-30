@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { useChooseRole } from "../hooks/use-choose-role";
 import { ROLE_OPTIONS } from "../constants/auth";
+import { useAuthContext } from "../hooks/use-auth-context";
+import { SupportContact, usePublicSettings } from "@/features/site-settings";
 import type { AccountType } from "@/types/database.types";
 
 const ICONS: Record<AccountType, typeof Building2> = {
@@ -22,6 +24,23 @@ export function RoleSelector() {
   const router = useRouter();
   const chooseRole = useChooseRole();
   const [selected, setSelected] = useState<AccountType | null>(null);
+  const { signup } = usePublicSettings();
+  const { data: context } = useAuthContext();
+  // Roles the admin closed to self sign-up (the API refuses them too).
+  const options = ROLE_OPTIONS.filter(
+    (option) => context?.isPlatformAdmin || signup.roles[option.value] !== false
+  );
+
+  if (options.length === 0) {
+    return (
+      <div className="space-y-4 text-center">
+        <p className="text-sm text-muted-foreground">
+          در حال حاضر ثبت‌نام با هیچ نقشی باز نیست. اگر لینک دعوت دارید، از همان لینک وارد شوید.
+        </p>
+        <SupportContact />
+      </div>
+    );
+  }
 
   async function handleContinue() {
     if (!selected) return;
@@ -39,7 +58,7 @@ export function RoleSelector() {
   return (
     <div className="space-y-5">
       <div className="space-y-3">
-        {ROLE_OPTIONS.map((option) => {
+        {options.map((option) => {
           const Icon = ICONS[option.value as AccountType];
           const isActive = selected === option.value;
           return (

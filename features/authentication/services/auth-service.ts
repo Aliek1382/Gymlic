@@ -133,6 +133,8 @@ export async function joinViaInvitation(
   await api.post<SessionResponse>("/auth/signup", {
     email: email.trim(),
     password,
+    // Lets the invitee in even while the admin has closed open sign-up.
+    invitation_code: trimmedCode,
   }).then((data) => setToken(data.token));
 
   await acceptInvitationForCurrentUser(trimmedCode, invitedRole);

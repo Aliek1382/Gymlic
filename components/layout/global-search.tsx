@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 
 import type { AccountType } from "@/types/database.types";
+import { featureForPath, useFeatureCheck } from "@/features/site-settings";
 import { SearchResultGroup, type SearchResultItem } from "./search-result-group";
 import { SIDEBAR_NAV } from "./sidebar-nav";
 
@@ -41,9 +42,12 @@ export function GlobalSearch({ accountType }: { accountType: AccountType }) {
   }, []);
 
   const trimmedQuery = query.trim().toLowerCase();
+  const isEnabled = useFeatureCheck();
 
   const pageResults: SearchResultItem[] = useMemo(() => {
-    const items = SIDEBAR_NAV[accountType];
+    const items = SIDEBAR_NAV[accountType].filter((item) =>
+      isEnabled(featureForPath(item.href))
+    );
     const matches = trimmedQuery
       ? items.filter((item) => item.label.toLowerCase().includes(trimmedQuery))
       : items;
@@ -53,7 +57,7 @@ export function GlobalSearch({ accountType }: { accountType: AccountType }) {
       href: item.href,
       icon: item.icon,
     }));
-  }, [accountType, trimmedQuery]);
+  }, [accountType, trimmedQuery, isEnabled]);
 
   const handleResultCountChange = useCallback((count: number) => {
     setTrainerResultCount(count);
