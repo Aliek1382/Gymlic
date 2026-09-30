@@ -4,8 +4,9 @@ declare(strict_types=1);
 namespace Gymlic;
 
 /**
- * Plain-text mail. Uses PHP's mail() (the host's local sendmail) unless
- * config 'mail' => 'smtp' has a host, in which case it talks SMTP directly.
+ * Plain-text mail. Uses PHP's mail() (the host's local sendmail) unless an
+ * SMTP host is set, in which case it talks SMTP directly. Settings come from
+ * /admin/settings when the admin set them there, else from config 'mail'.
  * No Composer, so the SMTP part is a small raw-socket client (AUTH LOGIN,
  * SSL on 465 or STARTTLS on 587).
  *
@@ -25,9 +26,9 @@ final class MailGateway
             return false;
         }
 
-        $config = (require __DIR__ . '/../config.php')['mail'] ?? [];
-        $fromAddress = self::oneLine((string) ($config['from_address'] ?? 'no-reply@gymlic-panel.ir'));
-        $fromName = self::oneLine((string) ($config['from_name'] ?? 'Gymlic'));
+        $config = self::config();
+        $fromAddress = self::oneLine($config['from_address']);
+        $fromName = self::oneLine($config['from_name']);
 
         // Subject and From name are non-ASCII, so both need RFC 2047 encoding; the body goes out base64.
         $headers = [
@@ -41,9 +42,8 @@ final class MailGateway
         $encodedBody = chunk_split(base64_encode($body), 76, "\r\n");
 
         try {
-            $smtp = $config['smtp'] ?? [];
-            $host = (string) ($smtp['host'] ?? '');
-            if ($host !== '' && $host !== 'CHANGE_ME') {
+            $smtp = $config['smtp'];
+            if ($smtp['host'] !== '') {
                 return self::viaSmtp($smtp, $fromAddress, $email, $encodedSubject, $headers, $encodedBody);
             }
 
@@ -60,6 +60,54 @@ final class MailGateway
             self::$lastError = 'mail: ' . $e->getMessage();
             return false;
         }
+    }
+
+    /**
+     * The effective mail settings. The sender fields fall back one by one;
+     * the SMTP block as a whole — a host set in the panel brings its own
+     * port, user and password rather than mixing with config.php's.
+     *
+     * @return array{from_address: string, from_name: string, source: string,
+     *               smtp: array{host: string, port: int, secure: string, user: string, pass: string}}
+     */
+    public static function config(): array
+    {
+        $file = (require __DIR__ . '/../config.php')['mail'] ?? [];
+        $panel = Settings::get('mail');
+
+        $fileSmtp = $file['smtp'] ?? [];
+        $fileHost = (string) ($fileSmtp['host'] ?? '');
+        if ($panel['smtp_host'] !== '') {
+            $smtp = [
+                'host'   => $panel['smtp_host'],
+                'port'   => $panel['smtp_port'],
+                'secure' => $panel['smtp_secure'],
+                'user'   => $panel['smtp_user'],
+                'pass'   => $panel['smtp_pass'],
+            ];
+            $source = 'panel';
+        } elseif ($fileHost !== '' && $fileHost !== 'CHANGE_ME') {
+            $smtp = [
+                'host'   => $fileHost,
+                'port'   => (int) ($fileSmtp['port'] ?? 465),
+                'secure' => (string) ($fileSmtp['secure'] ?? 'ssl'),
+                'user'   => (string) ($fileSmtp['user'] ?? ''),
+                'pass'   => (string) ($fileSmtp['pass'] ?? ''),
+            ];
+            $source = 'config';
+        } else {
+            $smtp = ['host' => '', 'port' => 465, 'secure' => 'ssl', 'user' => '', 'pass' => ''];
+            $source = 'mail()';
+        }
+
+        return [
+            'from_address' => $panel['from_address'] !== ''
+                ? $panel['from_address'] : (string) ($file['from_address'] ?? 'no-reply@gymlic-panel.ir'),
+            'from_name'    => $panel['from_name'] !== ''
+                ? $panel['from_name'] : (string) ($file['from_name'] ?? 'Gymlic'),
+            'source'       => $source,
+            'smtp'         => $smtp,
+        ];
     }
 
     public static function lastError(): string
@@ -80,9 +128,9 @@ final class MailGateway
 
     private static function viaSmtp(array $smtp, string $from, string $to, string $subject, array $headers, string $body): bool
     {
-        $host = (string) $smtp['host'];
-        $port = (int) ($smtp['port'] ?? 465);
-        $secure = (string) ($smtp['secure'] ?? 'ssl'); // 'ssl' (port 465) or 'tls' (STARTTLS, port 587)
+        $host = $smtp['host'];
+        $port = $smtp['port'];
+        $secure = $smtp['secure']; // 'ssl' (port 465) or 'tls' (STARTTLS, port 587)
 
         $socket = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $errno, $errstr, 10);
         if ($socket === false) {
@@ -115,10 +163,10 @@ final class MailGateway
                 }
                 $say('EHLO gymlic-panel.ir', '250');
             }
-            if ((string) ($smtp['user'] ?? '') !== '') {
+            if ($smtp['user'] !== '') {
                 $say('AUTH LOGIN', '334');
-                $say(base64_encode((string) $smtp['user']), '334');
-                $say(base64_encode((string) ($smtp['pass'] ?? '')), '235');
+                $say(base64_encode($smtp['user']), '334');
+                $say(base64_encode($smtp['pass']), '235');
             }
             $say('MAIL FROM:<' . $from . '>', '250');
             $say('RCPT TO:<' . $to . '>', '250,251');

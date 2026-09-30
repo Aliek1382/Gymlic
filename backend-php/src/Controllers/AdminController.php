@@ -301,6 +301,11 @@ final class AdminController
         $data = Validate::body();
         $suspended = !empty($data['suspended']);
 
+        if ($suspended && $params['id'] === $admin['id']) {
+            Response::error(409, 'self', 'نمی‌توانید حساب خودتان را مسدود کنید.');
+            return;
+        }
+
         $pdo = Database::connection();
         $before = $pdo->prepare('SELECT is_suspended FROM profiles WHERE id = :id');
         $before->execute(['id' => $params['id']]);

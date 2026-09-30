@@ -5,7 +5,12 @@ import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
 
-const Tabs = TabsPrimitive.Root;
+// Radix doesn't read the page's direction: without a `dir` it stamps
+// dir="ltr" on its root, turning everything inside a tab — text, switches,
+// the order of the triggers — left-to-right. The whole app is RTL.
+function Tabs({ dir = "rtl", ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
+  return <TabsPrimitive.Root dir={dir} {...props} />;
+}
 
 function TabsList({
   className,

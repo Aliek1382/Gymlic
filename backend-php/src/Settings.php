@@ -18,10 +18,26 @@ final class Settings
 {
     public const ROLES = ['club', 'trainer', 'athlete'];
 
-    public const KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels'];
+    public const KEYS = [
+        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail',
+    ];
 
     /** The groups any visitor may read; everything else is admin-only. */
-    public const PUBLIC_KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features'];
+    public const PUBLIC_KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features', 'limits'];
+
+    /**
+     * Fields that are credentials: never sent back to the browser (the admin
+     * screen gets a masked hint instead), and kept as they are when a save
+     * leaves them empty. See SettingsController.
+     */
+    public const SECRETS = ['sms' => ['api_key'], 'mail' => ['smtp_pass']];
+
+    public const ATTACHMENT_TYPES = ['voice', 'image', 'video', 'file'];
+
+    /** messages.body is VARCHAR(1000): the limit can be lowered, not raised. */
+    public const MESSAGE_MAX_CHARS = 1000;
+
+    private const DEFAULT_UPLOAD_MB = ['voice' => 8, 'image' => 8, 'video' => 50, 'file' => 8];
 
     private const ANNOUNCEMENT_TONES = ['info', 'warning', 'success'];
 
@@ -138,6 +154,25 @@ final class Settings
             ],
             'features' => self::features($v),
             'points_levels' => ['levels' => self::pointLevels($v['levels'] ?? null)],
+            'limits' => [
+                'message_max_chars' => self::int($v['message_max_chars'] ?? null, self::MESSAGE_MAX_CHARS, 50, self::MESSAGE_MAX_CHARS),
+                'attachments'       => self::switches($v['attachments'] ?? null, self::ATTACHMENT_TYPES),
+                'upload_mb'         => self::uploadMb($v['upload_mb'] ?? null),
+            ],
+            // Empty = fall back to config.php (see SmsGateway / MailGateway).
+            'sms' => [
+                'api_key' => self::text($v['api_key'] ?? null, 200),
+                'sender'  => self::text($v['sender'] ?? null, 30),
+            ],
+            'mail' => [
+                'from_address' => self::text($v['from_address'] ?? null, 150),
+                'from_name'    => self::text($v['from_name'] ?? null, 100),
+                'smtp_host'    => self::text($v['smtp_host'] ?? null, 150),
+                'smtp_port'    => self::int($v['smtp_port'] ?? null, 465, 1, 65535),
+                'smtp_secure'  => in_array($v['smtp_secure'] ?? null, ['ssl', 'tls'], true) ? $v['smtp_secure'] : 'ssl',
+                'smtp_user'    => self::text($v['smtp_user'] ?? null, 150),
+                'smtp_pass'    => self::text($v['smtp_pass'] ?? null, 200),
+            ],
             default => throw new \InvalidArgumentException("Unknown settings key: {$key}"),
         };
     }
@@ -194,6 +229,35 @@ final class Settings
         }
         $levels[0]['min_points'] = 0;
         return $levels;
+    }
+
+    private static function uploadMb(mixed $value): array
+    {
+        $v = is_array($value) ? $value : [];
+        $out = [];
+        foreach (self::DEFAULT_UPLOAD_MB as $type => $default) {
+            $out[$type] = self::int($v[$type] ?? null, $default, 1, 200);
+        }
+        return $out;
+    }
+
+    /** @param string[] $names */
+    private static function switches(mixed $value, array $names): array
+    {
+        $v = is_array($value) ? $value : [];
+        $out = [];
+        foreach ($names as $name) {
+            $out[$name] = self::bool($v[$name] ?? null, true);
+        }
+        return $out;
+    }
+
+    private static function int(mixed $value, int $default, int $min, int $max): int
+    {
+        if (!is_numeric($value)) {
+            return $default;
+        }
+        return max($min, min($max, (int) $value));
     }
 
     /** @param string[] $allowed */

@@ -34,6 +34,10 @@ const ADMIN_ACTIONS = [
   "library_item_published",
   "point_rule_updated",
   "points_adjusted",
+  "user_role_changed",
+  "admin_granted",
+  "admin_revoked",
+  "password_set_by_admin",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -51,6 +55,10 @@ const ACTION_LABEL: Record<string, string> = {
   library_item_published: "انتقال به بانک عمومی",
   point_rule_updated: "تغییر قانون امتیاز",
   points_adjusted: "امتیاز دستی به مربی",
+  user_role_changed: "تغییر نقش کاربر",
+  admin_granted: "دادن دسترسی مدیریت",
+  admin_revoked: "برداشتن دسترسی مدیریت",
+  password_set_by_admin: "تعیین رمز جدید توسط مدیر",
 };
 
 const SETTINGS_GROUP_LABEL: Record<string, string> = {
@@ -60,6 +68,9 @@ const SETTINGS_GROUP_LABEL: Record<string, string> = {
   support: "پشتیبانی",
   features: "مدیریت بخش‌ها",
   points_levels: "سطح‌های امتیاز",
+  limits: "محدودیت پیام و فایل",
+  sms: "تنظیمات پیامک",
+  mail: "تنظیمات ایمیل",
 };
 
 export function AdminActivityPage() {

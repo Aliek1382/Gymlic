@@ -11,6 +11,7 @@ import {
   Tags,
   ToggleRight,
   Trophy,
+  UserCog,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -26,6 +27,7 @@ export const ADMIN_SIDEBAR_NAV: AdminNavItem[] = [
   { label: "باشگاه‌ها", href: "/admin/clubs", icon: Users },
   { label: "مربی‌ها", href: "/admin/trainers", icon: Dumbbell },
   { label: "ورزشکاران", href: "/admin/athletes", icon: UsersRound },
+  { label: "کاربران", href: "/admin/users", icon: UserCog },
   { label: "درخواست‌های پرداخت", href: "/admin/payments", icon: ReceiptText },
   { label: "پلن‌ها", href: "/admin/plans", icon: Tags },
   { label: "گزارش مالی", href: "/admin/reports", icon: Banknote },

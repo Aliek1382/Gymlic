@@ -8,12 +8,12 @@ use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Settings;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 
 final class MessageController
 {
-    private const MAX_BODY = 1000;
 
     private const TYPES = ['text', 'voice', 'image', 'video', 'file'];
 
@@ -271,13 +271,17 @@ final class MessageController
         $mediaName = null;
 
         if ($type === 'text') {
-            if ($body === '' || mb_strlen($body) > self::MAX_BODY) {
-                Response::error(400, 'invalid_body', 'A message must be between 1 and 1000 characters.');
+            if ($body === '' || mb_strlen($body) > self::maxBody()) {
+                self::bodyTooLong();
                 return;
             }
         } else {
-            if (mb_strlen($body) > self::MAX_BODY) {
-                Response::error(400, 'invalid_body', 'A message must be at most 1000 characters.');
+            if (!Settings::get('limits')['attachments'][$type]) {
+                self::attachmentOff($type);
+                return;
+            }
+            if (mb_strlen($body) > self::maxBody()) {
+                self::bodyTooLong();
                 return;
             }
             $mediaUrl = trim((string) ($data['media_url'] ?? ''));
@@ -320,8 +324,8 @@ final class MessageController
         ?string $planId
     ): void {
         $body = trim($rawBody);
-        if (($type === 'text' && $body === '') || mb_strlen($body) > self::MAX_BODY) {
-            Response::error(400, 'invalid_body', 'A message must be between 1 and 1000 characters.');
+        if (($type === 'text' && $body === '') || mb_strlen($body) > self::maxBody()) {
+            self::bodyTooLong();
             return;
         }
 
@@ -529,5 +533,23 @@ final class MessageController
         }
 
         return $counts;
+    }
+
+    /** Set by the admin in /admin/settings, never above the column's 1000. */
+    private static function maxBody(): int
+    {
+        return Settings::get('limits')['message_max_chars'];
+    }
+
+    private static function bodyTooLong(): void
+    {
+        $max = strtr((string) self::maxBody(), ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
+        Response::error(400, 'invalid_body', "متن پیام باید بین ۱ تا {$max} حرف باشد.");
+    }
+
+    public static function attachmentOff(string $type): void
+    {
+        $label = ['voice' => 'پیام صوتی', 'image' => 'عکس', 'video' => 'ویدیو', 'file' => 'فایل'][$type] ?? $type;
+        Response::error(403, 'attachment_disabled', "ارسال {$label} در حال حاضر توسط مدیریت غیرفعال شده است.");
     }
 }

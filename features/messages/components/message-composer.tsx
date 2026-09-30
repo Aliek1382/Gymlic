@@ -27,20 +27,21 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import type { PlanKind } from "@/features/athletes/types/athlete-types";
 import { uploadMessageMedia, type OutgoingMessage } from "../services/message-service";
 import type { ConversationPlan } from "../types/message-types";
-
-// Same ceiling the messages.body check enforces in the database.
-const MAX_MESSAGE_LENGTH = 1000;
+import { usePublicSettings } from "@/features/site-settings";
 
 // A message doesn't have to be about anything in particular — that is the
 // default, and what makes the inbox usable before a plan exists.
 const NO_PLAN = "none";
 
-// Recordings stop themselves here — well inside the server's 8MB voice limit
-// at the bitrates browsers use for speech.
+// Recordings stop themselves at 5 minutes, or sooner if the admin lowered the
+// voice size limit: browsers record speech at up to ~64kbps, about 120
+// seconds per MB, so a recording always fits under the limit.
 const MAX_RECORDING_SECONDS = 300;
+const RECORDING_SECONDS_PER_MB = 120;
 
 // Picker filters only; the server re-checks what the file really is.
-const GALLERY_ACCEPT = "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime";
+const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
+const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime";
 const FILE_ACCEPT = ".pdf,.doc,.docx";
 
 // Safari records mp4, Chrome and Firefox webm/ogg: take whichever this
@@ -84,6 +85,18 @@ export function MessageComposer({
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // What the admin allows (/admin/settings); the API enforces the same.
+  const { limits } = usePublicSettings();
+  const allowed = limits.attachments;
+  const galleryAccept = [allowed.image && IMAGE_ACCEPT, allowed.video && VIDEO_ACCEPT]
+    .filter(Boolean)
+    .join(",");
+
+  const maxRecordingSeconds = Math.min(
+    MAX_RECORDING_SECONDS,
+    limits.upload_mb.voice * RECORDING_SECONDS_PER_MB
+  );
+
   const busy = isPending || uploading;
   const recording = recordingSeconds !== null;
 
@@ -120,7 +133,15 @@ export function MessageComposer({
   function handlePicked(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = ""; // picking the same file twice must still fire
-    if (file) void sendAttachment(file);
+    if (!file) return;
+    // Caught here rather than after a long upload the server would refuse.
+    const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : "file";
+    const maxMb = limits.upload_mb[type];
+    if (file.size > maxMb * 1024 * 1024) {
+      toast.error(`حجم این فایل بیشتر از حد مجاز (${maxMb.toLocaleString("fa-IR")} مگابایت) است.`);
+      return;
+    }
+    void sendAttachment(file);
   }
 
   async function startRecording() {
@@ -177,10 +198,10 @@ export function MessageComposer({
   }, [recording]);
 
   useEffect(() => {
-    if (recordingSeconds !== null && recordingSeconds >= MAX_RECORDING_SECONDS) {
+    if (recordingSeconds !== null && recordingSeconds >= maxRecordingSeconds) {
       stopRecording(false);
     }
-  }, [recordingSeconds]);
+  }, [recordingSeconds, maxRecordingSeconds]);
 
   // Leaving the thread mid-recording must release the microphone.
   useEffect(
@@ -225,7 +246,7 @@ export function MessageComposer({
       <input
         ref={galleryInputRef}
         type="file"
-        accept={GALLERY_ACCEPT}
+        accept={galleryAccept}
         className="hidden"
         onChange={handlePicked}
       />
@@ -263,39 +284,47 @@ export function MessageComposer({
         </div>
       ) : (
       <div className="flex items-end gap-2">
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          disabled={busy}
-          onClick={() => galleryInputRef.current?.click()}
-          aria-label="ارسال عکس یا ویدیو"
-        >
-          <ImagePlus />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          disabled={busy}
-          onClick={() => fileInputRef.current?.click()}
-          aria-label="ارسال فایل"
-        >
-          <Paperclip />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          disabled={busy}
-          onClick={startRecording}
-          aria-label="ضبط پیام صوتی"
-        >
-          <Mic />
-        </Button>
+        {galleryAccept && (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => galleryInputRef.current?.click()}
+            aria-label={
+              allowed.image && allowed.video ? "ارسال عکس یا ویدیو" : allowed.image ? "ارسال عکس" : "ارسال ویدیو"
+            }
+          >
+            <ImagePlus />
+          </Button>
+        )}
+        {allowed.file && (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="ارسال فایل"
+          >
+            <Paperclip />
+          </Button>
+        )}
+        {allowed.voice && (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={busy}
+            onClick={startRecording}
+            aria-label="ضبط پیام صوتی"
+          >
+            <Mic />
+          </Button>
+        )}
         <textarea
           value={draft}
-          onChange={(event) => setDraft(event.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+          onChange={(event) => setDraft(event.target.value.slice(0, limits.message_max_chars))}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
