@@ -122,9 +122,21 @@ final class AthleteController
     {
         $user = Auth::requireUser();
 
-        Database::connection()
-            ->prepare('DELETE FROM trainer_athletes WHERE trainer_id = :trainer_id AND athlete_id = :athlete_id')
-            ->execute(['trainer_id' => $user['id'], 'athlete_id' => $params['id']]);
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('DELETE FROM trainer_athletes WHERE trainer_id = :trainer_id AND athlete_id = :athlete_id');
+        $stmt->execute(['trainer_id' => $user['id'], 'athlete_id' => $params['id']]);
+
+        if ($stmt->rowCount() > 0) {
+            AuthController::notify(
+                $pdo,
+                $params['id'],
+                $user['id'],
+                'trainer_removed',
+                'پایان همکاری با مربی',
+                'همکاری مربی شما با شما در جیم‌لیک پایان یافت.',
+                '/dashboard'
+            );
+        }
 
         Response::ok(['ok' => true]);
     }

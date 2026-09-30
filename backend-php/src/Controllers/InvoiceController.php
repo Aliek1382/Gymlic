@@ -240,6 +240,17 @@ final class InvoiceController
             throw $e;
         }
 
+        AuthController::notify(
+            $pdo,
+            $invoice['athlete_id'],
+            $user['id'],
+            'invoice_cancelled',
+            'فاکتور لغو شد',
+            'فاکتور صادرشده برای شما لغو شد و نیازی به پرداخت آن نیست.',
+            self::linkFor($invoice['item_type']),
+            ['invoice_id' => $invoice['id']]
+        );
+
         Response::ok(['ok' => true]);
     }
 

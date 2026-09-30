@@ -228,6 +228,22 @@ final class AdminController
 
         self::logActivity($pdo, null, $admin['id'], null, 'payment_request_rejected', ['request_id' => $params['id']]);
 
+        $request = $pdo->prepare('SELECT submitted_by, admin_note FROM payment_requests WHERE id = :id');
+        $request->execute(['id' => $params['id']]);
+        $request = $request->fetch();
+        if ($request !== false && $request['submitted_by'] !== null) {
+            $note = trim((string) ($request['admin_note'] ?? ''));
+            AuthController::notify(
+                $pdo,
+                $request['submitted_by'],
+                $admin['id'],
+                'broadcast',
+                'پرداخت رد شد',
+                $note !== '' ? 'درخواست پرداخت اشتراک شما رد شد: ' . $note : 'درخواست پرداخت اشتراک شما رد شد. برای پیگیری با پشتیبانی تماس بگیرید.',
+                '/finance'
+            );
+        }
+
         Response::ok(['ok' => true]);
     }
 
@@ -243,15 +259,38 @@ final class AdminController
         }
 
         $pdo = Database::connection();
+        $club = $pdo->prepare('SELECT name, owner_id FROM clubs WHERE id = :id');
+        $club->execute(['id' => $params['id']]);
+        $club = $club->fetch();
+
         $stmt = $pdo->prepare('UPDATE clubs SET status = :status WHERE id = :id');
         $stmt->execute(['status' => $status, 'id' => $params['id']]);
 
+        // rowCount() is 0 both for a missing club and for "already in that status".
         if ($stmt->rowCount() === 0) {
-            Response::error(404, 'not_found', 'Club not found.');
+            if ($club === false) {
+                Response::error(404, 'not_found', 'Club not found.');
+                return;
+            }
+            Response::ok(['ok' => true]);
             return;
         }
 
         self::logActivity($pdo, $params['id'], $admin['id'], null, 'club_status_changed', ['status' => $status]);
+
+        if ($club !== false && $status !== 'pending') {
+            AuthController::notify(
+                $pdo,
+                $club['owner_id'],
+                $admin['id'],
+                'broadcast',
+                $status === 'suspended' ? 'باشگاه شما تعلیق شد' : 'باشگاه شما فعال شد',
+                $status === 'suspended'
+                    ? 'باشگاه «' . $club['name'] . '» تعلیق شد. برای پیگیری با پشتیبانی تماس بگیرید.'
+                    : 'باشگاه «' . $club['name'] . '» دوباره فعال شد.',
+                '/dashboard'
+            );
+        }
 
         Response::ok(['ok' => true]);
     }
@@ -263,6 +302,10 @@ final class AdminController
         $suspended = !empty($data['suspended']);
 
         $pdo = Database::connection();
+        $before = $pdo->prepare('SELECT is_suspended FROM profiles WHERE id = :id');
+        $before->execute(['id' => $params['id']]);
+        $before = $before->fetch();
+
         $pdo->prepare('UPDATE profiles SET is_suspended = :suspended WHERE id = :id')
             ->execute(['suspended' => $suspended ? 1 : 0, 'id' => $params['id']]);
 
@@ -274,6 +317,21 @@ final class AdminController
         self::logActivity($pdo, null, $admin['id'], $params['id'], 'profile_suspension_changed', [
             'suspended' => $suspended,
         ]);
+
+        // Only a real change: the push reaches their devices even though the session is gone.
+        if ($before !== false && (bool) $before['is_suspended'] !== $suspended) {
+            AuthController::notify(
+                $pdo,
+                $params['id'],
+                $admin['id'],
+                'broadcast',
+                $suspended ? 'حساب شما تعلیق شد' : 'حساب شما فعال شد',
+                $suspended
+                    ? 'حساب کاربری شما تعلیق شد. برای پیگیری با پشتیبانی تماس بگیرید.'
+                    : 'حساب کاربری شما دوباره فعال شد و می‌توانید وارد شوید.',
+                '/login'
+            );
+        }
 
         Response::ok(['ok' => true]);
     }
