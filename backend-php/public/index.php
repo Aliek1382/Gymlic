@@ -39,6 +39,7 @@ use Gymlic\Controllers\NotificationController;
 use Gymlic\Controllers\ProfileController;
 use Gymlic\Controllers\ProgressController;
 use Gymlic\Controllers\PushController;
+use Gymlic\Controllers\QuestionnaireController;
 use Gymlic\Controllers\UploadController;
 use Gymlic\Controllers\WorkoutPlanBuilderController;
 use Gymlic\Response;
@@ -126,6 +127,16 @@ $router->get('/session-packages', fn () => SessionPackageController::list());
 $router->get('/session-packages/mine', fn () => SessionPackageController::listMine());
 $router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
 $router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
+
+// Static paths before {id}: 'mine' and 'responses' must not be read as ids.
+$router->post('/questionnaires', fn () => QuestionnaireController::create());
+$router->get('/questionnaires', fn () => QuestionnaireController::list());
+$router->get('/questionnaires/mine', fn () => QuestionnaireController::listMine());
+$router->post('/questionnaires/responses/{id}/submit', fn (array $p) => QuestionnaireController::submit($p));
+$router->patch('/questionnaires/{id}', fn (array $p) => QuestionnaireController::update($p));
+$router->delete('/questionnaires/{id}', fn (array $p) => QuestionnaireController::delete($p));
+$router->post('/questionnaires/{id}/assign', fn (array $p) => QuestionnaireController::assign($p));
+$router->get('/questionnaires/{id}/responses', fn (array $p) => QuestionnaireController::responses($p));
 
 $router->get('/push/public-key', fn () => PushController::publicKey());
 $router->post('/push/subscriptions', fn () => PushController::subscribe());

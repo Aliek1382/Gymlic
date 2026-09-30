@@ -7,6 +7,7 @@ import {
   Calendar,
   CalendarCheck,
   CalendarDays,
+  ClipboardList,
   Dumbbell,
   LayoutGrid,
   LineChart,
@@ -84,6 +85,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
         "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
     },
     {
+      label: "پرسشنامه‌ها",
+      href: "/questionnaires",
+      icon: ClipboardList,
+      description:
+        "فرم دلخواه بسازید، برای ورزشکاران بفرستید و پاسخ‌ها را جدولی و خلاصه ببینید.",
+    },
+    {
       label: "فاکتورهای من",
       href: "/invoices",
       icon: Receipt,
@@ -106,6 +114,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "برنامه تمرینی", href: "/workout", icon: Dumbbell },
     { label: "برنامه غذایی", href: "/nutrition", icon: Apple },
     { label: "جلسات خصوصی", href: "/session-packages", icon: CalendarCheck },
+    { label: "پرسشنامه‌ها", href: "/questionnaires", icon: ClipboardList },
     { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
     { label: "تیکت‌ها", href: "/tickets", icon: Ticket },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },

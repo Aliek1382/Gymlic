@@ -8,7 +8,14 @@ import type { PlanInvoiceSummary } from "../types/invoice-types";
  * plan's text isn't sent by the API at all — the blur here is only decoration
  * over placeholder lines, never over real content.
  */
-export function LockedPlanCard({ invoice }: { invoice: PlanInvoiceSummary }) {
+export function LockedPlanCard({
+  invoice,
+  subject = "برنامه",
+}: {
+  invoice: PlanInvoiceSummary;
+  /** What is locked, as it reads in "to see the …" — a plan by default. */
+  subject?: string;
+}) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border">
       <div aria-hidden className="space-y-2 p-4 blur-sm select-none">
@@ -23,7 +30,7 @@ export function LockedPlanCard({ invoice }: { invoice: PlanInvoiceSummary }) {
           مبلغ فاکتور: {formatNumber(invoice.amountToman)} تومان
         </p>
         <p className="text-xs text-muted-foreground">
-          برای مشاهده برنامه، هزینه را با مربی خود تسویه کنید.
+          برای مشاهده {subject}، هزینه را با مربی خود تسویه کنید.
         </p>
         <p className="text-xs text-muted-foreground">
           شماره فاکتور: {toPersianDigits(invoice.number)}
