@@ -21,7 +21,7 @@ export function AdminMobileSidebar() {
         <Menu />
         <span className="sr-only">باز کردن منو</span>
       </Button>
-      <SheetContent side="right" className="w-72 p-0">
+      <SheetContent side="right" className="h-dvh w-72 gap-0 bg-sidebar p-0">
         <SheetTitle className="sr-only">منوی پنل مدیریت</SheetTitle>
         <AdminSidebarContent onNavigate={() => setOpen(false)} />
       </SheetContent>

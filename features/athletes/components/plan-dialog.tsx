@@ -235,7 +235,9 @@ export function PlanDialog({
 
       <DialogContent
         className={cn(
-          builderMode === "structured" && "sm:max-w-2xl",
+          // Wide enough to write comfortably: near full-bleed on phones,
+          // roomy on tablets and laptops.
+          "w-[calc(100%-1rem)] sm:max-w-3xl lg:max-w-4xl",
           // The meal cards need the width more than the gutter on a phone.
           kind === "nutrition" && builderMode === "structured" && "p-4 sm:p-6"
         )}
