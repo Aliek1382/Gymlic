@@ -16,4 +16,5 @@ export const INVOICE_ITEM_LABEL: Record<InvoiceItemType, string> = {
   workout_plan: "تمرینی",
   nutrition_plan: "غذایی",
   session_package: "پکیج جلسه",
+  questionnaire: "پرسشنامه",
 };
