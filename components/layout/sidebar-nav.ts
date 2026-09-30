@@ -15,6 +15,7 @@ import {
   Ruler,
   Salad,
   Settings,
+  Ticket,
   User,
   UserCircle,
   Users,
@@ -52,6 +53,12 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
       icon: MessageCircle,
       description:
         "گفتگوی مستقیم با هر ورزشکار درباره برنامه‌هایی که برایش نوشته‌اید.",
+    },
+    {
+      label: "تیکت‌ها",
+      href: "/tickets",
+      icon: Ticket,
+      description: "درخواست‌های رسمی ورزشکاران را با شمارهٔ پیگیری ببینید و وضعیتشان را مدیریت کنید.",
     },
     {
       label: "قالب‌ها",
@@ -100,6 +107,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "برنامه غذایی", href: "/nutrition", icon: Apple },
     { label: "جلسات خصوصی", href: "/session-packages", icon: CalendarCheck },
     { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
+    { label: "تیکت‌ها", href: "/tickets", icon: Ticket },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "پروفایل", href: "/profile", icon: UserCircle },
