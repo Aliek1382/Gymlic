@@ -1,6 +1,7 @@
 "use client";
 
 import { RoleGate } from "@/features/authentication/components/role-gate";
+import { MySupplementPlans } from "@/features/supplements";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { MyPlanList } from "./my-plan-list";
 
@@ -45,6 +46,8 @@ export function MyPlanPage({ kind }: { kind: "workout" | "nutrition" }) {
             trainerAvatarUrl={context.trainerAvatarUrl}
           />
         )}
+
+        {kind === "nutrition" && <MySupplementPlans />}
       </div>
     </RoleGate>
   );
