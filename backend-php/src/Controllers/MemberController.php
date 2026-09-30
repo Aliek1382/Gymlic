@@ -202,9 +202,20 @@ final class MemberController
             return;
         }
 
-        Database::connection()
-            ->prepare('DELETE FROM memberships WHERE id = :id')
-            ->execute(['id' => $params['id']]);
+        $pdo = Database::connection();
+        $pdo->prepare('DELETE FROM memberships WHERE id = :id')->execute(['id' => $params['id']]);
+
+        $club = $pdo->prepare('SELECT name FROM clubs WHERE id = :id');
+        $club->execute(['id' => $membership['club_id']]);
+        AuthController::notify(
+            $pdo,
+            $membership['user_id'],
+            $user['id'],
+            'membership_removed',
+            'پایان عضویت',
+            'عضویت شما در باشگاه «' . ($club->fetchColumn() ?: 'باشگاه') . '» پایان یافت.',
+            '/dashboard'
+        );
 
         Response::ok(['ok' => true]);
     }

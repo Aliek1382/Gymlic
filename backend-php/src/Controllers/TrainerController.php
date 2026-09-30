@@ -140,6 +140,18 @@ final class TrainerController
         $pdo->prepare('DELETE FROM memberships WHERE id = :id')->execute(['id' => $params['id']]);
         $pdo->commit();
 
+        $club = $pdo->prepare('SELECT name FROM clubs WHERE id = :id');
+        $club->execute(['id' => $membership['club_id']]);
+        AuthController::notify(
+            $pdo,
+            $membership['user_id'],
+            $user['id'],
+            'membership_removed',
+            'پایان همکاری',
+            'همکاری شما با باشگاه «' . ($club->fetchColumn() ?: 'باشگاه') . '» پایان یافت.',
+            '/dashboard'
+        );
+
         Response::ok(['ok' => true]);
     }
 }
