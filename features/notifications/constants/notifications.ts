@@ -8,6 +8,7 @@ import {
   Pill,
   Ruler,
   Sparkles,
+  Ticket,
   UserPlus,
   Users,
   type LucideIcon,
@@ -31,4 +32,5 @@ export const NOTIFICATION_ICON: Record<NotificationType, LucideIcon> = {
   // Written by plan_comments' trigger until 0036; historical rows only.
   plan_comment: MessageSquare,
   message: MessageCircle,
+  ticket: Ticket,
 };

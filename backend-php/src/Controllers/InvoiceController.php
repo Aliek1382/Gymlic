@@ -13,11 +13,13 @@ use Gymlic\Validate;
 
 /**
  * A trainer's bill to one athlete for one plan (workout_assignments /
- * nutrition_assignments) or one session package (session_packages). item_id is
+ * nutrition_assignments), one session package (session_packages) or one
+ * questionnaire sent to them (questionnaire_responses). item_id is
  * polymorphic across those tables, so there is no FK on it — ownership is
- * checked here instead. A pending invoice locks a plan's content for the
- * athlete (see PlanController); settling a session_package invoice activates
- * the package (see SessionPackageController::activate).
+ * checked here instead. A pending invoice locks a plan's or questionnaire's
+ * content for the athlete (see PlanController, QuestionnaireController);
+ * settling a session_package invoice activates the package (see
+ * SessionPackageController::activate).
  *
  * Not to be confused with payment_requests (an athlete paying their club),
  * revenue_entries (the club's manual ledger) or plans (Gymlic's own pricing).
@@ -189,16 +191,17 @@ final class InvoiceController
             throw $e;
         }
 
-        $isPackage = $invoice['item_type'] === 'session_package';
         AuthController::notify(
             $pdo,
             $invoice['athlete_id'],
             $user['id'],
             'invoice_paid',
             'پرداخت شما تایید شد',
-            $isPackage
-                ? 'پرداخت شما ثبت شد و پکیج جلسات خصوصی شما فعال است.'
-                : 'پرداخت شما ثبت شد و برنامه اکنون برای شما باز است.',
+            match ($invoice['item_type']) {
+                'session_package' => 'پرداخت شما ثبت شد و پکیج جلسات خصوصی شما فعال است.',
+                'questionnaire'   => 'پرداخت شما ثبت شد و اکنون می‌توانید به پرسشنامه پاسخ دهید.',
+                default           => 'پرداخت شما ثبت شد و برنامه اکنون برای شما باز است.',
+            },
             self::linkFor($invoice['item_type']),
             ['invoice_id' => $invoice['id']]
         );
@@ -319,6 +322,7 @@ final class InvoiceController
         return match ($itemType) {
             'nutrition_plan'  => '/nutrition',
             'session_package' => '/session-packages',
+            'questionnaire'   => '/questionnaires',
             default           => '/workout',
         };
     }
@@ -326,13 +330,15 @@ final class InvoiceController
     private static function listSql(): string
     {
         return 'SELECT ' . self::SELECT . ",
-                       COALESCE(wa.title, na.title, sp.title) AS item_title,
+                       COALESCE(wa.title, na.title, sp.title, qn.title) AS item_title,
                        ap.first_name AS athlete_first_name, ap.last_name AS athlete_last_name
                 FROM invoices i
                 JOIN profiles ap ON ap.id = i.athlete_id
                 LEFT JOIN workout_assignments wa ON i.item_type = 'workout_plan' AND wa.id = i.item_id
                 LEFT JOIN nutrition_assignments na ON i.item_type = 'nutrition_plan' AND na.id = i.item_id
-                LEFT JOIN session_packages sp ON i.item_type = 'session_package' AND sp.id = i.item_id";
+                LEFT JOIN session_packages sp ON i.item_type = 'session_package' AND sp.id = i.item_id
+                LEFT JOIN questionnaire_responses qr ON i.item_type = 'questionnaire' AND qr.id = i.item_id
+                LEFT JOIN questionnaires qn ON qn.id = qr.questionnaire_id";
     }
 
     private static function present(array $rows): array

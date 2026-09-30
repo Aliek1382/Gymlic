@@ -563,15 +563,17 @@ CREATE TABLE trainer_payments (
 -- invoices: a trainer's bill to one athlete for one plan. A pending invoice
 -- locks that plan's content for the athlete until the trainer records the
 -- payment. item_id is polymorphic (workout_assignments.id,
--- nutrition_assignments.id or session_packages.id), so it carries no FK.
+-- nutrition_assignments.id, session_packages.id or questionnaire_responses.id),
+-- so it carries no FK.
 -- =========================================================================
 CREATE TABLE invoices (
   id             CHAR(36) NOT NULL PRIMARY KEY,
   trainer_id     CHAR(36) NOT NULL,
   athlete_id     CHAR(36) NOT NULL,
-  item_type      ENUM('workout_plan','nutrition_plan','session_package') NOT NULL,
-  item_id        CHAR(36) NOT NULL,   -- workout_assignments.id, nutrition_assignments.id or
-                                      -- session_packages.id (polymorphic, so no real FK)
+  item_type      ENUM('workout_plan','nutrition_plan','session_package','questionnaire') NOT NULL,
+  item_id        CHAR(36) NOT NULL,   -- workout_assignments.id, nutrition_assignments.id,
+                                      -- session_packages.id or questionnaire_responses.id
+                                      -- (polymorphic, so no real FK)
   amount_toman   BIGINT NOT NULL,
   status         ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
   payment_method ENUM('cash','card_transfer','online') NULL,
@@ -744,6 +746,60 @@ CREATE TABLE supplement_plan_items (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
+-- Questionnaire builder: a trainer's own custom form (free text / multiple
+-- choice / number questions) sent to athletes, optionally priced through an
+-- invoice (item_type 'questionnaire', item_id = questionnaire_responses.id).
+-- Unrelated to measurements (the fixed body-assessment table).
+-- =========================================================================
+CREATE TABLE questionnaires (
+  id           CHAR(36) NOT NULL PRIMARY KEY,
+  coach_id     CHAR(36) NOT NULL,
+  title        VARCHAR(255) NOT NULL,
+  description  TEXT NULL,
+  price_toman  BIGINT NULL,     -- NULL = رایگان
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_q_coach (coach_id, created_at DESC),
+  CONSTRAINT fk_q_coach FOREIGN KEY (coach_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE questionnaire_questions (
+  id               CHAR(36) NOT NULL PRIMARY KEY,
+  questionnaire_id CHAR(36) NOT NULL,
+  type             ENUM('text','multiple_choice','number') NOT NULL,
+  label            VARCHAR(500) NOT NULL,
+  options          JSON NULL,     -- فقط برای multiple_choice: آرایهٔ رشته‌ها
+  is_required      TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order       INT NOT NULL DEFAULT 0,
+  KEY idx_qq_questionnaire (questionnaire_id, sort_order),
+  CONSTRAINT fk_qq_questionnaire FOREIGN KEY (questionnaire_id) REFERENCES questionnaires(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE questionnaire_responses (
+  id               CHAR(36) NOT NULL PRIMARY KEY,
+  questionnaire_id CHAR(36) NOT NULL,
+  athlete_id       CHAR(36) NOT NULL,
+  status           ENUM('assigned','submitted') NOT NULL DEFAULT 'assigned',
+  submitted_at     DATETIME NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_qr_questionnaire_athlete (questionnaire_id, athlete_id),
+  KEY idx_qr_athlete (athlete_id, status),
+  CONSTRAINT fk_qr_questionnaire FOREIGN KEY (questionnaire_id) REFERENCES questionnaires(id) ON DELETE CASCADE,
+  CONSTRAINT fk_qr_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE questionnaire_answers (
+  id          CHAR(36) NOT NULL PRIMARY KEY,
+  response_id CHAR(36) NOT NULL,
+  question_id CHAR(36) NOT NULL,
+  value       TEXT NULL,   -- متن/عدد به‌صورت رشته، یا برای multiple_choice همان گزینهٔ انتخابی
+  UNIQUE KEY uq_qa_response_question (response_id, question_id),
+  CONSTRAINT fk_qa_response FOREIGN KEY (response_id) REFERENCES questionnaire_responses(id) ON DELETE CASCADE,
+  CONSTRAINT fk_qa_question FOREIGN KEY (question_id) REFERENCES questionnaire_questions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
 -- sessions (new: replaces Supabase's client-managed JWT with a server-side session)
 -- =========================================================================
 CREATE TABLE sessions (
@@ -759,3 +815,37 @@ CREATE TABLE sessions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- =========================================================================
+-- Tickets: formal athlete -> trainer requests (separate from `messages`).
+-- AUTO_INCREMENT=1000 only makes the first tracking numbers look 4-digit.
+-- =========================================================================
+
+CREATE TABLE tickets (
+  id             CHAR(36) NOT NULL PRIMARY KEY,
+  ticket_number  BIGINT NOT NULL AUTO_INCREMENT,
+  trainer_id     CHAR(36) NOT NULL,
+  athlete_id     CHAR(36) NOT NULL,
+  category       ENUM('plan','nutrition','injury','other') NOT NULL DEFAULT 'other',
+  subject        VARCHAR(255) NOT NULL,
+  status         ENUM('open','in_progress','closed') NOT NULL DEFAULT 'open',
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  closed_at      DATETIME NULL,
+  UNIQUE KEY uq_tickets_number (ticket_number),
+  KEY idx_tickets_trainer (trainer_id, status, updated_at DESC),
+  KEY idx_tickets_athlete (athlete_id, status),
+  CONSTRAINT fk_tickets_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tickets_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1000;
+
+CREATE TABLE ticket_messages (
+  id         CHAR(36) NOT NULL PRIMARY KEY,
+  ticket_id  CHAR(36) NOT NULL,
+  sender_id  CHAR(36) NOT NULL,
+  body       VARCHAR(2000) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_tm_ticket (ticket_id, created_at),
+  CONSTRAINT fk_tm_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tm_sender FOREIGN KEY (sender_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -34,7 +34,8 @@ export type NotificationType =
   // Written by plan_comments' trigger until 0036; kept so historical rows
   // still render with an icon.
   | "plan_comment"
-  | "message";
+  | "message"
+  | "ticket";
 
 type TableOf<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
