@@ -42,7 +42,10 @@ export function DashboardShell({
             home indicator reserves, instead of being overlapped by it. */}
         <main className="flex-1 px-4 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
           <InstallAppPrompt />
-          {children}
+          {/* Next hands a page down as an array of segment elements. Listed
+              beside a sibling, React checks that array for keys in dev and
+              blames this component; a fragment makes it one child instead. */}
+          <>{children}</>
         </main>
       </div>
     </div>

@@ -13,9 +13,15 @@ export function formatMacro(value: number): string {
   return toPersianDigits(String(rounded)).replace(".", "٫");
 }
 
-/** "۲۰۶ کالری" — the short label shown next to a food's name while picking. */
-export function formatFoodCalories(food: FoodMacros): string | null {
-  return food.caloriesPerUnit === null
-    ? null
-    : `${formatMacro(food.caloriesPerUnit)} کالری`;
+/**
+ * The short label shown next to a food's name while picking: "۲۰۶ کالری / عدد".
+ * A food counted per gram would read "۱٫۷ کالری / گرم", which nobody can size a
+ * portion from, so it is shown per 100 g instead: "۱۶۵ کالری / ۱۰۰ گرم".
+ */
+export function formatFoodCalories(food: FoodMacros & { defaultUnit: string }): string | null {
+  if (food.caloriesPerUnit === null) return null;
+  if (food.defaultUnit === "گرم") {
+    return `${formatMacro(food.caloriesPerUnit * 100)} کالری / ${toPersianDigits(100)} گرم`;
+  }
+  return `${formatMacro(food.caloriesPerUnit)} کالری / ${food.defaultUnit}`;
 }
