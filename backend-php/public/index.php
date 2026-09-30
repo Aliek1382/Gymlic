@@ -25,6 +25,7 @@ use Gymlic\Controllers\ClubController;
 use Gymlic\Controllers\LibraryController;
 use Gymlic\Controllers\MemberController;
 use Gymlic\Controllers\MessageController;
+use Gymlic\Controllers\TicketController;
 use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\NutritionPlanBuilderController;
 use Gymlic\Controllers\PlanController;
@@ -224,6 +225,14 @@ $router->post('/messages/conversation/{id}/read', fn (array $p) => MessageContro
 $router->post('/messages', fn () => MessageController::send());
 $router->get('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::planComments($p));
 $router->post('/plans/{kind}/{id}/comments', fn (array $p) => MessageController::addPlanComment($p));
+
+$router->get('/tickets/mine', fn () => TicketController::listMine());
+$router->get('/tickets/trainers', fn () => TicketController::trainers());
+$router->get('/tickets', fn () => TicketController::listForTrainer());
+$router->post('/tickets', fn () => TicketController::create());
+$router->get('/tickets/{id}', fn (array $p) => TicketController::get($p));
+$router->post('/tickets/{id}/messages', fn (array $p) => TicketController::addMessage($p));
+$router->patch('/tickets/{id}/status', fn (array $p) => TicketController::setStatus($p));
 
 $router->get('/profiles/{id}', fn (array $p) => ProfileController::get($p));
 $router->patch('/me/profile', fn () => ProfileController::updateProfile());

@@ -703,3 +703,37 @@ CREATE TABLE sessions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- =========================================================================
+-- Tickets: formal athlete -> trainer requests (separate from `messages`).
+-- AUTO_INCREMENT=1000 only makes the first tracking numbers look 4-digit.
+-- =========================================================================
+
+CREATE TABLE tickets (
+  id             CHAR(36) NOT NULL PRIMARY KEY,
+  ticket_number  BIGINT NOT NULL AUTO_INCREMENT,
+  trainer_id     CHAR(36) NOT NULL,
+  athlete_id     CHAR(36) NOT NULL,
+  category       ENUM('plan','nutrition','injury','other') NOT NULL DEFAULT 'other',
+  subject        VARCHAR(255) NOT NULL,
+  status         ENUM('open','in_progress','closed') NOT NULL DEFAULT 'open',
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  closed_at      DATETIME NULL,
+  UNIQUE KEY uq_tickets_number (ticket_number),
+  KEY idx_tickets_trainer (trainer_id, status, updated_at DESC),
+  KEY idx_tickets_athlete (athlete_id, status),
+  CONSTRAINT fk_tickets_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tickets_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1000;
+
+CREATE TABLE ticket_messages (
+  id         CHAR(36) NOT NULL PRIMARY KEY,
+  ticket_id  CHAR(36) NOT NULL,
+  sender_id  CHAR(36) NOT NULL,
+  body       VARCHAR(2000) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_tm_ticket (ticket_id, created_at),
+  CONSTRAINT fk_tm_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tm_sender FOREIGN KEY (sender_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
