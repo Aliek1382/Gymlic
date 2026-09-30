@@ -85,3 +85,16 @@ answers 404):
 
 Use the same `php` binary the site runs on (in cPanel: Cron Jobs → the path
 shown there for PHP 8.1). The script prints how many reminders it sent.
+
+### Supplement reminders
+
+`cron/calendar-reminders.php` also sends the supplement plans' reminders
+(`SupplementController::sendDueReminders()`), so the same 5-minute cron entry
+covers them and nothing new has to be added in cPanel. Each plan item reminds
+once a day within 30 minutes after its time, at: breakfast 08:00, lunch 13:00,
+dinner 20:00, before sleep 22:30 (Asia/Tehran), or its `custom_time`.
+`before_workout` / `after_workout` items remind only if a `custom_time` is set.
+
+`cron/supplement-reminders.php` runs just that part, for testing on a dev
+machine: `php cron/supplement-reminders.php`. Running it again the same day
+sends nothing new (`supplement_plan_items.last_reminded_on`).

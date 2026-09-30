@@ -132,3 +132,95 @@ INSERT INTO foods (id, name, name_en, category, default_unit) VALUES
   (UUID(), 'چای سبز', 'Green Tea', 'نوشیدنی‌ها', 'لیوان'),
   (UUID(), 'قهوه تلخ', 'Black Coffee', 'نوشیدنی‌ها', 'فنجان'),
   (UUID(), 'آب‌میوه طبیعی', 'Fresh Fruit Juice', 'نوشیدنی‌ها', 'لیوان');
+
+-- Supplements (shared library)
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'پودر پروتئین وی', 'Whey Protein', 'پروتئین سریع‌جذب؛ معمولاً بعد از تمرین یا بین وعده‌ها مصرف می‌شود.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Whey Protein' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'کازئین', 'Casein Protein', 'پروتئین کندجذب؛ معمولاً قبل از خواب مصرف می‌شود.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Casein Protein' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'گینر', 'Mass Gainer', 'مکمل پرکالری برای افزایش وزن؛ مقدار مصرف به کالری موردنیاز فرد بستگی دارد.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Mass Gainer' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'کراتین مونوهیدرات', 'Creatine Monohydrate', 'پرمصرف‌ترین مکمل قدرتی؛ معمولاً روزانه ۳ تا ۵ گرم.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Creatine Monohydrate' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'بی‌سی‌ای‌ای', 'BCAA', 'آمینواسیدهای شاخه‌دار؛ معمولاً حین یا اطراف تمرین.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'BCAA' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'آمینو اسید ضروری', 'EAA', 'مجموعه آمینواسیدهای ضروری؛ معمولاً حین یا اطراف تمرین.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'EAA' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'گلوتامین', 'Glutamine', 'آمینواسید کمکی برای ریکاوری؛ معمولاً بعد از تمرین یا قبل از خواب.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Glutamine' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'پیش‌تمرین', 'Pre-Workout', 'مکمل افزایش انرژی و تمرکز؛ معمولاً ۲۰ تا ۳۰ دقیقه قبل از تمرین. به کافئین آن دقت کنید.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Pre-Workout' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'کافئین', 'Caffeine', 'محرک افزایش هوشیاری و عملکرد؛ معمولاً قبل از تمرین، نه نزدیک خواب.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Caffeine' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'بتا آلانین', 'Beta-Alanine', 'برای تحمل تمرین‌های پرتکرار؛ ممکن است گزگز موقت ایجاد کند.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Beta-Alanine' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'سیترولین مالات', 'Citrulline Malate', 'مکمل پمپ و استقامت؛ معمولاً قبل از تمرین.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Citrulline Malate' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'ال‌کارنیتین', 'L-Carnitine', 'مکمل مرتبط با متابولیسم چربی؛ معمولاً قبل از تمرین.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'L-Carnitine' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'امگا ۳ (روغن ماهی)', 'Omega-3 Fish Oil', 'اسیدهای چرب ضروری؛ معمولاً همراه غذا.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Omega-3 Fish Oil' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'مولتی‌ویتامین', 'Multivitamin', 'مجموعه ویتامین‌ها و مواد معدنی؛ معمولاً همراه صبحانه.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Multivitamin' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'ویتامین دی ۳', 'Vitamin D3', 'ویتامین محلول در چربی؛ معمولاً همراه یک وعدهٔ چرب.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Vitamin D3' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'ویتامین ث', 'Vitamin C', 'ویتامین آنتی‌اکسیدان؛ معمولاً همراه غذا.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Vitamin C' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'ویتامین ب ۱۲', 'Vitamin B12', 'ویتامین گروه ب؛ مصرف‌کنندگان رژیم گیاهی بیشتر به آن نیاز دارند.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Vitamin B12' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'منیزیم', 'Magnesium', 'ماده معدنی مرتبط با ریکاوری و خواب؛ معمولاً شب.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Magnesium' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'زینک', 'Zinc', 'ماده معدنی کم‌مقدار؛ معمولاً همراه غذا.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Zinc' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'زد‌ام‌آ', 'ZMA', 'ترکیب زینک، منیزیم و ویتامین ب ۶؛ معمولاً قبل از خواب و با معده خالی.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'ZMA' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'کلسیم', 'Calcium', 'ماده معدنی استخوان‌ساز؛ معمولاً همراه غذا.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Calcium' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'آهن', 'Iron', 'فقط با تشخیص مربی یا پزشک؛ مقدار زیاد آن مضر است.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Iron' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'کلاژن', 'Collagen', 'پروتئین مفصل و بافت همبند؛ معمولاً یک بار در روز.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Collagen' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'گلوکوزامین', 'Glucosamine', 'مکمل حمایت از مفاصل؛ معمولاً همراه غذا.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Glucosamine' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'الکترولیت', 'Electrolytes', 'املاح جبران‌کنندهٔ تعریق؛ معمولاً حین تمرین طولانی یا هوای گرم.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Electrolytes' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'اشواگاندا', 'Ashwagandha', 'گیاه تطبیق‌دهندهٔ استرس؛ معمولاً یک بار در روز.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Ashwagandha' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'ملاتونین', 'Melatonin', 'هورمون خواب؛ فقط با تشخیص مربی یا پزشک و قبل از خواب.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Melatonin' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'پروبیوتیک', 'Probiotic', 'باکتری‌های مفید گوارشی؛ معمولاً ناشتا یا همراه صبحانه.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Probiotic' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'اچ‌ام‌بی', 'HMB', 'مکمل کاهش تخریب عضلانی؛ معمولاً سه وعده در روز.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'HMB' AND created_by IS NULL);
+INSERT INTO supplements (id, name, name_en, description, created_by)
+SELECT UUID(), 'پروتئین بار', 'Protein Bar', 'میان‌وعدهٔ پرپروتئین؛ مقدار کالری برندها متفاوت است.', NULL FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM supplements WHERE name_en = 'Protein Bar' AND created_by IS NULL);

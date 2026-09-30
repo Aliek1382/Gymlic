@@ -11,7 +11,7 @@ use Gymlic\Uuid;
 use Gymlic\Validate;
 
 /**
- * The exercise and food libraries are the same table shape twice over: shared
+ * The exercise, food and supplement libraries are the same table shape three times over: shared
  * presets (created_by IS NULL) plus each trainer's own additions, with a
  * per-trainer usage counter driving the picker's "most used" order.
  */
@@ -29,6 +29,13 @@ final class LibraryController
             'usage_table' => 'food_usage',
             'usage_key'   => 'food_id',
             'extra'       => 'category, default_unit, calories_per_unit, protein_g, carbs_g, fat_g',
+        ],
+        // list() already selects description, so only image_url is extra here.
+        'supplements' => [
+            'table'       => 'supplements',
+            'usage_table' => 'supplement_usage',
+            'usage_key'   => 'supplement_id',
+            'extra'       => 'image_url',
         ],
     ];
 
@@ -98,7 +105,11 @@ final class LibraryController
         $kindName = $params['kind'];
         $kind = self::kind($kindName);
 
-        $required = $kindName === 'exercises' ? ['name', 'muscle_group'] : ['name', 'category', 'default_unit'];
+        $required = match ($kindName) {
+            'exercises'   => ['name', 'muscle_group'],
+            'supplements' => ['name'],
+            default       => ['name', 'category', 'default_unit'],
+        };
         $data = Validate::required(Validate::body(), $required);
 
         $id = Uuid::v4();
@@ -114,6 +125,17 @@ final class LibraryController
                 'description'  => Validate::nullableString($data['description'] ?? null),
                 'muscle_group' => (string) $data['muscle_group'],
                 'created_by'   => $user['id'],
+            ]);
+        } elseif ($kindName === 'supplements') {
+            Database::connection()->prepare(
+                'INSERT INTO supplements (id, name, name_en, description, created_by)
+                 VALUES (:id, :name, :name_en, :description, :created_by)'
+            )->execute([
+                'id'          => $id,
+                'name'        => (string) $data['name'],
+                'name_en'     => Validate::nullableString($data['name_en'] ?? null),
+                'description' => Validate::nullableString($data['description'] ?? null),
+                'created_by'  => $user['id'],
             ]);
         } else {
             // Macros are per one default_unit and all optional: NULL means "not

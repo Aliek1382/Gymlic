@@ -29,6 +29,7 @@ use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\NutritionPlanBuilderController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\SessionPackageController;
+use Gymlic\Controllers\SupplementController;
 use Gymlic\Controllers\TechniqueController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
@@ -125,6 +126,12 @@ $router->get('/session-packages', fn () => SessionPackageController::list());
 $router->get('/session-packages/mine', fn () => SessionPackageController::listMine());
 $router->get('/session-packages/{id}/sessions', fn (array $p) => SessionPackageController::listSessions($p));
 $router->patch('/session-packages/{id}/sessions/{sessionId}', fn (array $p) => SessionPackageController::updateSession($p));
+
+$router->post('/supplement-plans', fn () => SupplementController::create());
+$router->get('/supplement-plans', fn () => SupplementController::list());
+$router->get('/supplement-plans/mine', fn () => SupplementController::listMine());
+$router->patch('/supplement-plans/{id}', fn (array $p) => SupplementController::update($p));
+$router->delete('/supplement-plans/{id}', fn (array $p) => SupplementController::delete($p));
 
 $router->get('/push/public-key', fn () => PushController::publicKey());
 $router->post('/push/subscriptions', fn () => PushController::subscribe());

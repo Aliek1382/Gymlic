@@ -688,6 +688,62 @@ CREATE TABLE push_vapid_keys (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
+-- supplements / supplement_usage / supplement_assignments / supplement_plan_items
+-- =========================================================================
+CREATE TABLE supplements (
+  id          CHAR(36) NOT NULL PRIMARY KEY,
+  name        VARCHAR(255) NOT NULL,
+  name_en     VARCHAR(255) NULL,
+  description TEXT NULL,
+  image_url   VARCHAR(1024) NULL,
+  created_by  CHAR(36) NULL,   -- NULL = بانک عمومی، پر = اختصاصی همان مربی (دقیقاً مثل exercises/foods)
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_supplements_creator (created_by),
+  CONSTRAINT fk_supplements_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE supplement_usage (
+  id            CHAR(36) NOT NULL PRIMARY KEY,
+  trainer_id    CHAR(36) NOT NULL,
+  supplement_id CHAR(36) NOT NULL,
+  use_count     INT NOT NULL DEFAULT 0,
+  last_used_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_supplement_usage (trainer_id, supplement_id),
+  CONSTRAINT fk_supplement_usage_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_supplement_usage_supplement FOREIGN KEY (supplement_id) REFERENCES supplements(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE supplement_assignments (
+  id          CHAR(36) NOT NULL PRIMARY KEY,
+  trainer_id  CHAR(36) NOT NULL,
+  athlete_id  CHAR(36) NOT NULL,
+  title       VARCHAR(255) NOT NULL,
+  status      ENUM('active','completed','cancelled') NOT NULL DEFAULT 'active',
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_sa_trainer (trainer_id),
+  KEY idx_sa_athlete (athlete_id, status),
+  CONSTRAINT fk_sa_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sa_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE supplement_plan_items (
+  id               CHAR(36) NOT NULL PRIMARY KEY,
+  assignment_id    CHAR(36) NOT NULL,
+  supplement_id    CHAR(36) NOT NULL,
+  dose             VARCHAR(100) NOT NULL,     -- متن آزاد، مثل "۵ گرم" یا "۲ کپسول"
+  timing           ENUM('before_workout','after_workout','breakfast','lunch','dinner','before_sleep','custom') NOT NULL,
+  custom_time      TIME NULL,   -- ساعت یادآوری: اجباری برای custom، اختیاری برای before/after_workout
+  note             VARCHAR(255) NULL,
+  sort_order       INT NOT NULL DEFAULT 0,
+  last_reminded_on DATE NULL,   -- برای این‌که کرون همان روز دوباره یادآوری تکراری نسازد
+  KEY idx_spi_assignment (assignment_id, sort_order),
+  KEY idx_spi_supplement (supplement_id),
+  CONSTRAINT fk_spi_assignment FOREIGN KEY (assignment_id) REFERENCES supplement_assignments(id) ON DELETE CASCADE,
+  CONSTRAINT fk_spi_supplement FOREIGN KEY (supplement_id) REFERENCES supplements(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
 -- sessions (new: replaces Supabase's client-managed JWT with a server-side session)
 -- =========================================================================
 CREATE TABLE sessions (
