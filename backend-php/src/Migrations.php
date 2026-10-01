@@ -22,6 +22,7 @@ final class Migrations
     /**
      * check: every condition must hold for the change to count as applied.
      *   ['table', name] | ['column', table, column] | ['scale', table, column, decimals]
+     *   | ['preset', table, name_en] (a shared-library row with that English name exists)
      *
      * @var list<array{id: string, file: string, title: string, check: list<array>}>
      */
@@ -153,6 +154,19 @@ final class Migrations
                 ['column', 'questionnaires', 'is_public'],
                 ['column', 'exercises', 'image_url'],
                 ['column', 'exercises', 'video_url'],
+            ],
+        ],
+        [
+            'id'    => 'library-extra',
+            'file'  => 'library-extra-update.sql',
+            'title' => '۵۰ حرکت، ۵۰ غذا و ۲۰ مکمل جدید در بانک عمومی',
+            'check' => [
+                ['preset', 'exercises', 'Decline Barbell Bench Press'],
+                ['preset', 'exercises', 'Power Clean'],
+                ['preset', 'foods', 'Cooked Lean Ground Beef'],
+                ['preset', 'foods', 'Air-Popped Popcorn'],
+                ['preset', 'supplements', 'Whey Isolate'],
+                ['preset', 'supplements', 'Rhodiola Rosea'],
             ],
         ],
     ];
@@ -306,6 +320,7 @@ final class Migrations
                 'table'  => self::tableExists($pdo, $check[1]),
                 'column' => self::columnInfo($pdo, $check[1], $check[2]) !== null,
                 'scale'  => (int) (self::columnInfo($pdo, $check[1], $check[2])['NUMERIC_SCALE'] ?? -1) === $check[3],
+                'preset' => self::presetExists($pdo, $check[1], $check[2]),
                 default  => false,
             };
             if (!$ok) {
@@ -321,6 +336,14 @@ final class Migrations
             'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t'
         );
         $stmt->execute(['t' => $table]);
+        return $stmt->fetch() !== false;
+    }
+
+    /** $table comes from LIST, never from a request. */
+    private static function presetExists(PDO $pdo, string $table, string $nameEn): bool
+    {
+        $stmt = $pdo->prepare("SELECT 1 FROM {$table} WHERE name_en = :n AND created_by IS NULL LIMIT 1");
+        $stmt->execute(['n' => $nameEn]);
         return $stmt->fetch() !== false;
     }
 
