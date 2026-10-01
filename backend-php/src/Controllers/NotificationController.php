@@ -82,7 +82,7 @@ final class NotificationController
     /** create_broadcast_notification (0021/0024): every profile, or every active member of the given clubs. */
     public static function broadcast(): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('notifications');
         $data = Validate::required(Validate::body(), ['title']);
         $clubIds = $data['club_ids'] ?? null;
 

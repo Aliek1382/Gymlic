@@ -19,7 +19,7 @@ final class Settings
     public const ROLES = ['club', 'trainer', 'athlete'];
 
     public const KEYS = [
-        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail',
+        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security',
     ];
 
     /** The groups any visitor may read; everything else is admin-only. */
@@ -158,6 +158,13 @@ final class Settings
                 'message_max_chars' => self::int($v['message_max_chars'] ?? null, self::MESSAGE_MAX_CHARS, 50, self::MESSAGE_MAX_CHARS),
                 'attachments'       => self::switches($v['attachments'] ?? null, self::ATTACHMENT_TYPES),
                 'upload_mb'         => self::uploadMb($v['upload_mb'] ?? null),
+            ],
+            // See Security. admin_2fa is only switched on through its own flow.
+            'security' => [
+                'max_attempts'    => self::int($v['max_attempts'] ?? null, 5, 3, 20),
+                'lock_minutes'    => self::int($v['lock_minutes'] ?? null, 15, 1, 1440),
+                'ip_max_attempts' => self::int($v['ip_max_attempts'] ?? null, 30, 10, 1000),
+                'admin_2fa'       => self::bool($v['admin_2fa'] ?? null, false),
             ],
             // Empty = fall back to config.php (see SmsGateway / MailGateway).
             'sms' => [

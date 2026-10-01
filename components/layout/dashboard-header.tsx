@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OfflineQueueBadge } from "@/components/pwa/offline-queue-badge";
-import { useProfile } from "@/features/authentication/hooks/use-profile";
+import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { NotificationBell } from "@/features/notifications";
 import { SupportMenu } from "@/features/site-settings";
@@ -43,7 +43,8 @@ export function DashboardHeader({
   userId,
 }: DashboardHeaderProps) {
   const signOut = useSignOut();
-  const profile = useProfile();
+  // Any admin, a limited role included, gets the way into /admin.
+  const { data: context } = useAuthContext();
   const pathname = usePathname();
   const initials = fullName.trim().slice(0, 2) || "کا";
   const pageTitle =
@@ -77,7 +78,7 @@ export function DashboardHeader({
               تنظیمات حساب
             </Link>
           </DropdownMenuItem>
-          {profile.data?.isPlatformAdmin && (
+          {context?.admin && (
             <DropdownMenuItem asChild>
               <Link href="/admin">
                 <ShieldCheck />

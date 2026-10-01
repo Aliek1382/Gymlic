@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRound,
+  Laptop,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Search,
   ShieldCheck,
-  ShieldOff,
   UserCog,
   UserRoundX,
   Users,
@@ -58,12 +59,13 @@ import type { AccountType } from "@/types/database.types";
 import { setProfileSuspended } from "../services/admin-service";
 import {
   listAdminUsers,
-  setUserAdmin,
   setUserPassword,
   setUserRole,
   type AdminUserRow,
   type UserFilter,
 } from "../services/admin-users-service";
+import { useAdminCan } from "../hooks/use-admin-access";
+import { AdminAccessDialog, ProfileEditDialog, SessionsDialog } from "./user-account-dialogs";
 
 const FILTERS: { value: UserFilter; label: string }[] = [
   { value: "", label: "همه" },
@@ -83,6 +85,8 @@ function parseDate(value: string): Date {
 }
 
 type Action =
+  | { kind: "edit"; user: AdminUserRow }
+  | { kind: "sessions"; user: AdminUserRow }
   | { kind: "role"; user: AdminUserRow }
   | { kind: "password"; user: AdminUserRow }
   | { kind: "admin"; user: AdminUserRow }
@@ -96,6 +100,9 @@ export function AdminUsersPage() {
   const [q, setQ] = useState("");
   const applySearch = useDebouncedCallback((value: string) => setQ(value.trim()), 350);
   const [action, setAction] = useState<Action | null>(null);
+  const can = useAdminCan();
+  const isSuper = can("super");
+  const canManage = can("users.manage");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin", "users", filter, q],
@@ -112,8 +119,8 @@ export function AdminUsersPage() {
         <h1 className="text-xl font-bold text-foreground">کاربران</h1>
         <p className="text-sm text-muted-foreground">
           همهٔ حساب‌های سایت، از جمله مدیران باشگاه و کسانی که ثبت‌نام کرده‌اند ولی هنوز نقش انتخاب
-          نکرده‌اند. از منوی هر ردیف می‌توانید حساب را مسدود کنید، نقشش را عوض کنید، به او دسترسی
-          مدیریت بدهید یا برایش رمز تازه بگذارید.
+          نکرده‌اند. از منوی هر ردیف: ویرایش پروفایل، دستگاه‌های فعال، تغییر نقش، رمز تازه،
+          مسدودسازی، و (برای مدیر کل) دسترسی مدیریت.
         </p>
       </div>
 
@@ -175,6 +182,9 @@ export function AdminUsersPage() {
                 {rows.map((user) => {
                   const name = fullName(user.first_name, user.last_name);
                   const isMe = user.id === me?.userId;
+                  // An admin's account is the super admin's to change (the API enforces it).
+                  const isAdminAccount = user.is_platform_admin || !!user.admin_role_id;
+                  const mayChange = canManage && (isSuper || !isAdminAccount);
                   return (
                     <TableRow key={user.id} className={user.is_suspended ? "opacity-60" : undefined}>
                       <TableCell>
@@ -190,6 +200,9 @@ export function AdminUsersPage() {
                             </p>
                             <div className="flex flex-wrap gap-1">
                               {user.is_platform_admin && <Badge variant="info">مدیر کل</Badge>}
+                              {!user.is_platform_admin && user.admin_role_name && (
+                                <Badge variant="info">{user.admin_role_name}</Badge>
+                              )}
                               {user.is_suspended && <Badge variant="destructive">مسدود</Badge>}
                             </div>
                           </div>
@@ -213,44 +226,63 @@ export function AdminUsersPage() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {user.last_login_at ? formatRelativeTime(parseDate(user.last_login_at)) : "—"}
+                        {user.session_count > 0 && (
+                          <p className="text-[11px]">روی {formatNumber(user.session_count)} دستگاه</p>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost" aria-label={`عملیات ${name}`}>
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setAction({ kind: "role", user })}>
-                              <UserCog />
-                              تغییر نقش
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={isMe}
-                              onClick={() => setAction({ kind: "password", user })}
-                            >
-                              <KeyRound />
-                              تعیین رمز جدید
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={isMe && user.is_platform_admin}
-                              onClick={() => setAction({ kind: "admin", user })}
-                            >
-                              {user.is_platform_admin ? <ShieldOff /> : <ShieldCheck />}
-                              {user.is_platform_admin ? "برداشتن دسترسی مدیریت" : "دادن دسترسی مدیریت"}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant={user.is_suspended ? "default" : "destructive"}
-                              disabled={isMe}
-                              onClick={() => setAction({ kind: "suspend", user })}
-                            >
-                              <UserRoundX />
-                              {user.is_suspended ? "رفع مسدودی" : "مسدودکردن حساب"}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {(mayChange || (isSuper && !isMe)) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" aria-label={`عملیات ${name}`}>
+                                <MoreHorizontal />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {mayChange && (
+                                <>
+                                  <DropdownMenuItem onClick={() => setAction({ kind: "edit", user })}>
+                                    <Pencil />
+                                    ویرایش پروفایل
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setAction({ kind: "sessions", user })}>
+                                    <Laptop />
+                                    دستگاه‌های فعال
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setAction({ kind: "role", user })}>
+                                    <UserCog />
+                                    تغییر نقش
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={isMe}
+                                    onClick={() => setAction({ kind: "password", user })}
+                                  >
+                                    <KeyRound />
+                                    تعیین رمز جدید
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {isSuper && !isMe && (
+                                <DropdownMenuItem onClick={() => setAction({ kind: "admin", user })}>
+                                  <ShieldCheck />
+                                  دسترسی مدیریت
+                                </DropdownMenuItem>
+                              )}
+                              {mayChange && !isMe && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant={user.is_suspended ? "default" : "destructive"}
+                                    onClick={() => setAction({ kind: "suspend", user })}
+                                  >
+                                    <UserRoundX />
+                                    {user.is_suspended ? "رفع مسدودی" : "مسدودکردن حساب"}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -272,29 +304,9 @@ export function AdminUsersPage() {
         onClose={close}
         onDone={refresh}
       />
-      {action?.kind === "admin" && (
-        <ConfirmDialog
-          open
-          onOpenChange={(open) => !open && close()}
-          title={
-            action.user.is_platform_admin
-              ? `برداشتن دسترسی مدیریت از ${fullName(action.user.first_name, action.user.last_name)}`
-              : `دادن دسترسی مدیریت به ${fullName(action.user.first_name, action.user.last_name)}`
-          }
-          description={
-            action.user.is_platform_admin
-              ? "دیگر به پنل مدیریت دسترسی نخواهد داشت."
-              : "به همهٔ بخش‌های پنل مدیریت، از جمله همین صفحه، تنظیمات سایت و کلیدهای پیامک و ایمیل دسترسی کامل پیدا می‌کند. فقط به کسی بدهید که کاملاً به او اعتماد دارید."
-          }
-          confirmLabel={action.user.is_platform_admin ? "برداشتن دسترسی" : "دادن دسترسی"}
-          errorMessage="تغییر دسترسی با خطا مواجه شد."
-          onConfirm={async () => {
-            await setUserAdmin(action.user.id, !action.user.is_platform_admin);
-            toast.success("دسترسی به‌روزرسانی شد.");
-            refresh();
-          }}
-        />
-      )}
+      <ProfileEditDialog user={action?.kind === "edit" ? action.user : null} onClose={close} onDone={refresh} />
+      <SessionsDialog user={action?.kind === "sessions" ? action.user : null} onClose={close} onDone={refresh} />
+      <AdminAccessDialog user={action?.kind === "admin" ? action.user : null} onClose={close} onDone={refresh} />
       {action?.kind === "suspend" && (
         <ConfirmDialog
           open

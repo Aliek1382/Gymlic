@@ -7,11 +7,18 @@ import { LayoutDashboard, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
+import { useAdminCan } from "@/features/admin/hooks/use-admin-access";
 import { ADMIN_SIDEBAR_GROUPS } from "./admin-sidebar-nav";
 
 export function AdminSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const signOut = useSignOut();
+  const can = useAdminCan();
+  // A limited role sees only its own pages; a group with none left goes too.
+  const groups = ADMIN_SIDEBAR_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => can(item.permission)),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar">
@@ -28,7 +35,7 @@ export function AdminSidebarContent({ onNavigate }: { onNavigate?: () => void })
       </div>
 
       <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-2">
-        {ADMIN_SIDEBAR_GROUPS.map((group, index) => (
+        {groups.map((group, index) => (
           <div key={group.title ?? index} className="space-y-1">
             {group.title && (
               <p className="px-3.5 pb-1 text-[11px] font-semibold text-muted-foreground">

@@ -99,14 +99,42 @@ final class Auth
         return $user;
     }
 
+    /** A super admin (profiles.is_platform_admin) — for what no role can be given. */
     public static function requirePlatformAdmin(): array
     {
+        return self::requireAdmin(AdminAccess::SUPER);
+    }
+
+    /**
+     * Any admin holding at least one of $permissions (AdminAccess keys, or
+     * AdminAccess::SUPER). With none given, any admin at all.
+     *
+     * @param string|string[] $permissions
+     */
+    public static function requireAdmin(string|array $permissions = []): array
+    {
         $user = self::requireUser();
-        if ((int) $user['is_platform_admin'] !== 1) {
+        if (AdminAccess::of($user) === null) {
             Response::error(403, 'forbidden', 'Platform admin only.');
             exit;
         }
-        return $user;
+        $permissions = (array) $permissions;
+        if ($permissions === []) {
+            return $user;
+        }
+        foreach ($permissions as $permission) {
+            if (AdminAccess::can($user, $permission)) {
+                return $user;
+            }
+        }
+        Response::error(
+            403,
+            'permission_denied',
+            in_array(AdminAccess::SUPER, $permissions, true) && count($permissions) === 1
+                ? 'این کار فقط از عهدهٔ مدیر کل برمی‌آید.'
+                : 'نقش مدیریتی شما به این بخش دسترسی ندارد.'
+        );
+        exit;
     }
 
     public static function hashPassword(string $password): string

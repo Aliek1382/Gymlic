@@ -108,6 +108,17 @@ final class Migrations
                 ['column', 'supplements', 'is_hidden'],
             ],
         ],
+        [
+            'id'    => 'security',
+            'file'  => 'security-update.sql',
+            'title' => 'نقش‌های مدیریتی، قفل ورود و ورود دومرحله‌ای (فاز ۵)',
+            'check' => [
+                ['table', 'admin_roles'],
+                ['column', 'profiles', 'admin_role_id'],
+                ['table', 'login_attempts'],
+                ['table', 'login_challenges'],
+            ],
+        ],
     ];
 
     /**

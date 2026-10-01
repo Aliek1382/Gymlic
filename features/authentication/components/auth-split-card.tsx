@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { KeyRound, Loader2, Lock, Mail, User } from "lucide-react";
+import { KeyRound, Loader2, Lock, Mail, MessageSquareText, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { SupportContact, usePublicSettings } from "@/features/site-settings";
-import { useSignInWithPassword } from "../hooks/use-sign-in-with-password";
+import { useSignInWithPassword, useVerifyLoginCode } from "../hooks/use-sign-in-with-password";
+import { resendLoginCode, type TwoFactorChallenge } from "../services/auth-service";
 import { useSignUpWithPassword } from "../hooks/use-sign-up-with-password";
 import {
   loginSchema,
@@ -71,6 +72,7 @@ export function AuthSplitCard() {
 function LoginPanel({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
   const router = useRouter();
   const signIn = useSignInWithPassword();
+  const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -79,12 +81,20 @@ function LoginPanel({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
 
   async function onSubmit(values: LoginFormValues) {
     try {
-      await signIn.mutateAsync(values);
+      const { twoFactor } = await signIn.mutateAsync(values);
+      if (twoFactor) {
+        setChallenge(twoFactor);
+        return;
+      }
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
       toast.error(getErrorMessage(error, "ورود با خطا مواجه شد."));
     }
+  }
+
+  if (challenge) {
+    return <TwoFactorStep challenge={challenge} onBack={() => setChallenge(null)} />;
   }
 
   return (
@@ -158,6 +168,89 @@ function LoginPanel({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
           ثبت‌نام کنید
         </button>
       </p>
+    </div>
+  );
+}
+
+/** The code texted to an admin after a correct password, when two-step login is on. */
+function TwoFactorStep({ challenge, onBack }: { challenge: TwoFactorChallenge; onBack: () => void }) {
+  const router = useRouter();
+  const verify = useVerifyLoginCode();
+  const [code, setCode] = useState("");
+  const [resending, setResending] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!code.trim()) return;
+    try {
+      await verify.mutateAsync({ challengeId: challenge.challengeId, code });
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "کد درست نیست."));
+    }
+  }
+
+  async function resend() {
+    setResending(true);
+    try {
+      await resendLoginCode(challenge.challengeId);
+      toast.success("کد تازه فرستاده شد.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "ارسال دوبارهٔ کد ناموفق بود."));
+    } finally {
+      setResending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-1.5">
+        <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+          <MessageSquareText className="size-5" />
+        </div>
+        <h1 className="text-2xl font-bold text-foreground">کد تأیید</h1>
+        <p className="text-sm text-muted-foreground">
+          ورود مدیران دومرحله‌ای است. کد ۶ رقمی به شمارهٔ{" "}
+          <span dir="ltr" className="font-medium text-foreground">
+            {challenge.phoneHint}
+          </span>{" "}
+          پیامک شد؛ تا {Math.round(challenge.expiresIn / 60).toLocaleString("fa-IR")} دقیقه معتبر است.
+        </p>
+      </div>
+
+      <form onSubmit={submit} className="space-y-5">
+        <Input
+          dir="ltr"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          placeholder="------"
+          className="text-center text-lg tracking-[0.5em]"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          autoFocus
+          aria-label="کد تأیید"
+        />
+        <Button type="submit" size="lg" className="w-full" disabled={verify.isPending || !code.trim()}>
+          {verify.isPending && <Loader2 className="animate-spin" />}
+          ورود
+        </Button>
+      </form>
+
+      <div className="flex items-center justify-between text-sm">
+        <button type="button" onClick={onBack} className="text-muted-foreground hover:underline">
+          بازگشت
+        </button>
+        <button
+          type="button"
+          onClick={resend}
+          disabled={resending}
+          className="font-medium text-primary hover:underline disabled:opacity-60"
+        >
+          {resending ? "در حال ارسال…" : "ارسال دوبارهٔ کد"}
+        </button>
+      </div>
     </div>
   );
 }

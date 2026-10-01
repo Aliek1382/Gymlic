@@ -3,11 +3,14 @@ declare(strict_types=1);
 
 namespace Gymlic\Controllers;
 
+use Gymlic\AdminAccess;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Security;
+use Gymlic\SmsGateway;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use PDO;
@@ -76,7 +79,8 @@ final class AdminController
     public static function listPaymentRequests(): void
     {
         $user = Auth::requireUser();
-        $isAdmin = (int) $user['is_platform_admin'] === 1;
+        // A finance role reviews every club's requests, like a super admin.
+        $isAdmin = AdminAccess::can($user, 'finance');
 
         $sql =
             'SELECT pr.id, pr.club_id, pr.plan_id, pr.amount_toman, pr.reference_note, pr.status,
@@ -109,7 +113,7 @@ final class AdminController
      */
     public static function approvePaymentRequest(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('finance');
         $data = Validate::body();
 
         $pdo = Database::connection();
@@ -206,7 +210,7 @@ final class AdminController
 
     public static function rejectPaymentRequest(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('finance');
         $data = Validate::body();
         $pdo = Database::connection();
 
@@ -249,7 +253,7 @@ final class AdminController
 
     public static function setClubStatus(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('users.manage');
         $data = Validate::required(Validate::body(), ['status']);
         $status = (string) $data['status'];
 
@@ -297,7 +301,7 @@ final class AdminController
 
     public static function setProfileSuspended(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('users.manage');
         $data = Validate::body();
         $suspended = !empty($data['suspended']);
 
@@ -305,6 +309,7 @@ final class AdminController
             Response::error(409, 'self', 'نمی‌توانید حساب خودتان را مسدود کنید.');
             return;
         }
+        Security::targetFor($admin, $params['id']);
 
         $pdo = Database::connection();
         $before = $pdo->prepare('SELECT is_suspended FROM profiles WHERE id = :id');
@@ -348,8 +353,9 @@ final class AdminController
      */
     public static function updateProfile(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('users.manage');
         $data = Validate::body();
+        $target = Security::targetFor($admin, $params['id']);
 
         $fields = [];
         $bind = ['id' => $params['id']];
@@ -357,7 +363,7 @@ final class AdminController
         foreach (['first_name', 'last_name', 'email', 'phone', 'birth_date'] as $key) {
             if (array_key_exists($key, $data)) {
                 $fields[] = "{$key} = :{$key}";
-                $bind[$key] = Validate::nullableString($data[$key] === null ? null : (string) $data[$key]);
+                $bind[$key] = Validate::nullableString($data[$key] === null ? null : trim((string) $data[$key]));
             }
         }
 
@@ -367,6 +373,30 @@ final class AdminController
         }
 
         $pdo = Database::connection();
+
+        if (isset($bind['email'])) {
+            $bind['email'] = strtolower($bind['email']);
+            if (!Validate::email($bind['email'])) {
+                Response::error(400, 'invalid_email', 'ایمیل معتبر نیست.');
+                return;
+            }
+            $taken = $pdo->prepare('SELECT 1 FROM profiles WHERE email = :email AND id <> :id');
+            $taken->execute(['email' => $bind['email'], 'id' => $params['id']]);
+            if ($taken->fetch() !== false) {
+                Response::error(409, 'email_taken', 'این ایمیل برای حساب دیگری ثبت شده است.');
+                return;
+            }
+        } elseif (array_key_exists('email', $bind)) {
+            Response::error(400, 'invalid_email', 'ایمیل نمی‌تواند خالی باشد؛ کاربر با آن وارد می‌شود.');
+            return;
+        }
+
+        // With two-step login on, an admin without a mobile number could no longer sign in.
+        if (array_key_exists('phone', $bind) && AdminAccess::isAdminAccount($target)
+            && Security::settings()['admin_2fa'] && SmsGateway::normalizePhone((string) $bind['phone']) === null) {
+            Response::error(409, 'admin_needs_phone', 'ورود دومرحله‌ای روشن است؛ حساب مدیران باید شمارهٔ موبایل معتبر داشته باشد.');
+            return;
+        }
         $pdo->prepare('UPDATE profiles SET ' . implode(', ', $fields) . ' WHERE id = :id')->execute($bind);
 
         self::logActivity($pdo, null, $admin['id'], $params['id'], 'profile_updated', array_keys($bind));
@@ -376,7 +406,7 @@ final class AdminController
 
     public static function createPlan(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('finance');
         $data = Validate::required(Validate::body(), ['name', 'price_toman', 'duration_days']);
 
         $id = Uuid::v4();
@@ -398,7 +428,7 @@ final class AdminController
 
     public static function updatePlan(array $params): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('finance');
         $data = Validate::body();
 
         $fields = [];
@@ -426,7 +456,7 @@ final class AdminController
     /** The counters and subscription breakdown on the admin landing page. */
     public static function overview(): void
     {
-        Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin();
         $pdo = Database::connection();
 
         $counts = $pdo->query(
@@ -443,12 +473,17 @@ final class AdminController
                  WHERE status = 'approved') AS total_revenue"
         )->fetch();
 
+        // Money is the finance permission's: a role without it gets the counts only.
+        if (!AdminAccess::can($admin, 'finance')) {
+            unset($counts['pending_requests_count'], $counts['total_revenue']);
+        }
+
         Response::ok(Cast::row($counts, [], array_keys($counts)));
     }
 
     public static function listClubs(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('users.view');
 
         $stmt = Database::connection()->query(
             "SELECT c.id, c.name, c.status, c.member_capacity, c.created_at,
@@ -470,7 +505,7 @@ final class AdminController
     /** One club's whole file: the club, its active members, and its payment history. */
     public static function clubDetail(array $params): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('users.view');
         $pdo = Database::connection();
 
         $stmt = $pdo->prepare(
@@ -525,7 +560,7 @@ final class AdminController
      */
     public static function listProfiles(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('users.view');
 
         $type = $_GET['account_type'] ?? null;
         $extra = '';
@@ -572,7 +607,7 @@ final class AdminController
     /** One trainer's file: their profile, their club, and their athletes. */
     public static function trainerDetail(array $params): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('users.view');
         $pdo = Database::connection();
 
         $stmt = $pdo->prepare(
@@ -610,7 +645,7 @@ final class AdminController
     /** Club names for the broadcast form's audience picker. */
     public static function listClubOptions(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin(['users.view', 'notifications']);
 
         $stmt = Database::connection()->query('SELECT id, name FROM clubs ORDER BY name ASC');
 
@@ -619,7 +654,7 @@ final class AdminController
 
     public static function listActivity(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('activity');
 
         $stmt = Database::connection()->query(
             'SELECT a.id, a.club_id, a.actor_id, a.subject_id, a.action, a.metadata, a.created_at,

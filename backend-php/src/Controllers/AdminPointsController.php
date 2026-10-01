@@ -30,7 +30,7 @@ final class AdminPointsController
 
     public static function overview(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('content');
         $pdo = Database::connection();
 
         $rules = $pdo->query('SELECT action_type, label, points, is_active FROM point_rules ORDER BY label')->fetchAll();
@@ -64,7 +64,7 @@ final class AdminPointsController
     /** Edits one rule. Which actions exist is fixed by the code that awards them. */
     public static function updateRule(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('content');
         $data = Validate::body();
         $pdo = Database::connection();
 
@@ -114,7 +114,7 @@ final class AdminPointsController
     /** Adds (or, with a negative number, takes away) points from one coach. */
     public static function adjust(): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('content');
         $data = Validate::required(Validate::body(), ['coach_id', 'points']);
         $pdo = Database::connection();
 

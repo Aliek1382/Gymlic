@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { useAdminCan } from "../hooks/use-admin-access";
 import { setProfileSuspended } from "../services/admin-service";
 
 export function SuspendToggle({
@@ -16,6 +17,7 @@ export function SuspendToggle({
   userId: string;
   isSuspended: boolean;
 }) {
+  const can = useAdminCan();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -31,6 +33,9 @@ export function SuspendToggle({
     });
   }
 
+
+  // A role that can only view users sees the state, not the switch.
+  if (!can("users.manage")) return null;
   return (
     <Button
       variant={isSuspended ? "default" : "destructive"}

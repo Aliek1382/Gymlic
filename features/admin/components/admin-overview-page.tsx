@@ -27,6 +27,8 @@ export function AdminOverviewPage() {
   const pendingClubsCount = data?.pending_clubs_count ?? 0;
   const trainersCount = data?.trainers_count ?? 0;
   const athletesCount = data?.athletes_count ?? 0;
+  // Absent for an admin role without the finance permission.
+  const showFinance = data?.total_revenue !== undefined;
   const pendingRequestsCount = data?.pending_requests_count ?? 0;
   const activeSubs = data?.active_subs ?? 0;
   const expiringSubs = data?.expiring_subs ?? 0;
@@ -69,21 +71,25 @@ export function AdminOverviewPage() {
             (pendingClubsCount ?? 0) > 0 ? "bg-warning-muted text-warning" : undefined
           }
         />
-        <StatisticCard
-          icon={ReceiptText}
-          title="درخواست پرداخت در انتظار"
-          value={formatNumber(pendingRequestsCount ?? 0)}
-          iconClassName={
-            (pendingRequestsCount ?? 0) > 0
-              ? "bg-warning-muted text-warning"
-              : undefined
-          }
-        />
-        <StatisticCard
-          icon={Banknote}
-          title="درآمد کل تاییدشده"
-          value={`${formatToman(totalRevenue)} تومان`}
-        />
+        {showFinance && (
+          <>
+            <StatisticCard
+              icon={ReceiptText}
+              title="درخواست پرداخت در انتظار"
+              value={formatNumber(pendingRequestsCount ?? 0)}
+              iconClassName={
+                (pendingRequestsCount ?? 0) > 0
+                  ? "bg-warning-muted text-warning"
+                  : undefined
+              }
+            />
+            <StatisticCard
+              icon={Banknote}
+              title="درآمد کل تاییدشده"
+              value={`${formatToman(totalRevenue)} تومان`}
+            />
+          </>
+        )}
         <StatisticCard
           icon={Users}
           title="اشتراک‌های فعال"

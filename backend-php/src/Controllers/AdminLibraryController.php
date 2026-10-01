@@ -57,7 +57,7 @@ final class AdminLibraryController
     /** ?scope=public (the shared bank, default) | custom (trainers' own); ?q= filters by name. */
     public static function list(array $params): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('content');
         $kind = self::kind($params['kind']);
         $pdo = Database::connection();
 
@@ -105,7 +105,7 @@ final class AdminLibraryController
     /** A new entry in the shared bank. */
     public static function create(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('content');
         $kind = self::kind($params['kind']);
         $values = self::values($kind, Validate::body(), true);
 
@@ -123,7 +123,7 @@ final class AdminLibraryController
     /** Edits any entry, shared or a trainer's; also hides/unhides it. */
     public static function update(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('content');
         $kind = self::kind($params['kind']);
         $data = Validate::body();
         $entry = self::find($kind, $params['id']);
@@ -153,7 +153,7 @@ final class AdminLibraryController
     /** Only an entry no plan uses; anything else can be hidden instead. */
     public static function delete(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('content');
         $kind = self::kind($params['kind']);
         $entry = self::find($kind, $params['id']);
         $pdo = Database::connection();
@@ -181,7 +181,7 @@ final class AdminLibraryController
     /** Moves a trainer's own entry into the shared bank, for every trainer to use. */
     public static function publish(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('content');
         $kind = self::kind($params['kind']);
         $entry = self::find($kind, $params['id']);
 

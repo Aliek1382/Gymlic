@@ -78,11 +78,12 @@ export interface AdminOverview {
   pending_clubs_count: number;
   trainers_count: number;
   athletes_count: number;
-  pending_requests_count: number;
+  /** Only for an admin with the finance permission. */
+  pending_requests_count?: number;
   active_subs: number;
   expiring_subs: number;
   expired_subs: number;
-  total_revenue: number;
+  total_revenue?: number;
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {
