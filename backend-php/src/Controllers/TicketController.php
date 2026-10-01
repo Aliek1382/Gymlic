@@ -157,7 +157,59 @@ final class TicketController
         $ticket = self::ticketOr404($params['id']);
         Acl::require(self::isParty($ticket, $user['id']));
 
-        $stmt = Database::connection()->prepare(
+        Response::ok(self::detail($ticket));
+    }
+
+    /**
+     * GET /admin/tickets?status= — read-only oversight of athlete ↔ trainer
+     * tickets for admins with the support permission (e.g. to settle a
+     * dispute). Admins never write here: the thread belongs to the two parties.
+     */
+    public static function adminList(): void
+    {
+        Auth::requireAdmin('support');
+        $status = isset($_GET['status']) ? (string) $_GET['status'] : '';
+        if (!in_array($status, self::STATUSES, true)) {
+            $status = '';
+        }
+
+        $pdo = Database::connection();
+        $sql = "SELECT t.id, t.ticket_number, t.category, t.subject, t.status,
+                       t.created_at, t.updated_at, t.closed_at, t.trainer_id, t.athlete_id,
+                       tp.first_name AS trainer_first_name, tp.last_name AS trainer_last_name,
+                       ap.first_name AS athlete_first_name, ap.last_name AS athlete_last_name,
+                       (SELECT COUNT(*) FROM ticket_messages m WHERE m.ticket_id = t.id) AS message_count
+                FROM tickets t
+                JOIN profiles tp ON tp.id = t.trainer_id
+                JOIN profiles ap ON ap.id = t.athlete_id";
+        $bind = [];
+        if ($status !== '') {
+            $sql .= ' WHERE t.status = :status';
+            $bind['status'] = $status;
+        }
+        $sql .= ' ORDER BY t.updated_at DESC LIMIT 300';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($bind);
+
+        $counts = ['open' => 0, 'in_progress' => 0, 'closed' => 0];
+        foreach ($pdo->query('SELECT status, COUNT(*) AS n FROM tickets GROUP BY status')->fetchAll() as $row) {
+            $counts[$row['status']] = (int) $row['n'];
+        }
+
+        Response::ok(['items' => $stmt->fetchAll(), 'counts' => $counts]);
+    }
+
+    /** GET /admin/tickets/{id} — one ticket with its messages, read-only. */
+    public static function adminGet(array $params): void
+    {
+        Auth::requireAdmin('support');
+        Response::ok(self::detail(self::ticketOr404($params['id'])));
+    }
+
+    private static function detail(array $ticket): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare(
             'SELECT m.id, m.sender_id, m.body, m.created_at, p.first_name, p.last_name, p.avatar_url
              FROM ticket_messages m
              JOIN profiles p ON p.id = m.sender_id
@@ -167,9 +219,7 @@ final class TicketController
         $stmt->execute(['id' => $ticket['id']]);
         $messages = $stmt->fetchAll();
 
-        $stmt = Database::connection()->prepare(
-            'SELECT id, first_name, last_name FROM profiles WHERE id IN (:t, :a)'
-        );
+        $stmt = $pdo->prepare('SELECT id, first_name, last_name FROM profiles WHERE id IN (:t, :a)');
         $stmt->execute(['t' => $ticket['trainer_id'], 'a' => $ticket['athlete_id']]);
         $names = array_column($stmt->fetchAll(), null, 'id');
 
@@ -178,7 +228,7 @@ final class TicketController
         $ticket['athlete_first_name'] = $names[$ticket['athlete_id']]['first_name'] ?? null;
         $ticket['athlete_last_name'] = $names[$ticket['athlete_id']]['last_name'] ?? null;
 
-        Response::ok(['ticket' => $ticket, 'messages' => $messages]);
+        return ['ticket' => $ticket, 'messages' => $messages];
     }
 
     /** POST /tickets/{id}/messages — either party; a message on a closed ticket reopens it. */
