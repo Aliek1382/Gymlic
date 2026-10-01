@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Trash;
 use Gymlic\Validate;
 
 /**
@@ -120,7 +121,12 @@ final class PagesController
             return;
         }
         $pdo = Database::connection();
-        $pdo->prepare('DELETE FROM site_pages WHERE slug = :slug')->execute(['slug' => $page['slug']]);
+        // Into the recycle bin once it exists; before its SQL, gone as before.
+        if (Trash::ready()) {
+            TrashController::trash($pdo, 'page', [['site_pages', 'slug', $page['slug']]], $page['title'], '/page?slug=' . $page['slug'], $admin['id']);
+        } else {
+            $pdo->prepare('DELETE FROM site_pages WHERE slug = :slug')->execute(['slug' => $page['slug']]);
+        }
         AdminController::logActivity($pdo, null, $admin['id'], null, 'page_deleted', ['slug' => $page['slug'], 'title' => $page['title']]);
         Response::ok(['ok' => true]);
     }

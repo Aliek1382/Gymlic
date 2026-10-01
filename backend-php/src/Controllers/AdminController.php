@@ -3,23 +3,25 @@ declare(strict_types=1);
 
 namespace Gymlic\Controllers;
 
-use Gymlic\AdminAccess;
 use Gymlic\Acl;
+use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Receipts;
-use Gymlic\Settings;
 use Gymlic\Response;
 use Gymlic\Security;
+use Gymlic\Settings;
 use Gymlic\SmsGateway;
 use Gymlic\Subscriptions;
+use Gymlic\Templates;
+use Gymlic\Tiers;
+use Gymlic\TrainerBilling;
+use Gymlic\TrainerVerification;
 use Gymlic\Uuid;
 use Gymlic\Validate;
-use Gymlic\Templates;
-use Gymlic\TrainerBilling;
 use PDO;
 use Throwable;
 
@@ -277,6 +279,7 @@ final class AdminController
             // Counted from the current expiry while it is still running, so
             // approving early doesn't cost the club its remaining days.
             $expiresAt = Subscriptions::extend($pdo, $request['club_id'], (int) $request['duration_days'], $request['plan_name']);
+            Tiers::setClubTier($pdo, $request['club_id'], Tiers::planTier($pdo, 'plans', $request['plan_id']));
 
             $pdo->prepare("UPDATE clubs SET member_capacity = :cap, status = 'active' WHERE id = :id")
                 ->execute(['cap' => $request['max_members'], 'id' => $request['club_id']]);
@@ -722,7 +725,8 @@ final class AdminController
                         (SELECT c.name FROM memberships m
                           JOIN clubs c ON c.id = m.club_id
                           WHERE m.user_id = profiles.id AND m.role = 'trainer' AND m.status = 'active'
-                          ORDER BY m.joined_at ASC LIMIT 1) AS club_name";
+                          ORDER BY m.joined_at ASC LIMIT 1) AS club_name,
+                        " . TrainerVerification::flagSql('profiles.id') . ' AS is_verified';
         }
 
         $sql = 'SELECT id, first_name, last_name, email, phone, account_type, birth_date,
@@ -744,7 +748,7 @@ final class AdminController
                 $stmt->fetchAll(),
                 [],
                 $type === 'trainer' ? ['athlete_count'] : [],
-                ['is_suspended', 'is_platform_admin']
+                $type === 'trainer' ? ['is_suspended', 'is_platform_admin', 'is_verified'] : ['is_suspended', 'is_platform_admin']
             ),
         ]);
     }

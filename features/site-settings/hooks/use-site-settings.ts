@@ -10,6 +10,7 @@ import {
   getAdminSiteSettings,
   getPublicSettings,
   isFeatureEnabled,
+  isTierAllowed,
   removeBrandLogo,
   updateSiteSetting,
   uploadBrandLogo,
@@ -45,14 +46,16 @@ export function usePublicSettings(): SiteSettings {
  * gets true, matching the API, which lets an admin through too.
  */
 export function useFeatureCheck(): (key: FeatureKey | null) => boolean {
-  const { features } = usePublicSettings();
+  const { features, tiers } = usePublicSettings();
   const { data: context } = useAuthContext();
   const role = context?.accountType;
+  const tier = context?.tier?.key;
   const isAdmin = !!context?.isPlatformAdmin;
 
   return useCallback(
-    (key: FeatureKey | null) => !key || isAdmin || isFeatureEnabled(features, key, role),
-    [features, role, isAdmin]
+    (key: FeatureKey | null) =>
+      !key || isAdmin || (isFeatureEnabled(features, key, role) && isTierAllowed(tiers, key, tier)),
+    [features, tiers, role, tier, isAdmin]
   );
 }
 

@@ -1,6 +1,7 @@
 import { api, fullName } from "@/lib/api/client";
 import type {
   PricingRow,
+  ResumeVerification,
   SocialKey,
   TrainerResume,
   TrainerResumeView,
@@ -12,6 +13,7 @@ interface ResumeRow {
   certificates: string[];
   pricing_table: { title: string; price_toman: number; description: string }[];
   social_links: Partial<Record<SocialKey, string>>;
+  verification?: ResumeVerification | null;
 }
 
 function mapResume(row: ResumeRow): TrainerResume {
@@ -25,6 +27,7 @@ function mapResume(row: ResumeRow): TrainerResume {
       description: item.description ?? "",
     })),
     socialLinks: row.social_links,
+    verification: row.verification ?? null,
   };
 }
 
@@ -48,6 +51,11 @@ export async function saveMyResume(input: TrainerResume): Promise<TrainerResume>
   return mapResume(row);
 }
 
+/** Sends the saved certificates to the admins for the «مربی تأییدشده» badge. */
+export async function requestVerification(): Promise<TrainerResume> {
+  return mapResume(await api.post<ResumeRow>("/trainer-profile/verification"));
+}
+
 /** Uploads one certificate photo; the URL only counts once the résumé is saved with it. */
 export async function uploadCertificate(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
@@ -66,6 +74,7 @@ export async function getTrainerResume(trainerId: string): Promise<TrainerResume
         first_name: string | null;
         last_name: string | null;
         avatar_url: string | null;
+        is_verified?: boolean;
       };
     }
   >(`/trainer-profile/${trainerId}`);
@@ -75,5 +84,6 @@ export async function getTrainerResume(trainerId: string): Promise<TrainerResume
     trainerId: data.trainer.id,
     trainerName: fullName(data.trainer.first_name, data.trainer.last_name, "مربی"),
     trainerAvatarUrl: data.trainer.avatar_url,
+    trainerVerified: !!data.trainer.is_verified,
   };
 }

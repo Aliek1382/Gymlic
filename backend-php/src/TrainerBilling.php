@@ -202,7 +202,24 @@ final class TrainerBilling
      */
     public static function inviteBlock(PDO $pdo, string $trainerId): ?string
     {
-        if (!Settings::get('billing')['trainer_enforce'] || !self::ready() || self::inClub($pdo, $trainerId)) {
+        if (self::inClub($pdo, $trainerId)) {
+            return null;
+        }
+
+        // The free tier's cap (Tiers), for a trainer with no running plan
+        // while subscriptions aren't required: set in the admin's plan tiers.
+        $freeCap = Tiers::freeCap('max_athletes');
+        if ($freeCap !== null && !Settings::get('billing')['trainer_enforce']) {
+            $own = self::ready() ? self::subscription($pdo, $trainerId) : null;
+            if ($own === null || $own['status'] === 'expired') {
+                $counts = self::athleteCounts($pdo, $trainerId);
+                if ($counts['active'] + $counts['pending_invites'] >= $freeCap) {
+                    return "در پلن رایگان حداکثر {$freeCap} ورزشکار می‌توانید داشته باشید و به سقف رسیده‌اید. برای دعوت بیشتر، از «اشتراک من» پلن تهیه کنید.";
+                }
+            }
+        }
+
+        if (!Settings::get('billing')['trainer_enforce'] || !self::ready()) {
             return null;
         }
 

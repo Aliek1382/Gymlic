@@ -27,6 +27,7 @@ export function DashboardPage() {
           athleteId={context.userId}
           athleteName={name}
           trainerName={context.trainerName}
+          trainerVerified={context.trainerVerified}
         />
       ) : null}
     </RoleGate>

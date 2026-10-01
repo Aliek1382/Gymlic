@@ -4,6 +4,8 @@ declare(strict_types=1);
 // Sends scheduled admin broadcasts once their time comes, and the SMS / email
 // copies of notifications queued in notification_deliveries
 // (AuthController::notify queues them; nothing is sent during a web request).
+// Also sends the weekly email report on Saturday morning (WeeklyReport) and
+// empties the recycle bin of items older than 30 days (Trash).
 // Meant for the host's cron, every 5 minutes:
 //
 //   php /home/USER/path/to/backend-php/cron/notification-dispatch.php
@@ -27,10 +29,15 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+// Warnings and crashes also show up in the admin's error log.
+Gymlic\ErrorLog::registerCli();
+
 use Gymlic\Broadcasts;
 use Gymlic\CronHeartbeat;
 use Gymlic\Database;
 use Gymlic\DeliveryDispatcher;
+use Gymlic\Trash;
+use Gymlic\WeeklyReport;
 
 const BATCH = 50;
 
@@ -55,6 +62,11 @@ foreach (DeliveryDispatcher::due($pdo, BATCH) as $row) {
     }
 }
 
-$summary = "broadcasts: {$broadcasts}, deliveries sent: {$ok}, failed: {$bad}";
+// The weekly email report rides this cron: on Saturday morning, once.
+$weekly = WeeklyReport::sendIfDue($pdo);
+// And the recycle bin's 30-day clean-up, a few times a day at most.
+Trash::purgeIfDue($pdo);
+
+$summary = "broadcasts: {$broadcasts}, deliveries sent: {$ok}, failed: {$bad}" . ($weekly !== null ? ", {$weekly}" : '');
 CronHeartbeat::record('notification-dispatch', $summary);
 echo date('Y-m-d H:i:s'), " {$summary}\n";

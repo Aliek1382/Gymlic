@@ -19,11 +19,11 @@ final class Settings
     public const ROLES = ['club', 'trainer', 'athlete'];
 
     public const KEYS = [
-        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing', 'templates', 'branding',
+        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing', 'templates', 'branding', 'reports', 'tiers',
     ];
 
     /** The groups any visitor may read; everything else is admin-only. */
-    public const PUBLIC_KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features', 'limits', 'branding'];
+    public const PUBLIC_KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features', 'limits', 'branding', 'tiers'];
 
     /**
      * Fields that are credentials: never sent back to the browser (the admin
@@ -50,6 +50,11 @@ final class Settings
     ];
 
     private const MAX_POINT_LEVELS = 20;
+
+    /** Where the weekly report goes until the admin changes it. */
+    private const DEFAULT_REPORT_RECIPIENTS = ['gymlicsite@gmail.com'];
+
+    private const MAX_REPORT_RECIPIENTS = 5;
 
     /** @var array<string, mixed>|null raw decoded rows, loaded once per request */
     private static ?array $stored = null;
@@ -204,6 +209,15 @@ final class Settings
                     ? $v['logo_url']
                     : '',
             ],
+            // What each tier opens (Tiers); everything until the admin says otherwise.
+            'tiers' => self::tiers($v),
+            // The weekly email to the owner (WeeklyReport): on, to whom, from
+            // what hour on Saturday (Iran time).
+            'reports' => [
+                'weekly_enabled' => self::bool($v['weekly_enabled'] ?? null, true),
+                'recipients'     => self::emails($v['recipients'] ?? null, self::DEFAULT_REPORT_RECIPIENTS),
+                'send_hour'      => self::int($v['send_hour'] ?? null, 8, 0, 23),
+            ],
             // Empty = fall back to config.php (see SmsGateway / MailGateway).
             'sms' => [
                 'api_key' => self::text($v['api_key'] ?? null, 200),
@@ -220,6 +234,34 @@ final class Settings
             ],
             default => throw new \InvalidArgumentException("Unknown settings key: {$key}"),
         };
+    }
+
+    /**
+     * Per tier: its name and which sections it opens (all, by default); and
+     * the free tier's caps (null = none) for those with no running plan.
+     */
+    private static function tiers(array $v): array
+    {
+        $out = [];
+        foreach (Tiers::KEYS as $tier) {
+            $entry = is_array($v[$tier] ?? null) ? $v[$tier] : [];
+            $features = is_array($entry['features'] ?? null) ? $entry['features'] : [];
+            $label = self::text($entry['label'] ?? null, 30);
+            $out[$tier] = [
+                'label'    => $label !== '' ? $label : Tiers::LABELS[$tier],
+                'features' => array_map(
+                    static fn (string $key): bool => self::bool($features[$key] ?? null, true),
+                    array_combine(array_keys(Features::CATALOG), array_keys(Features::CATALOG))
+                ),
+            ];
+        }
+        $limits = is_array($v['free_limits'] ?? null) ? $v['free_limits'] : [];
+        $cap = static fn (mixed $value): ?int => is_numeric($value) && (int) $value >= 0 ? min(100000, (int) $value) : null;
+        $out['free_limits'] = [
+            'max_athletes' => $cap($limits['max_athletes'] ?? null),
+            'max_members'  => $cap($limits['max_members'] ?? null),
+        ];
+        return $out;
     }
 
     /** Every feature in the catalogue, on unless the admin switched it off. */
@@ -328,6 +370,30 @@ final class Settings
             return false;
         }
         return $default;
+    }
+
+    /**
+     * Valid addresses only, at most a few, no repeats. A list or a text with
+     * commas / new lines; missing altogether means the default (an empty
+     * list the admin saved stays empty: the report then goes nowhere).
+     *
+     * @param list<string> $default
+     * @return list<string>
+     */
+    private static function emails(mixed $value, array $default): array
+    {
+        if ($value === null) {
+            return $default;
+        }
+        $items = is_array($value) ? $value : preg_split('/[\s,،;]+/u', (string) $value);
+        $out = [];
+        foreach ($items ?: [] as $item) {
+            $email = strtolower(trim((string) $item));
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false && !in_array($email, $out, true)) {
+                $out[] = $email;
+            }
+        }
+        return array_slice($out, 0, self::MAX_REPORT_RECIPIENTS);
     }
 
     /** Latin digits only (Persian ones converted, spaces and dashes dropped). */

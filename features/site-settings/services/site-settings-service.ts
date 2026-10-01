@@ -57,6 +57,21 @@ export interface BrandingSettings {
   logo_url: string;
 }
 
+export type TierKey = "free" | "silver" | "gold" | "diamond";
+
+export const TIER_KEYS: TierKey[] = ["free", "silver", "gold", "diamond"];
+
+export interface TierConfig {
+  label: string;
+  /** false = this tier doesn't open the section; missing = it does. */
+  features: Partial<Record<FeatureKey, boolean>>;
+}
+
+/** What each plan tier opens (backend Tiers); everything until the admin says otherwise. */
+export type TiersSettings = Record<TierKey, TierConfig> & {
+  free_limits: { max_athletes: number | null; max_members: number | null };
+};
+
 export interface SiteSettings {
   maintenance: MaintenanceSettings;
   signup: SignupSettings;
@@ -65,6 +80,7 @@ export interface SiteSettings {
   features: FeatureSettings;
   limits: LimitsSettings;
   branding: BrandingSettings;
+  tiers: TiersSettings;
 }
 
 export type SiteSettingKey = keyof SiteSettings;
@@ -84,6 +100,13 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     upload_mb: { voice: 8, image: 8, video: 50, file: 8 },
   },
   branding: { app_name: "", primary_color: "", logo_url: "" },
+  tiers: {
+    free: { label: "رایگان", features: {} },
+    silver: { label: "نقره‌ای", features: {} },
+    gold: { label: "طلایی", features: {} },
+    diamond: { label: "الماسی", features: {} },
+    free_limits: { max_athletes: null, max_members: null },
+  },
 };
 
 /**
@@ -216,6 +239,12 @@ export async function sendTestSms(phone: string) {
 
 export async function sendTestMail(email: string) {
   await api.post("/admin/settings/test-mail", { email });
+}
+
+/** Whether the user's plan tier opens the section; a null tier (not limited) opens everything. */
+export function isTierAllowed(tiers: TiersSettings, key: FeatureKey, tier: TierKey | null | undefined): boolean {
+  if (!tier) return true;
+  return tiers[tier]?.features?.[key] !== false;
 }
 
 export function isFeatureEnabled(

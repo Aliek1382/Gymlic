@@ -6,6 +6,7 @@ import { OfflineBanner } from "@/components/pwa/offline-banner";
 import { OfflineSync } from "@/components/pwa/offline-sync";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import { BrandTheme } from "@/components/brand/brand-theme";
+import { ErrorReporter } from "@/components/providers/error-reporter";
 import { ViewAsBanner } from "@/features/view-as/components/view-as-banner";
 import { BRAND_BOOT_SCRIPT } from "@/lib/brand-theme";
 import "./globals.css";
@@ -69,6 +70,7 @@ export default function RootLayout({
             paint (see lib/brand-theme.ts); BrandTheme keeps it current. */}
         <script dangerouslySetInnerHTML={{ __html: BRAND_BOOT_SCRIPT }} />
         <QueryProvider>
+          <ErrorReporter />
           <BrandTheme />
           <ViewAsBanner />
           <ServiceWorkerRegistrar />

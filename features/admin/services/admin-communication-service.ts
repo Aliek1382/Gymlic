@@ -14,6 +14,8 @@ export interface BroadcastAudience {
   club_ids: string[];
   /** 0 = off; otherwise only people not seen for this many days. */
   inactive_days: number;
+  /** Chosen accounts (the users page's bulk action); empty/absent = no such filter. */
+  user_ids?: string[];
 }
 
 export interface BroadcastChannels {

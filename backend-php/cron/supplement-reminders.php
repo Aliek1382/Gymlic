@@ -27,6 +27,9 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+// Warnings and crashes also show up in the admin's error log.
+Gymlic\ErrorLog::registerCli();
+
 $sent = Gymlic\Controllers\SupplementController::sendDueReminders();
 $pushed = Gymlic\Controllers\PushController::deliverPending();
 echo date('Y-m-d H:i:s'), " supplement reminders sent: {$sent}, notifications pushed: {$pushed}\n";

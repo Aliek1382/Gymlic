@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { EyeOff, Lock } from "lucide-react";
+import { EyeOff, Lock, Sparkles } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { featureForPath } from "../constants";
 import { usePublicSettings } from "../hooks/use-site-settings";
-import { isFeatureEnabled } from "../services/site-settings-service";
+import { isFeatureEnabled, isTierAllowed } from "../services/site-settings-service";
 import { SupportContact } from "./support-contact";
 
 /**
@@ -20,13 +22,14 @@ import { SupportContact } from "./support-contact";
  */
 export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { features } = usePublicSettings();
+  const { features, tiers } = usePublicSettings();
   const { data: context } = useAuthContext();
 
   const feature = featureForPath(pathname);
-  const enabled = !feature || isFeatureEnabled(features, feature, context?.accountType);
+  const switchedOn = !feature || isFeatureEnabled(features, feature, context?.accountType);
+  const inPlan = !feature || isTierAllowed(tiers, feature, context?.tier?.key);
 
-  if (enabled) return <>{children}</>;
+  if (switchedOn && inPlan) return <>{children}</>;
 
   if (context?.isPlatformAdmin) {
     return (
@@ -37,6 +40,31 @@ export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
         </div>
         {children}
       </>
+    );
+  }
+
+  // Switched on, but not in this user's plan tier: an upgrade, not an outage.
+  if (switchedOn && !inPlan) {
+    const athlete = context?.accountType === "athlete";
+    return (
+      <Card className="flex flex-col items-center gap-4 py-16 text-center">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+          <Sparkles className="size-6" />
+        </div>
+        <div className="space-y-1.5 px-6">
+          <h2 className="text-lg font-semibold text-foreground">این بخش در پلن {athlete ? "مربی شما" : "فعلی شما"} نیست</h2>
+          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+            {athlete
+              ? "مربی شما با تهیهٔ پلن بالاتر می‌تواند این بخش را برایتان باز کند."
+              : `پلن فعلی شما «${context?.tier?.label ?? ""}» است. با تهیهٔ پلن بالاتر این بخش باز می‌شود.`}
+          </p>
+        </div>
+        {!athlete && (
+          <Button asChild>
+            <Link href={context?.accountType === "club" ? "/finance" : "/subscription"}>دیدن پلن‌ها</Link>
+          </Button>
+        )}
+      </Card>
     );
   }
 

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, parseLocaleNumber, toPersianDigits } from "@/lib/persian";
 import { useSaveResume, useUploadCertificate } from "../hooks/use-trainer-resume";
+import { VerificationPanel } from "./verification-panel";
 import {
   SOCIAL_KEYS,
   type SocialKey,
@@ -224,6 +225,13 @@ export function TrainerResumeEditor({ initial }: { initial: TrainerResume }) {
             <ImagePlus />
             افزودن عکس
           </Button>
+          {initial.verification && (
+            <VerificationPanel
+              verification={initial.verification}
+              hasSavedCertificates={initial.certificates.length > 0}
+              unsaved={certificates.join("|") !== initial.certificates.join("|")}
+            />
+          )}
         </CardContent>
       </Card>
 

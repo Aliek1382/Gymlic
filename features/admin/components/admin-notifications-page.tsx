@@ -521,6 +521,7 @@ function HistoryList({ ready, items }: { ready: boolean | undefined; items: Broa
 }
 
 function describeAudience(a: BroadcastAudience): string {
+  if (a.user_ids && a.user_ids.length > 0) return `${formatNumber(a.user_ids.length)} کاربر انتخاب‌شده`;
   const parts = [a.roles.length === 0 ? "همه" : a.roles.map((r) => ROLE_LABEL[r]).join(" و ")];
   if (a.club_ids.length > 0) parts.push(`عضو ${formatNumber(a.club_ids.length)} باشگاه`);
   if (a.inactive_days > 0) parts.push(`غیرفعال بیش از ${toPersianDigits(a.inactive_days)} روز`);

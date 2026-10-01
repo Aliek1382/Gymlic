@@ -16,10 +16,12 @@ export function AthleteDashboard({
   athleteId,
   athleteName,
   trainerName,
+  trainerVerified = false,
 }: {
   athleteId: string;
   athleteName: string;
   trainerName: string | null;
+  trainerVerified?: boolean;
 }) {
   const dashboard = useAthleteDashboard(athleteId);
   const isEnabled = useFeatureCheck();
@@ -38,6 +40,7 @@ export function AthleteDashboard({
         name={athleteName}
         subtitle="برنامه امروز و پیشرفت خودت را اینجا ببین."
         trainerName={trainerName}
+        trainerVerified={trainerVerified}
       />
 
       <StreakCard

@@ -36,6 +36,7 @@ import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
+import { MyTierBadge } from "@/features/site-settings/components/my-tier-badge";
 import {
   checkTrainerDiscount,
   getTrainerBilling,
@@ -68,7 +69,10 @@ export function TrainerSubscriptionPage() {
     <RoleGate allow={["trainer"]}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">اشتراک من</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground">اشتراک من</h1>
+            <MyTierBadge />
+          </div>
           <p className="text-sm text-muted-foreground">
             اشتراک شما در جیم‌لیک، پلن‌ها و تاریخچهٔ پرداخت‌های کارت‌به‌کارت.
           </p>

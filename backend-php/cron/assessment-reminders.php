@@ -26,6 +26,9 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+// Warnings and crashes also show up in the admin's error log.
+Gymlic\ErrorLog::registerCli();
+
 $sent = Gymlic\Controllers\ProgressController::sendDueReminders();
 Gymlic\CronHeartbeat::record('assessment-reminders', "assessment reminders sent: {$sent}");
 echo date('Y-m-d H:i:s'), " assessment reminders sent: {$sent}\n";

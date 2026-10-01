@@ -14,6 +14,7 @@ use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Subscriptions;
 use Gymlic\Templates;
+use Gymlic\Tiers;
 use Gymlic\TrainerBilling;
 use Gymlic\TrainerDiscounts;
 use Gymlic\Uuid;
@@ -371,6 +372,7 @@ final class TrainerBillingController
                 $request['plan_name'],
                 $request['max_athletes'] === null ? null : (int) $request['max_athletes']
             );
+            Tiers::setTrainerTier($pdo, $request['trainer_id'], Tiers::planTier($pdo, 'trainer_plans', $request['plan_id']));
             $pdo->prepare(
                 "UPDATE trainer_payment_requests
                  SET status = 'approved', admin_note = :note, reviewed_by = :admin, reviewed_at = NOW() WHERE id = :id"
@@ -615,6 +617,10 @@ final class TrainerBillingController
         $pdo->beginTransaction();
         try {
             $expiresAt = TrainerBilling::extend($pdo, $params['trainerId'], $days, $planName, $cap);
+            // A plan brings its tier; free days keep the tier there is.
+            if ($planId !== null) {
+                Tiers::setTrainerTier($pdo, $params['trainerId'], Tiers::planTier($pdo, 'trainer_plans', $planId));
+            }
             Templates::notify(
                 $pdo,
                 'trainer_subscription_granted',

@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Security;
 use Gymlic\SmsGateway;
+use Gymlic\Templates;
 use Gymlic\Validate;
 
 /**
@@ -235,6 +236,100 @@ final class AdminUsersController
         ]);
 
         Response::ok(['count' => $stmt->rowCount()]);
+    }
+
+    private const BULK_LIMIT = 200;
+
+    /**
+     * POST /admin/users/bulk — {action: suspend|unsuspend|role, ids: [...],
+     * role?: club|trainer|athlete|null}. Each account goes through the same
+     * rules as its single action (never yourself; an admin account only for
+     * a super admin; a role only on an account with nothing tied to it), and
+     * the answer says which ones were skipped and why.
+     */
+    public static function bulk(): void
+    {
+        $admin = Auth::requireAdmin('users.manage');
+        $data = Validate::body();
+        $action = (string) ($data['action'] ?? '');
+        if (!in_array($action, ['suspend', 'unsuspend', 'role'], true)) {
+            Response::error(400, 'invalid_action', 'عملیات گروهی نامعتبر است.');
+            return;
+        }
+        $ids = array_values(array_unique(array_filter(
+            is_array($data['ids'] ?? null) ? $data['ids'] : [],
+            static fn ($id): bool => is_string($id) && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1
+        )));
+        if ($ids === [] || count($ids) > self::BULK_LIMIT) {
+            Response::error(400, 'invalid_ids', 'بین ۱ تا ' . self::BULK_LIMIT . ' کاربر انتخاب کنید.');
+            return;
+        }
+        $role = $data['role'] ?? null;
+        if ($action === 'role' && $role !== null && !in_array($role, self::ROLES, true)) {
+            Response::error(400, 'invalid_role', 'نقش باید باشگاه، مربی، ورزشکار یا خالی باشد.');
+            return;
+        }
+
+        $pdo = Database::connection();
+        $columns = 'id, first_name, last_name, email, account_type, is_suspended, is_platform_admin'
+            . (AdminAccess::rolesReady() ? ', admin_role_id' : '');
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare("SELECT {$columns} FROM profiles WHERE id IN ({$marks})");
+        $stmt->execute($ids);
+        $targets = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $targets[$row['id']] = $row;
+        }
+
+        $done = 0;
+        $skipped = [];
+        $isSuper = AdminAccess::can($admin, AdminAccess::SUPER);
+        foreach ($ids as $id) {
+            $target = $targets[$id] ?? null;
+            $name = $target === null ? $id : (trim(($target['first_name'] ?? '') . ' ' . ($target['last_name'] ?? '')) ?: (string) $target['email']);
+            $reason = match (true) {
+                $target === null                                       => 'پیدا نشد',
+                $id === $admin['id']                                   => 'حساب خودتان',
+                AdminAccess::isAdminAccount($target) && !$isSuper      => 'حساب مدیر (فقط مدیر کل)',
+                default                                                => null,
+            };
+            if ($reason === null && $action === 'role') {
+                $links = $pdo->prepare('SELECT ' . self::linkCountSql(':id1', ':id2', ':id3', ':id4') . ' AS n');
+                $links->execute(['id1' => $id, 'id2' => $id, 'id3' => $id, 'id4' => $id]);
+                if ((int) $links->fetchColumn() > 0) {
+                    $reason = 'به باشگاه یا مربی/ورزشکار وصل است';
+                } elseif ($target['account_type'] === $role) {
+                    $reason = 'همین نقش را دارد';
+                }
+            }
+            if ($reason === null && $action !== 'role' && (bool) $target['is_suspended'] === ($action === 'suspend')) {
+                $reason = $action === 'suspend' ? 'از قبل مسدود است' : 'مسدود نیست';
+            }
+            if ($reason !== null) {
+                $skipped[] = ['id' => $id, 'name' => $name, 'reason' => $reason];
+                continue;
+            }
+
+            if ($action === 'role') {
+                $pdo->prepare('UPDATE profiles SET account_type = :role WHERE id = :id')->execute(['role' => $role, 'id' => $id]);
+                AdminController::logActivity($pdo, null, $admin['id'], $id, 'user_role_changed', [
+                    'from' => $target['account_type'], 'to' => $role, 'bulk' => true,
+                ]);
+            } else {
+                $suspend = $action === 'suspend';
+                $pdo->prepare('UPDATE profiles SET is_suspended = :s WHERE id = :id')->execute(['s' => $suspend ? 1 : 0, 'id' => $id]);
+                if ($suspend) {
+                    $pdo->prepare('DELETE FROM sessions WHERE user_id = :id')->execute(['id' => $id]);
+                }
+                AdminController::logActivity($pdo, null, $admin['id'], $id, 'profile_suspension_changed', [
+                    'suspended' => $suspend, 'bulk' => true,
+                ]);
+                Templates::notify($pdo, $suspend ? 'account_suspended' : 'account_activated', $id, $admin['id'], 'broadcast', [], '/login');
+            }
+            $done++;
+        }
+
+        Response::ok(['done' => $done, 'skipped' => $skipped]);
     }
 
     /** How long a view of someone's panel lasts before it has to be opened again. */

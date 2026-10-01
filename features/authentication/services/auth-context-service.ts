@@ -1,4 +1,5 @@
 import { ApiError, api, fullName } from "@/lib/api/client";
+import type { TierKey } from "@/features/site-settings/services/site-settings-service";
 import type {
   AccountType,
   ClubStatus,
@@ -56,6 +57,10 @@ export interface AuthContext {
   hasTrainer: boolean;
   trainerName: string | null;
   trainerAvatarUrl: string | null;
+  /** The athlete's trainer has the «مربی تأییدشده» badge. */
+  trainerVerified: boolean;
+  /** The plan tier that decides which sections open; null = not limited. */
+  tier: { key: TierKey; label: string } | null;
 }
 
 interface MeResponse {
@@ -82,7 +87,11 @@ interface MeResponse {
     first_name: string | null;
     last_name: string | null;
     avatar_url: string | null;
+    /** Absent before the phase-10 backend. */
+    is_verified?: boolean;
   } | null;
+  /** Absent from a backend older than plan tiers. */
+  tier?: { key: TierKey; label: string } | null;
   /** Absent from a backend older than admin roles. */
   admin?: {
     level: "super" | "staff";
@@ -140,6 +149,8 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     hasTrainer: trainer !== null,
     trainerName: trainer ? fullName(trainer.first_name, trainer.last_name, "") || null : null,
     trainerAvatarUrl: trainer?.avatar_url ?? null,
+    trainerVerified: !!trainer?.is_verified,
+    tier: data.tier ?? null,
   };
 }
 

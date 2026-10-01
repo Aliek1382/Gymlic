@@ -66,3 +66,16 @@ export function revokeUserSessions(userId: string, sessionId?: string) {
 export async function setUserPassword(userId: string, password: string) {
   await api.post(`/admin/users/${userId}/password`, { password });
 }
+
+export type BulkAction = "suspend" | "unsuspend" | "role";
+
+export interface BulkResult {
+  done: number;
+  /** The accounts left as they were, and why. */
+  skipped: { id: string; name: string; reason: string }[];
+}
+
+/** One action on many accounts; each goes through the same rules as its single action. */
+export function bulkUserAction(action: BulkAction, ids: string[], role?: AccountType | null) {
+  return api.post<BulkResult>("/admin/users/bulk", { action, ids, role: role ?? null });
+}
