@@ -25,13 +25,16 @@ Deployment happens from the owner's Windows machine with
 CI deploys anything. So:
 
 - **A merged PR is not a deployed change.** Say what still has to happen.
-- **Schema changes ship their exact SQL in the PR description.** The
-  owner runs it by hand in phpMyAdmin; the deploy script never touches
-  the database. Never tell them to re-import `schema/schema.sql` — it
-  errors on existing tables and changes nothing.
-- **Order matters**: database first, then backend, then frontend. A page
-  that reaches the host before its endpoint is a live error for anyone
-  who opens it.
+- **Schema changes ship as a `schema/*-update.sql` file, registered in
+  `backend-php/src/Migrations.php`, with the exact SQL also in the PR
+  description.** The owner runs it from the admin panel's database page
+  (or by hand in phpMyAdmin); the deploy script never touches the
+  database. Never tell them to re-import `schema/schema.sql` — it errors
+  on existing tables and changes nothing.
+- **Order matters**: backend, then the database update, then frontend.
+  The backend arrives before its SQL runs, so it must work without its
+  new tables/columns (detect and degrade). A page that reaches the host
+  before its endpoint is a live error for anyone who opens it.
 
 ## Things that break if forgotten
 

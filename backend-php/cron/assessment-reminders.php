@@ -27,4 +27,5 @@ spl_autoload_register(static function (string $class): void {
 });
 
 $sent = Gymlic\Controllers\ProgressController::sendDueReminders();
+Gymlic\CronHeartbeat::record('assessment-reminders', "assessment reminders sent: {$sent}");
 echo date('Y-m-d H:i:s'), " assessment reminders sent: {$sent}\n";

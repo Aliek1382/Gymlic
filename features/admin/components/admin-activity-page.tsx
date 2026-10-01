@@ -38,6 +38,9 @@ const ADMIN_ACTIONS = [
   "admin_granted",
   "admin_revoked",
   "password_set_by_admin",
+  "migration_run",
+  "backup_downloaded",
+  "delivery_retried",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -59,6 +62,9 @@ const ACTION_LABEL: Record<string, string> = {
   admin_granted: "دادن دسترسی مدیریت",
   admin_revoked: "برداشتن دسترسی مدیریت",
   password_set_by_admin: "تعیین رمز جدید توسط مدیر",
+  migration_run: "اجرای به‌روزرسانی دیتابیس",
+  backup_downloaded: "دانلود نسخهٔ پشتیبان",
+  delivery_retried: "ارسال دوبارهٔ پیامک/ایمیل",
 };
 
 const SETTINGS_GROUP_LABEL: Record<string, string> = {
@@ -128,10 +134,15 @@ export function AdminActivityPage() {
                 const libraryItem = log.action.startsWith("library_item_")
                   ? String(log.metadata?.name ?? "")
                   : "";
+                const migration =
+                  log.action === "migration_run"
+                    ? `${String(log.metadata?.id ?? "")}${log.metadata?.ok === false ? " (ناموفق)" : ""}`
+                    : "";
                 const subjectName =
                   SETTINGS_GROUP_LABEL[settingsGroup] ??
+                  (migration ||
                   (libraryItem ||
-                  [log.subject_first_name, log.subject_last_name].filter(Boolean).join(" "));
+                  [log.subject_first_name, log.subject_last_name].filter(Boolean).join(" ")));
                 return (
                   <TableRow key={log.id}>
                     <TableCell className="font-medium text-foreground">
