@@ -1,0 +1,267 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2, Paperclip, Wallet } from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PaymentInfoCard } from "@/features/finance/components/payment-info-card";
+import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
+import { getBillingInfo, prepareReceipt } from "@/features/finance/services/finance-service";
+import { getErrorMessage } from "@/lib/get-error-message";
+import { formatPersianDate, toAsciiDigits } from "@/lib/persian";
+import { useSubmitInvoiceClaim } from "../hooks/use-invoice-claims";
+import { useMyInvoices } from "../hooks/use-my-invoices";
+
+/**
+ * Athlete side of a pending invoice: where to send the card-to-card payment
+ * and a form to say "I paid" (tracking code, last four card digits, receipt).
+ * The plan stays locked until the trainer approves; a rejection comes back
+ * with the trainer's reason and the athlete may file again.
+ */
+export function PayInvoiceCard({ invoiceId }: { invoiceId: string }) {
+  const mine = useMyInvoices();
+  const [open, setOpen] = useState(false);
+
+  const invoice = mine.data?.invoices.find((row) => row.id === invoiceId);
+  if (!invoice || invoice.status !== "pending") return null;
+
+  const claimsEnabled = mine.data?.claimsEnabled === true;
+  const claim = invoice.claim;
+  const waiting = claim?.status === "pending";
+  const payTo = invoice.payTo;
+  const hasAccount = !!payTo && (payTo.cardNumber || payTo.sheba);
+
+  return (
+    <div className="space-y-3 text-start">
+      {hasAccount ? (
+        <PaymentInfoCard
+          info={{
+            card_number: payTo.cardNumber,
+            sheba: payTo.sheba,
+            account_holder: payTo.holderName,
+            bank_name: payTo.bankName,
+            instructions: "",
+          }}
+        />
+      ) : (
+        <p className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
+          مربی هنوز شمارهٔ کارت خود را در سایت ثبت نکرده است. روش پرداخت را از خود مربی بپرسید.
+        </p>
+      )}
+
+      {claimsEnabled && waiting && claim && (
+        <div className="space-y-2 rounded-xl border border-warning/30 bg-warning-muted p-3 text-sm">
+          <Badge variant="warning">در انتظار تأیید مربی</Badge>
+          <p className="text-xs text-muted-foreground">
+            پرداخت شما با کد پیگیری <span dir="ltr" className="font-mono">{claim.trackingCode}</span> در{" "}
+            {formatPersianDate(new Date(claim.createdAt.replace(" ", "T")))} ثبت شد. بعد از تأیید مربی،
+            محتوا برای شما باز می‌شود.
+          </p>
+          {claim.hasReceipt && (
+            <ReceiptViewer requestId={claim.id} kind="invoice-claim" isPdf={claim.receiptIsPdf} />
+          )}
+        </div>
+      )}
+
+      {claimsEnabled && claim?.status === "rejected" && (
+        <div className="space-y-1 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+          <Badge variant="destructive">پرداخت قبلی تأیید نشد</Badge>
+          <p className="text-xs text-muted-foreground">
+            {claim.trainerNote ?? "برای پیگیری با مربی خود صحبت کنید."}
+          </p>
+        </div>
+      )}
+
+      {claimsEnabled && !waiting && (
+        <Button size="sm" onClick={() => setOpen(true)}>
+          <Wallet />
+          {claim?.status === "rejected" ? "ثبت دوبارهٔ پرداخت" : "پرداخت کردم"}
+        </Button>
+      )}
+
+      {claimsEnabled && <ClaimDialog invoiceId={invoiceId} open={open} onOpenChange={setOpen} />}
+    </div>
+  );
+}
+
+function ClaimDialog({
+  invoiceId,
+  open,
+  onOpenChange,
+}: {
+  invoiceId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const submit = useSubmitInvoiceClaim();
+  const [trackingCode, setTrackingCode] = useState("");
+  const [cardLast4, setCardLast4] = useState("");
+  const [paidAt, setPaidAt] = useState("");
+  const [note, setNote] = useState("");
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: billing } = useQuery({
+    queryKey: ["finance", "billing-info"],
+    queryFn: getBillingInfo,
+    enabled: open,
+  });
+  const rules = billing?.receipts ?? null;
+
+  async function handleSubmit() {
+    const code = toAsciiDigits(trackingCode).replace(/\s+/g, "");
+    const last4 = toAsciiDigits(cardLast4).trim();
+    if (!/^[A-Za-z0-9_/-]{4,40}$/.test(code)) {
+      setError("کد پیگیری باید بین ۴ تا ۴۰ حرف یا رقم باشد.");
+      return;
+    }
+    if (!/^\d{4}$/.test(last4)) {
+      setError("چهار رقم آخر کارت خود را وارد کنید.");
+      return;
+    }
+    if (rules?.required !== false && !receipt) {
+      setError("تصویر یا فایل رسید پرداخت را پیوست کنید.");
+      return;
+    }
+    setError(null);
+
+    try {
+      const prepared = receipt ? await prepareReceipt(receipt) : null;
+      if (prepared && rules && prepared.size > rules.max_mb * 1024 * 1024) {
+        setError(`حجم رسید باید حداکثر ${rules.max_mb} مگابایت باشد.`);
+        return;
+      }
+      await submit.mutateAsync({
+        invoiceId,
+        trackingCode: code,
+        cardLast4: last4,
+        paidAt: paidAt || undefined,
+        note: note.trim() || undefined,
+        receipt: prepared,
+      });
+      toast.success("پرداخت شما ثبت شد و در انتظار تأیید مربی است.");
+      setTrackingCode("");
+      setCardLast4("");
+      setPaidAt("");
+      setNote("");
+      setReceipt(null);
+      onOpenChange(false);
+    } catch (e) {
+      setError(getErrorMessage(e, "ثبت پرداخت با خطا مواجه شد."));
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>ثبت پرداخت کارت‌به‌کارت</DialogTitle>
+          <DialogDescription>
+            بعد از واریز به کارت مربی، اطلاعات پرداخت را اینجا ثبت کنید. محتوا بعد از تأیید مربی باز می‌شود.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="claim-tracking">کد پیگیری واریز</Label>
+              <Input
+                id="claim-tracking"
+                dir="ltr"
+                maxLength={40}
+                autoComplete="off"
+                value={trackingCode}
+                onChange={(e) => setTrackingCode(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="claim-last4">چهار رقم آخر کارت شما</Label>
+              <Input
+                id="claim-last4"
+                dir="ltr"
+                inputMode="numeric"
+                maxLength={4}
+                autoComplete="off"
+                value={cardLast4}
+                onChange={(e) => setCardLast4(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="claim-receipt">
+              تصویر رسید{" "}
+              <span className="text-muted-foreground">
+                {rules?.required === false ? "(اختیاری)" : "(الزامی)"}
+              </span>
+            </Label>
+            <label
+              htmlFor="claim-receipt"
+              className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-input px-4 py-3 text-sm text-muted-foreground hover:bg-accent"
+            >
+              <Paperclip className="size-4 shrink-0" />
+              <span className="truncate">{receipt ? receipt.name : "انتخاب عکس یا فایل PDF"}</span>
+            </label>
+            <input
+              id="claim-receipt"
+              type="file"
+              accept="image/*,application/pdf"
+              className="sr-only"
+              onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
+            />
+            {rules && (
+              <p className="text-xs text-muted-foreground">
+                عکس قبل از ارسال کوچک می‌شود. حداکثر {rules.max_mb} مگابایت
+                {rules.retention_days > 0
+                  ? `؛ فایل ${rules.retention_days} روز پس از بررسی حذف می‌شود.`
+                  : "."}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="claim-paid-at">
+              زمان واریز <span className="text-muted-foreground">(اختیاری)</span>
+            </Label>
+            <Input
+              id="claim-paid-at"
+              type="datetime-local"
+              dir="ltr"
+              value={paidAt}
+              onChange={(e) => setPaidAt(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="claim-note">
+              توضیح برای مربی <span className="text-muted-foreground">(اختیاری)</span>
+            </Label>
+            <Input id="claim-note" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button onClick={handleSubmit} disabled={submit.isPending}>
+            {submit.isPending && <Loader2 className="animate-spin" />}
+            ثبت پرداخت
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

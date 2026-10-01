@@ -645,6 +645,42 @@ CREATE TABLE invoices (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
+-- trainer_payment_info: where an athlete sends a card-to-card payment.
+-- invoice_payment_claims: an athlete's "I paid" against a pending invoice. The
+-- invoice stays pending (and its plan locked) until the trainer approves one.
+-- =========================================================================
+CREATE TABLE trainer_payment_info (
+  trainer_id  CHAR(36) NOT NULL PRIMARY KEY,
+  card_number VARCHAR(19) NULL,
+  sheba       VARCHAR(26) NULL,
+  holder_name VARCHAR(100) NULL,
+  bank_name   VARCHAR(60) NULL,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_tpi_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE invoice_payment_claims (
+  id                CHAR(36) NOT NULL PRIMARY KEY,
+  invoice_id        CHAR(36) NOT NULL,
+  athlete_id        CHAR(36) NOT NULL,
+  tracking_code     VARCHAR(40) NOT NULL,
+  card_last4        CHAR(4) NOT NULL,
+  paid_at           DATETIME NULL,
+  note              VARCHAR(500) NULL,
+  receipt_path      VARCHAR(120) NULL,   -- file under uploads/receipts/, NULL once purged
+  receipt_purged_at DATETIME NULL,
+  status            ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  trainer_note      VARCHAR(500) NULL,
+  reviewed_at       DATETIME NULL,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_claims_invoice (invoice_id, created_at DESC),
+  KEY idx_claims_status (status),
+  KEY idx_claims_tracking (tracking_code),
+  CONSTRAINT fk_claims_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+  CONSTRAINT fk_claims_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
 -- session_packages: a block of N private sessions a trainer sells one athlete.
 -- Selling it issues an invoice; settling that invoice flips it to 'active' and
 -- creates its package_sessions rows. Unrelated to class_attendance_logs (a

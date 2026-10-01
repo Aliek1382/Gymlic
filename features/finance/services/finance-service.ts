@@ -61,12 +61,18 @@ export async function prepareReceipt(file: File): Promise<File> {
   }
 }
 
-/** The receipt file for a request, as a blob (the endpoint needs the login header). */
-export async function fetchReceiptBlob(requestId: string): Promise<Blob> {
+export type ReceiptKind = "payment-request" | "invoice-claim";
+
+/**
+ * The receipt file of a club's payment request, or of an athlete's claim
+ * against a trainer's invoice, as a blob (the endpoint needs the login header).
+ */
+export async function fetchReceiptBlob(id: string, kind: ReceiptKind = "payment-request"): Promise<Blob> {
   const token = getToken();
+  const path = kind === "payment-request" ? `/payment-requests/${id}/receipt` : `/invoice-claims/${id}/receipt`;
   let response: Response;
   try {
-    response = await fetch(`${getApiBaseUrl()}/payment-requests/${requestId}/receipt`, {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
   } catch {

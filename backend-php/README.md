@@ -167,3 +167,29 @@ the payment dialog shows none of the new fields.
   Without the cron entry the same cleanup still runs, at most every six hours,
   when a club files a request or an admin opens the payment requests. Its last
   run shows up under "سلامت سایت" in `/admin/system` like the other cron jobs.
+
+## Athlete → trainer card-to-card payments
+
+A trainer's invoice (`invoices`) can now be paid card-to-card from the site.
+The database step is `schema/invoice-claims-update.sql` (admin panel's
+database page, or phpMyAdmin); before it has run the backend and pages behave
+as they did (`Receipts::claimsReady()` is false, endpoints answer 409).
+
+1. The trainer saves a receiving card in Settings (`trainer_payment_info`,
+   `GET/PUT /payment-info`; the card number is Luhn-checked).
+2. An athlete with a pending invoice sees that card (`pay_to` on
+   `GET /invoices/mine`, only for pending invoices) and files a claim:
+   `POST /invoices/{id}/claim` with tracking code, last four card digits and a
+   receipt (same rules, size ceiling, shrinking and retention as the club
+   payments, from the admin's billing settings). One waiting claim per invoice.
+3. The trainer is notified (`invoice_claim_submitted`) and sees the claim on
+   the plan, the package, the questionnaire and in `/invoices`. Approving
+   (`POST /invoices/{id}/claim/approve`) goes through `InvoiceController::settle`,
+   the same code as the manual "mark paid", so a session package is activated
+   and the plan unlocks. Rejecting (`.../claim/reject`) tells the athlete why
+   (`invoice_claim_rejected`) and lets them file again.
+4. The invoice stays `pending`, and the plan locked, until a claim is approved
+   or the trainer settles/cancels by hand (either closes a waiting claim).
+5. Receipt files (`GET /invoice-claims/{id}/receipt`, athlete or trainer only)
+   are deleted by the same cleanup as the club ones, N days after the claim is
+   reviewed.

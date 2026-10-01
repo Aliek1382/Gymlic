@@ -4,9 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listMyInvoices } from "../services/invoice-service";
 
-export function useMyInvoices() {
+/** Athlete side: { invoices, claimsEnabled }. */
+export function useMyInvoices(enabled = true) {
   return useQuery({
     queryKey: ["invoices", "mine"],
     queryFn: listMyInvoices,
+    enabled,
   });
 }

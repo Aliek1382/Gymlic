@@ -6,7 +6,9 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ClaimReview } from "@/features/invoices/components/claim-review";
 import { useCancelInvoice } from "@/features/invoices/hooks/use-cancel-invoice";
+import { useInvoices } from "@/features/invoices/hooks/use-invoices";
 import { useMarkInvoicePaid } from "@/features/invoices/hooks/use-mark-invoice-paid";
 import { PAYMENT_METHOD_LABEL } from "@/features/invoices/constants";
 import type { ManualPaymentMethod } from "@/features/invoices/types/invoice-types";
@@ -25,6 +27,8 @@ export function SessionPackageCard({ pkg }: { pkg: SessionPackage }) {
 
   const awaitingPayment = pkg.status === "pending_payment" && pkg.invoiceId !== null;
   const hasSessions = pkg.status === "active" || pkg.status === "completed";
+  const invoices = useInvoices(pkg.athleteId, awaitingPayment);
+  const invoice = invoices.data?.find((row) => row.id === pkg.invoiceId);
 
   return (
     <div className="space-y-3 rounded-xl border border-border p-4">
@@ -54,6 +58,8 @@ export function SessionPackageCard({ pkg }: { pkg: SessionPackage }) {
           </Button>
         </div>
       )}
+
+      {awaitingPayment && invoice && <ClaimReview invoice={invoice} />}
 
       {hasSessions && (
         <>

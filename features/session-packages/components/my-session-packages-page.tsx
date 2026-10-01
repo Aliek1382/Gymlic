@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
+import { PayInvoiceCard } from "@/features/invoices/components/pay-invoice-card";
 import { formatNumber, toPersianDigits } from "@/lib/persian";
 import { PACKAGE_STATUS_LABEL, PACKAGE_STATUS_VARIANT } from "../constants";
 import { useMySessionPackages } from "../hooks/use-my-session-packages";
@@ -29,6 +30,11 @@ function LockedPackage({ pkg }: { pkg: SessionPackage }) {
         <p className="text-xs text-muted-foreground">
           شماره فاکتور: {toPersianDigits(pkg.invoiceId.slice(0, 8).toUpperCase())}
         </p>
+      )}
+      {pkg.invoiceId && (
+        <div className="mt-2 w-full">
+          <PayInvoiceCard invoiceId={pkg.invoiceId} />
+        </div>
       )}
     </div>
   );

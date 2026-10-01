@@ -216,7 +216,8 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
             <CardDescription>
               باشگاه هنگام ثبت درخواست، کد پیگیری و چهار رقم آخر کارتش را همیشه وارد می‌کند. تصویر
               رسید در مرورگر کوچک و در سرور دوباره فشرده می‌شود و پس از بررسی درخواست، خودکار حذف
-              می‌شود. درخواست‌های در انتظار، رسیدشان را تا زمان بررسی نگه می‌دارند.
+              می‌شود. درخواست‌های در انتظار، رسیدشان را تا زمان بررسی نگه می‌دارند. همین تنظیمات برای
+              رسیدی که ورزشکار برای پرداخت به مربی می‌فرستد هم اعمال می‌شود.
             </CardDescription>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">

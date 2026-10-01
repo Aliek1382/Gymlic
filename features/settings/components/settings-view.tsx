@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProfile } from "@/features/authentication";
+import { TrainerPaymentInfoCard } from "@/features/invoices/components/trainer-payment-info-card";
 import { EmailForm } from "./email-form";
 import { NutritionGoalCard } from "./nutrition-goal-card";
 import { NotificationChannelsCard } from "./notification-channels-card";
@@ -39,6 +40,7 @@ export function SettingsView() {
       {profile.data.accountType === "athlete" && (
         <NutritionGoalCard profile={profile.data} />
       )}
+      {profile.data.accountType === "trainer" && <TrainerPaymentInfoCard />}
       <NotificationChannelsCard profile={profile.data} />
       <EmailForm currentEmail={profile.data.email} />
       <PasswordForm />

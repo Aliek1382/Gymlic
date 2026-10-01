@@ -23,6 +23,8 @@ import { useCancelInvoice } from "../hooks/use-cancel-invoice";
 import { useCreateInvoice } from "../hooks/use-create-invoice";
 import { useInvoices } from "../hooks/use-invoices";
 import { useMarkInvoicePaid } from "../hooks/use-mark-invoice-paid";
+import { useTrainerPaymentInfo } from "../hooks/use-trainer-payment-info";
+import { ClaimReview } from "./claim-review";
 import type { InvoiceItemType, ManualPaymentMethod } from "../types/invoice-types";
 
 /**
@@ -43,6 +45,7 @@ export function PlanInvoicePanel({
   const createInvoice = useCreateInvoice();
   const markPaid = useMarkInvoicePaid();
   const cancelInvoice = useCancelInvoice();
+  const paymentInfo = useTrainerPaymentInfo();
 
   const [priceOpen, setPriceOpen] = useState(false);
   const [amountText, setAmountText] = useState("");
@@ -121,6 +124,14 @@ export function PlanInvoicePanel({
           </Button>
         </div>
       )}
+
+      {invoice?.status === "pending" && paymentInfo.data?.ready && !paymentInfo.data.info.card_number && (
+        <p className="text-xs text-muted-foreground">
+          برای پرداخت کارت‌به‌کارت ورزشکار، شمارهٔ کارت خود را در «تنظیمات» ثبت کنید.
+        </p>
+      )}
+
+      {invoice && <ClaimReview invoice={invoice} />}
 
       <Dialog open={priceOpen} onOpenChange={setPriceOpen}>
         <DialogContent>

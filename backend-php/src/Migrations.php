@@ -143,6 +143,12 @@ final class Migrations
             ],
         ],
         [
+            'id'    => 'invoice-claims',
+            'file'  => 'invoice-claims-update.sql',
+            'title' => 'پرداخت کارت‌به‌کارت ورزشکار به مربی: کارت مربی و ثبت «پرداخت کردم»',
+            'check' => [['table', 'trainer_payment_info'], ['table', 'invoice_payment_claims']],
+        ],
+        [
             'id'    => 'communication',
             'file'  => 'communication-update.sql',
             'title' => 'اعلان همگانی، تیکت پشتیبانی و صفحه‌های متنی (فاز ۷)',
