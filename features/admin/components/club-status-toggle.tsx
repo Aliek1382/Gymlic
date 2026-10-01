@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { useAdminCan } from "../hooks/use-admin-access";
 import type { ClubStatus } from "@/types/database.types";
 import { setClubStatus } from "../services/admin-service";
 
@@ -17,6 +18,7 @@ export function ClubStatusToggle({
   clubId: string;
   status: ClubStatus;
 }) {
+  const can = useAdminCan();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -56,6 +58,9 @@ export function ClubStatusToggle({
     );
   }
 
+
+  // A role that can only view users sees the state, not the switch.
+  if (!can("users.manage")) return null;
   return (
     <Button
       variant={status === "active" ? "destructive" : "default"}

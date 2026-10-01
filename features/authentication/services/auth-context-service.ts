@@ -12,6 +12,27 @@ import type {
  * gate that used to run in a Server Component now resolves here instead and
  * is cached for the session by React Query.
  */
+export type AdminPermission =
+  | "users.view"
+  | "users.manage"
+  | "finance"
+  | "content"
+  | "notifications"
+  | "settings"
+  | "system"
+  | "activity";
+
+/**
+ * Access to /admin. super = profiles.is_platform_admin (everything); staff =
+ * a limited role with only `permissions`. Mirrors backend-php/src/AdminAccess.php,
+ * which enforces it on every request — this only decides what to show.
+ */
+export interface AdminAccess {
+  level: "super" | "staff";
+  roleName: string | null;
+  permissions: AdminPermission[];
+}
+
 export interface AuthContext {
   userId: string;
   phone: string | null;
@@ -22,6 +43,8 @@ export interface AuthContext {
   birthDate: string | null;
   accountType: AccountType | null;
   isPlatformAdmin: boolean;
+  /** Any kind of admin access, super or staff; null for everyone else. */
+  admin: AdminAccess | null;
   isSuspended: boolean;
   activeMembership: {
     clubId: string;
@@ -59,6 +82,12 @@ interface MeResponse {
     last_name: string | null;
     avatar_url: string | null;
   } | null;
+  /** Absent from a backend older than admin roles. */
+  admin?: {
+    level: "super" | "staff";
+    role_name: string | null;
+    permissions: AdminPermission[];
+  } | null;
 }
 
 /**
@@ -93,6 +122,11 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     birthDate: user.birth_date,
     accountType: user.account_type,
     isPlatformAdmin: user.is_platform_admin,
+    admin: data.admin
+      ? { level: data.admin.level, roleName: data.admin.role_name, permissions: data.admin.permissions }
+      : user.is_platform_admin
+        ? { level: "super", roleName: null, permissions: ALL_PERMISSIONS }
+        : null,
     isSuspended: user.is_suspended,
     activeMembership: membership
       ? {
@@ -108,15 +142,27 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   };
 }
 
+export const ALL_PERMISSIONS: AdminPermission[] = [
+  "users.view",
+  "users.manage",
+  "finance",
+  "content",
+  "notifications",
+  "settings",
+  "system",
+  "activity",
+];
+
 export interface AdminContext {
   userId: string;
   fullName: string;
   avatarUrl: string | null;
+  access: AdminAccess;
 }
 
 /**
  * Gate for the whole /admin route group. Returns null for anyone without
- * profiles.is_platform_admin set — including a signed-out visitor.
+ * admin access (super or a staff role) — including a signed-out visitor.
  *
  * On a static host this check is a routing convenience, not the security
  * boundary: /admin's HTML shell is served to anyone who asks for it. What
@@ -125,12 +171,13 @@ export interface AdminContext {
  */
 export async function getAdminContext(): Promise<AdminContext | null> {
   const context = await getAuthContext();
-  if (!context?.isPlatformAdmin) return null;
+  if (!context?.admin) return null;
 
   return {
     userId: context.userId,
-    fullName: fullName(context.firstName, context.lastName, "مدیر کل"),
+    fullName: fullName(context.firstName, context.lastName, "مدیر"),
     avatarUrl: context.avatarUrl,
+    access: context.admin,
   };
 }
 

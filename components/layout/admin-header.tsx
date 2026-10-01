@@ -4,7 +4,8 @@ import { usePathname } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ADMIN_SIDEBAR_NAV } from "./admin-sidebar-nav";
+import { useAdminContext } from "@/features/authentication/hooks/use-auth-context";
+import { adminNavItemFor } from "./admin-sidebar-nav";
 import { AdminMobileSidebar } from "./admin-mobile-sidebar";
 
 interface AdminHeaderProps {
@@ -15,12 +16,10 @@ interface AdminHeaderProps {
 export function AdminHeader({ fullName, avatarUrl }: AdminHeaderProps) {
   const pathname = usePathname();
   const initials = fullName.trim().slice(0, 2) || "کا";
-  const pageTitle =
-    ADMIN_SIDEBAR_NAV.find((item) =>
-      item.href === "/admin"
-        ? pathname === "/admin"
-        : pathname === item.href || pathname.startsWith(`${item.href}/`)
-    )?.label ?? "پنل مدیریت";
+  const { data: admin } = useAdminContext();
+  const pageTitle = adminNavItemFor(pathname)?.label ?? "پنل مدیریت";
+  const roleLabel =
+    admin?.access.level === "staff" ? (admin.access.roleName ?? "مدیر") : "مدیر کل پلتفرم";
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
@@ -36,7 +35,7 @@ export function AdminHeader({ fullName, avatarUrl }: AdminHeaderProps) {
             {fullName}
           </p>
           <p className="text-xs leading-tight text-muted-foreground">
-            مدیر کل پلتفرم
+            {roleLabel}
           </p>
         </div>
       </div>

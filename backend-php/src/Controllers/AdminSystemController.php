@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Gymlic\Controllers;
 
+use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\CronHeartbeat;
@@ -26,7 +27,7 @@ final class AdminSystemController
 
     public static function health(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('system');
         $pdo = Database::connection();
         $config = require __DIR__ . '/../../config.php';
 
@@ -77,7 +78,7 @@ final class AdminSystemController
      */
     public static function alerts(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('system');
         $pdo = Database::connection();
 
         $pending = count(array_filter(Migrations::status(), static fn (array $m): bool => $m['state'] === 'pending'));
@@ -101,13 +102,13 @@ final class AdminSystemController
 
     public static function migrations(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin(AdminAccess::SUPER);
         Response::ok(['items' => Migrations::status()]);
     }
 
     public static function runMigration(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin(AdminAccess::SUPER);
         if (!Migrations::exists($params['id'])) {
             Response::error(404, 'not_found', 'این به‌روزرسانی وجود ندارد.');
             return;
@@ -135,7 +136,7 @@ final class AdminSystemController
      */
     public static function backup(): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin(AdminAccess::SUPER);
         $pdo = Database::connection();
         @set_time_limit(0);
 
@@ -179,7 +180,7 @@ final class AdminSystemController
     /** ?status=pending|sent|failed &channel=sms|email */
     public static function deliveries(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('system');
         $pdo = Database::connection();
 
         $where = [];
@@ -235,7 +236,7 @@ final class AdminSystemController
     /** Back in the queue with fresh attempts: the next cron run sends it. */
     public static function retryDelivery(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('system');
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             "UPDATE notification_deliveries SET status = 'pending', attempts = 0, last_error = NULL
@@ -253,7 +254,7 @@ final class AdminSystemController
     /** The last 30 days only (what the page counts): an old reminder sent now is noise. */
     public static function retryAllFailed(): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('system');
         $pdo = Database::connection();
         $count = $pdo->exec(
             "UPDATE notification_deliveries SET status = 'pending', attempts = 0, last_error = NULL
@@ -266,7 +267,7 @@ final class AdminSystemController
     /** Sends one row right away instead of waiting for the cron, and reports the outcome. */
     public static function sendDelivery(array $params): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin('system');
         $pdo = Database::connection();
         $row = DeliveryDispatcher::find($pdo, $params['id']);
         if ($row === null) {

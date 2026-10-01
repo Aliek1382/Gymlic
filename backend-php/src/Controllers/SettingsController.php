@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Gymlic\Controllers;
 
+use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Features;
@@ -19,6 +20,17 @@ use Throwable;
  */
 final class SettingsController
 {
+    /** The permission each settings group needs; anything not listed is super admin only. */
+    private const KEY_PERMISSION = [
+        'maintenance'   => 'settings',
+        'signup'        => 'settings',
+        'announcement'  => 'settings',
+        'support'       => 'settings',
+        'features'      => 'settings',
+        'limits'        => 'settings',
+        'points_levels' => 'content',
+    ];
+
     /**
      * What the frontend needs before it can decide what to show: whether the
      * site is in maintenance, whether sign-up is open, the banner, the support
@@ -42,11 +54,14 @@ final class SettingsController
 
     public static function adminGet(): void
     {
-        Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin('settings');
 
+        // A limited role never even sees the masked SMS/email credentials.
         $settings = [];
         foreach (Settings::KEYS as $key) {
-            $settings[$key] = self::masked($key, Settings::get($key));
+            if (AdminAccess::can($admin, self::KEY_PERMISSION[$key] ?? AdminAccess::SUPER)) {
+                $settings[$key] = self::masked($key, Settings::get($key));
+            }
         }
 
         $sms = SmsGateway::credentials();
@@ -73,13 +88,14 @@ final class SettingsController
     /** Replaces one settings group. Body: {"value": {...}}. */
     public static function adminUpdate(array $params): void
     {
-        $admin = Auth::requirePlatformAdmin();
+        $admin = Auth::requireAdmin(['settings', 'content']);
         $key = $params['key'];
 
         if (!in_array($key, Settings::KEYS, true)) {
             Response::error(404, 'unknown_setting', 'این گروه تنظیمات وجود ندارد.');
             return;
         }
+        $admin = Auth::requireAdmin(self::KEY_PERMISSION[$key] ?? AdminAccess::SUPER);
 
         $body = Validate::body();
         if (!array_key_exists('value', $body) || !is_array($body['value'])) {
@@ -90,6 +106,13 @@ final class SettingsController
         if ($key === 'support' && ($body['value']['email'] ?? '') !== ''
             && !Validate::email(trim((string) $body['value']['email']))) {
             Response::error(400, 'invalid_email', 'ایمیل پشتیبانی معتبر نیست.');
+            return;
+        }
+
+        // Two-step login is only switched on through its own flow, which
+        // proves an SMS code reaches the admin first (SecurityController).
+        if ($key === 'security' && !empty($body['value']['admin_2fa']) && !Settings::get('security')['admin_2fa']) {
+            Response::error(409, 'use_2fa_flow', 'ورود دومرحله‌ای را از صفحهٔ «امنیت» و با تأیید کد پیامکی روشن کنید.');
             return;
         }
 
@@ -117,7 +140,7 @@ final class SettingsController
     /** Sends one SMS through whatever is configured, and says why not if it fails. */
     public static function testSms(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin(AdminAccess::SUPER);
         $data = Validate::required(Validate::body(), ['phone']);
 
         if (SmsGateway::send((string) $data['phone'], 'پیامک آزمایشی جیم‌لیک: تنظیمات پیامک درست کار می‌کند.')) {
@@ -129,7 +152,7 @@ final class SettingsController
 
     public static function testMail(): void
     {
-        Auth::requirePlatformAdmin();
+        Auth::requireAdmin(AdminAccess::SUPER);
         $data = Validate::required(Validate::body(), ['email']);
 
         $sent = MailGateway::send(

@@ -9,10 +9,16 @@ export interface AdminUserRow {
   last_name: string | null;
   email: string | null;
   phone: string | null;
+  birth_date: string | null;
   account_type: AccountType | null;
   avatar_url: string | null;
   is_suspended: boolean;
   is_platform_admin: boolean;
+  /** A limited admin role, if the account has one (null before the phase-5 update). */
+  admin_role_id: string | null;
+  admin_role_name: string | null;
+  /** Devices currently signed in. */
+  session_count: number;
   created_at: string;
   /** Newest live session; sessions are deleted on logout, so approximate. */
   last_login_at: string | null;
@@ -29,8 +35,32 @@ export async function setUserRole(userId: string, role: AccountType | null) {
   await api.patch(`/admin/users/${userId}/role`, { account_type: role });
 }
 
-export async function setUserAdmin(userId: string, isAdmin: boolean) {
-  await api.post(`/admin/users/${userId}/admin`, { is_admin: isAdmin });
+export type AdminLevel = "none" | "super" | "role";
+
+export async function setUserAdminLevel(userId: string, level: AdminLevel, roleId?: string) {
+  await api.post(`/admin/users/${userId}/admin`, { level, role_id: roleId ?? null });
+}
+
+export interface UserSession {
+  /** A hash prefix, not the token. */
+  id: string;
+  user_agent: string | null;
+  ip_address: string | null;
+  created_at: string;
+  expires_at: string;
+  /** The session this very page is using. */
+  is_current: boolean;
+}
+
+export async function listUserSessions(userId: string): Promise<UserSession[]> {
+  return (await api.get<{ items: UserSession[] }>(`/admin/users/${userId}/sessions`)).items;
+}
+
+/** One device, or — without sessionId — every device. */
+export function revokeUserSessions(userId: string, sessionId?: string) {
+  return api.delete<{ count: number }>(
+    `/admin/users/${userId}/sessions${sessionId ? `/${sessionId}` : ""}`
+  );
 }
 
 export async function setUserPassword(userId: string, password: string) {

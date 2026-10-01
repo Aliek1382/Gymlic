@@ -27,13 +27,60 @@ interface SessionResponse {
   user: ProfileRow;
 }
 
-export async function signInWithPassword(email: string, password: string) {
-  const data = await api.post<SessionResponse>("/auth/login", {
+/** The second step an admin gets when two-step login is on. */
+export interface TwoFactorChallenge {
+  challengeId: string;
+  phoneHint: string;
+  /** Seconds the code stays valid, and before a new one can be asked for. */
+  expiresIn: number;
+  resendAfter: number;
+}
+
+interface TwoFactorResponse {
+  two_factor: {
+    challenge_id: string;
+    phone_hint: string;
+    expires_in: number;
+    resend_after: number;
+  };
+}
+
+/**
+ * Signs in, or — for an admin with two-step login on — returns the code
+ * challenge instead; verifyLoginCode then finishes the login.
+ */
+export async function signInWithPassword(
+  email: string,
+  password: string
+): Promise<{ twoFactor: TwoFactorChallenge | null }> {
+  const data = await api.post<SessionResponse | TwoFactorResponse>("/auth/login", {
     email: email.trim(),
     password,
   });
+  if ("two_factor" in data) {
+    return {
+      twoFactor: {
+        challengeId: data.two_factor.challenge_id,
+        phoneHint: data.two_factor.phone_hint,
+        expiresIn: data.two_factor.expires_in,
+        resendAfter: data.two_factor.resend_after,
+      },
+    };
+  }
   setToken(data.token);
-  return data;
+  return { twoFactor: null };
+}
+
+export async function verifyLoginCode(challengeId: string, code: string): Promise<void> {
+  const data = await api.post<SessionResponse>("/auth/login/verify", {
+    challenge_id: challengeId,
+    code: code.trim(),
+  });
+  setToken(data.token);
+}
+
+export async function resendLoginCode(challengeId: string): Promise<void> {
+  await api.post("/auth/login/resend", { challenge_id: challengeId });
 }
 
 export async function signUpWithPassword(

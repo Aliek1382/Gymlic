@@ -80,7 +80,10 @@ export function AdminSiteSettingsPage() {
           <TabsList>
             <TabsTrigger value="general">عمومی</TabsTrigger>
             <TabsTrigger value="limits">محدودیت‌ها</TabsTrigger>
-            <TabsTrigger value="delivery">پیامک و ایمیل</TabsTrigger>
+            {/* Credentials: only a super admin gets them from the API at all. */}
+            {data.settings.sms && data.settings.mail && (
+              <TabsTrigger value="delivery">پیامک و ایمیل</TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="general">
             <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
@@ -99,20 +102,22 @@ export function AdminSiteSettingsPage() {
               />
             </div>
           </TabsContent>
-          <TabsContent value="delivery">
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-              <SmsCard
-                initial={data.settings.sms}
-                delivery={data.delivery}
-                locked={!data.storageReady}
-              />
-              <MailCard
-                initial={data.settings.mail}
-                delivery={data.delivery}
-                locked={!data.storageReady}
-              />
-            </div>
-          </TabsContent>
+          {data.settings.sms && data.settings.mail && (
+            <TabsContent value="delivery">
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+                <SmsCard
+                  initial={data.settings.sms}
+                  delivery={data.delivery}
+                  locked={!data.storageReady}
+                />
+                <MailCard
+                  initial={data.settings.mail}
+                  delivery={data.delivery}
+                  locked={!data.storageReady}
+                />
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       )}
     </div>

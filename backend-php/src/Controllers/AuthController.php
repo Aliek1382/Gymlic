@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 namespace Gymlic\Controllers;
 
+use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Security;
 use Gymlic\Settings;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -85,10 +87,23 @@ final class AuthController
         Response::ok(['token' => $session['token'], 'user' => self::profilePublic($user)], 201);
     }
 
+    /**
+     * Email + password. Repeated failures lock the email (and the IP) for a
+     * while — see Security. For an admin with two-step login on, a correct
+     * password doesn't sign in yet: it texts a code and answers
+     * {two_factor: {...}}; /auth/login/verify finishes the login.
+     */
     public static function login(): void
     {
         $data = Validate::required(Validate::body(), ['email', 'password']);
         $email = strtolower(trim((string) $data['email']));
+        $ip = Security::clientIp();
+
+        $locked = Security::lockedMinutes($email, $ip);
+        if ($locked !== null) {
+            self::lockedResponse($locked);
+            return;
+        }
 
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT * FROM profiles WHERE email = :email');
@@ -96,6 +111,7 @@ final class AuthController
         $user = $stmt->fetch();
 
         if ($user === false || !Auth::verifyPassword((string) $data['password'], $user['password_hash'])) {
+            Security::recordAttempt($email, $ip, false);
             Response::error(401, 'invalid_credentials', 'Incorrect email or password.');
             return;
         }
@@ -104,8 +120,86 @@ final class AuthController
             return;
         }
 
+        if (Security::twoFactorRequired($user)) {
+            [$challengeId, $error] = Security::startChallenge($user, 'login');
+            if ($challengeId === null) {
+                Response::error(503, 'two_factor_unavailable', 'ورود دومرحله‌ای برای مدیران روشن است ولی کد ارسال نشد: ' . $error);
+                return;
+            }
+            // Not a success yet: the lockout keeps counting until the code is right.
+            Response::ok(['two_factor' => [
+                'challenge_id' => $challengeId,
+                'phone_hint'   => Security::phoneHint($user['phone']),
+                'expires_in'   => Security::CODE_TTL_MINUTES * 60,
+                'resend_after' => Security::RESEND_AFTER_SECONDS,
+            ]]);
+            return;
+        }
+
+        Security::recordAttempt($email, $ip, true);
         $session = Auth::createSession($user['id']);
         Response::ok(['token' => $session['token'], 'user' => self::profilePublic($user)]);
+    }
+
+    /** The second step of an admin login: the texted code. */
+    public static function verifyLogin(): void
+    {
+        $data = Validate::required(Validate::body(), ['challenge_id', 'code']);
+        $pdo = Database::connection();
+
+        $owner = $pdo->prepare(
+            "SELECT p.* FROM login_challenges c JOIN profiles p ON p.id = c.user_id WHERE c.id = :id AND c.purpose = 'login'"
+        );
+        $owner->execute(['id' => (string) $data['challenge_id']]);
+        $user = $owner->fetch();
+        if ($user === false) {
+            Response::error(410, 'challenge_expired', 'این کد منقضی شده است. دوباره وارد شوید.');
+            return;
+        }
+
+        $email = strtolower((string) $user['email']);
+        $ip = Security::clientIp();
+        $locked = Security::lockedMinutes($email, $ip);
+        if ($locked !== null) {
+            self::lockedResponse($locked);
+            return;
+        }
+
+        [$userId, $error] = Security::verifyChallenge((string) $data['challenge_id'], 'login', (string) $data['code']);
+        if ($userId === null) {
+            Security::recordAttempt($email, $ip, false);
+            Response::error(401, 'invalid_code', $error ?? 'کد واردشده درست نیست.');
+            return;
+        }
+        if ((int) $user['is_suspended'] === 1) {
+            Response::error(403, 'account_suspended', 'This account has been suspended.');
+            return;
+        }
+
+        Security::recordAttempt($email, $ip, true);
+        $session = Auth::createSession($userId);
+        Response::ok(['token' => $session['token'], 'user' => self::profilePublic($user)]);
+    }
+
+    public static function resendLoginCode(): void
+    {
+        $data = Validate::required(Validate::body(), ['challenge_id']);
+        $error = Security::resendChallenge((string) $data['challenge_id'], 'login');
+        if ($error !== null) {
+            Response::error(429, 'resend_refused', $error);
+            return;
+        }
+        Response::ok(['ok' => true]);
+    }
+
+    private static function lockedResponse(int $minutes): void
+    {
+        $persian = strtr((string) $minutes, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
+        Response::error(
+            429,
+            'login_locked',
+            "به‌خاطر چند تلاش ناموفق پشت سر هم، ورود موقتاً قفل شده است. {$persian} دقیقهٔ دیگر دوباره امتحان کنید."
+        );
     }
 
     public static function logout(): void
@@ -148,8 +242,16 @@ final class AuthController
         $stmt->execute(['id' => $user['id']]);
         $trainer = $stmt->fetch() ?: null;
 
+        // What the panel shows of /admin: null for a regular user.
+        $admin = AdminAccess::of($user);
+
         Response::ok([
             'user'        => self::profilePublic($user) + ['is_suspended' => (bool) $user['is_suspended']],
+            'admin'       => $admin === null ? null : [
+                'level'       => $admin['level'],
+                'role_name'   => $admin['role_name'],
+                'permissions' => $admin['permissions'],
+            ],
             'membership'  => $membership,
             'trainer'     => $trainer,
         ]);

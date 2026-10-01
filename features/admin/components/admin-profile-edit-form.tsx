@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { BirthDatePicker } from "@/features/settings/components/birth-date-picker";
 import { updateProfileAsAdmin } from "../services/admin-service";
+import { useAdminCan } from "../hooks/use-admin-access";
 import {
   adminProfileEditSchema,
   type AdminProfileEditFormValues,
@@ -38,6 +39,7 @@ export function AdminProfileEditForm({
   showBirthDate = true,
 }: AdminProfileEditFormProps) {
   const router = useRouter();
+  const can = useAdminCan();
 
   const form = useForm<AdminProfileEditFormValues>({
     resolver: zodResolver(adminProfileEditSchema),
@@ -67,6 +69,8 @@ export function AdminProfileEditForm({
     }
   }
 
+
+  if (!can("users.manage")) return null;
   return (
     <Card className="gap-6 py-6">
       <div className="px-6">

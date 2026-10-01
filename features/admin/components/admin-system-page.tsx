@@ -30,6 +30,7 @@ import {
   type SystemHealth,
 } from "../services/admin-system-service";
 import { formatBytes, formatMinutesAgo, parseSqlDate } from "../utils/format";
+import { useIsSuperAdmin } from "../hooks/use-admin-access";
 
 const CRON_STATE: Record<CronStatus["state"], { label: string; variant: "success" | "destructive" | "warning" }> = {
   ok: { label: "سالم", variant: "success" },
@@ -42,6 +43,8 @@ function intervalLabel(minutes: number): string {
 }
 
 export function AdminSystemPage() {
+  // The backup holds every password hash and key: super admin only.
+  const isSuper = useIsSuperAdmin();
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["admin", "system", "health"],
     queryFn: getSystemHealth,
@@ -78,7 +81,7 @@ export function AdminSystemPage() {
             <DatabaseCard health={data} />
             <HostCard health={data} />
             <UploadsCard health={data} />
-            <BackupCard />
+            {isSuper && <BackupCard />}
           </div>
         </>
       )}

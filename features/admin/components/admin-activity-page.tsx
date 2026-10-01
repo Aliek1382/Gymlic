@@ -41,6 +41,11 @@ const ADMIN_ACTIONS = [
   "migration_run",
   "backup_downloaded",
   "delivery_retried",
+  "sessions_revoked",
+  "two_factor_enabled",
+  "login_unlocked",
+  "admin_role_saved",
+  "admin_role_deleted",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -65,6 +70,11 @@ const ACTION_LABEL: Record<string, string> = {
   migration_run: "اجرای به‌روزرسانی دیتابیس",
   backup_downloaded: "دانلود نسخهٔ پشتیبان",
   delivery_retried: "ارسال دوبارهٔ پیامک/ایمیل",
+  sessions_revoked: "خارج‌کردن کاربر از دستگاه‌ها",
+  two_factor_enabled: "روشن‌کردن ورود دومرحله‌ای",
+  login_unlocked: "باز کردن قفل ورود",
+  admin_role_saved: "ذخیرهٔ نقش مدیریتی",
+  admin_role_deleted: "حذف نقش مدیریتی",
 };
 
 const SETTINGS_GROUP_LABEL: Record<string, string> = {
@@ -77,6 +87,7 @@ const SETTINGS_GROUP_LABEL: Record<string, string> = {
   limits: "محدودیت پیام و فایل",
   sms: "تنظیمات پیامک",
   mail: "تنظیمات ایمیل",
+  security: "امنیت ورود",
 };
 
 export function AdminActivityPage() {
@@ -138,7 +149,14 @@ export function AdminActivityPage() {
                   log.action === "migration_run"
                     ? `${String(log.metadata?.id ?? "")}${log.metadata?.ok === false ? " (ناموفق)" : ""}`
                     : "";
+                const roleOrLock =
+                  log.action.startsWith("admin_role_")
+                    ? String(log.metadata?.name ?? "")
+                    : log.action === "login_unlocked"
+                      ? String(log.metadata?.email ?? log.metadata?.ip ?? "")
+                      : "";
                 const subjectName =
+                  (roleOrLock || undefined) ??
                   SETTINGS_GROUP_LABEL[settingsGroup] ??
                   (migration ||
                   (libraryItem ||
