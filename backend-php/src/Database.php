@@ -37,6 +37,26 @@ final class Database
     /** @var array<string, bool> */
     private static array $columns = [];
 
+    /** @var array<string, bool> */
+    private static array $tables = [];
+
+    /** Whether a table exists yet; same idea as hasColumn(). */
+    public static function hasTable(string $table): bool
+    {
+        if (!isset(self::$tables[$table])) {
+            try {
+                $stmt = self::connection()->prepare(
+                    'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table'
+                );
+                $stmt->execute(['table' => $table]);
+                self::$tables[$table] = $stmt->fetch() !== false;
+            } catch (\Throwable $e) {
+                self::$tables[$table] = false;
+            }
+        }
+        return self::$tables[$table];
+    }
+
     /**
      * Whether a column exists yet — for code that has to keep working on a
      * database whose ALTER hasn't been run (the backend can reach the host

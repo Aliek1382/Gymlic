@@ -48,6 +48,15 @@ export interface LimitsSettings {
   upload_mb: Record<AttachmentType, number>;
 }
 
+/** Empty fields = Gymlic's own name, color and mark. */
+export interface BrandingSettings {
+  app_name: string;
+  /** "#rrggbb" */
+  primary_color: string;
+  /** Set only through the logo upload (uploadBrandLogo). */
+  logo_url: string;
+}
+
 export interface SiteSettings {
   maintenance: MaintenanceSettings;
   signup: SignupSettings;
@@ -55,6 +64,7 @@ export interface SiteSettings {
   support: SupportSettings;
   features: FeatureSettings;
   limits: LimitsSettings;
+  branding: BrandingSettings;
 }
 
 export type SiteSettingKey = keyof SiteSettings;
@@ -73,6 +83,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     attachments: { voice: true, image: true, video: true, file: true },
     upload_mb: { voice: 8, image: 8, video: 50, file: 8 },
   },
+  branding: { app_name: "", primary_color: "", logo_url: "" },
 };
 
 /**
@@ -167,6 +178,17 @@ export async function updateSiteSetting<K extends AdminSettingKey>(
     value,
     clear_secrets: clearSecrets,
   });
+  return data.value;
+}
+
+/** Uploads a new logo (PNG, JPG or WebP); returns the whole branding group as saved. */
+export async function uploadBrandLogo(file: File): Promise<BrandingSettings> {
+  const data = await api.upload<{ value: BrandingSettings }>("/admin/branding/logo", file);
+  return data.value;
+}
+
+export async function removeBrandLogo(): Promise<BrandingSettings> {
+  const data = await api.delete<{ value: BrandingSettings }>("/admin/branding/logo");
   return data.value;
 }
 

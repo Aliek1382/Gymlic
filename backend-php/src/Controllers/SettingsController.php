@@ -32,6 +32,7 @@ final class SettingsController
         'points_levels' => 'content',
         'billing'       => 'finance',
         'templates'     => 'notifications',
+        'branding'      => 'settings',
     ];
 
     /**
@@ -122,6 +123,25 @@ final class SettingsController
             }
         }
 
+        if ($key === 'branding') {
+            // The logo has its own upload (BrandingController); a save of
+            // the name and color leaves it as it is.
+            $body['value']['logo_url'] = Settings::get('branding')['logo_url'];
+            $color = $body['value']['primary_color'] ?? '';
+            if ($color !== '' && (!is_string($color) || preg_match('/^#[0-9a-f]{6}$/i', $color) !== 1)) {
+                Response::error(400, 'invalid_color', 'رنگ باید به شکل #RRGGBB باشد.');
+                return;
+            }
+            if ($color !== '' && self::contrastWithWhite($color) < 3.0) {
+                Response::error(
+                    400,
+                    'color_too_light',
+                    'این رنگ روی زمینهٔ سفید خوانا نیست (متن و دکمه‌ها کم‌رنگ دیده می‌شوند). رنگ تیره‌تری انتخاب کنید.'
+                );
+                return;
+            }
+        }
+
         // Two-step login is only switched on through its own flow, which
         // proves an SMS code reaches the admin first (SecurityController).
         if ($key === 'security' && !empty($body['value']['admin_2fa']) && !Settings::get('security')['admin_2fa']) {
@@ -168,6 +188,21 @@ final class SettingsController
         }
 
         return null;
+    }
+
+    /**
+     * WCAG contrast of a #rrggbb color against white. The main color is
+     * also the color of links and outlined text on white, so it needs at
+     * least 3:1 (what WCAG asks of large text and controls).
+     */
+    public static function contrastWithWhite(string $hex): float
+    {
+        $channel = static function (string $pair): float {
+            $c = hexdec($pair) / 255;
+            return $c <= 0.03928 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
+        };
+        $l = 0.2126 * $channel(substr($hex, 1, 2)) + 0.7152 * $channel(substr($hex, 3, 2)) + 0.0722 * $channel(substr($hex, 5, 2));
+        return 1.05 / ($l + 0.05);
     }
 
     private static function luhn(string $digits): bool

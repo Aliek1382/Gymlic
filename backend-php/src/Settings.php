@@ -19,11 +19,11 @@ final class Settings
     public const ROLES = ['club', 'trainer', 'athlete'];
 
     public const KEYS = [
-        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing', 'templates',
+        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing', 'templates', 'branding',
     ];
 
     /** The groups any visitor may read; everything else is admin-only. */
-    public const PUBLIC_KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features', 'limits'];
+    public const PUBLIC_KEYS = ['maintenance', 'signup', 'announcement', 'support', 'features', 'limits', 'branding'];
 
     /**
      * Fields that are credentials: never sent back to the browser (the admin
@@ -179,6 +179,18 @@ final class Settings
             ],
             // Notification texts; see Templates.
             'templates' => Templates::normalize($v),
+            // The name, main color and logo the panel shows; empty = Gymlic's
+            // own. The logo is only set by BrandingController's upload.
+            'branding' => [
+                'app_name'      => self::text($v['app_name'] ?? null, 40),
+                'primary_color' => is_string($v['primary_color'] ?? null) && preg_match('/^#[0-9a-f]{6}$/i', $v['primary_color']) === 1
+                    ? strtolower($v['primary_color'])
+                    : '',
+                'logo_url'      => is_string($v['logo_url'] ?? null) && preg_match('#^https?://[^\s<>"\'()]+$#i', $v['logo_url']) === 1
+                    && strlen($v['logo_url']) <= 1024
+                    ? $v['logo_url']
+                    : '',
+            ],
             // Empty = fall back to config.php (see SmsGateway / MailGateway).
             'sms' => [
                 'api_key' => self::text($v['api_key'] ?? null, 200),

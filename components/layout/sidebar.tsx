@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { GymlicMark } from "@/components/brand/gymlic-mark";
+import { BrandMark, BrandName } from "@/components/brand/brand-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { MessagesNavBadge } from "@/features/messages/components/messages-nav-badge";
 import { featureForPath, useFeatureCheck } from "@/features/site-settings";
@@ -159,10 +159,8 @@ export function SidebarContent({
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar">
       <div className="flex shrink-0 items-center gap-2.5 px-6 py-6">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <GymlicMark className="size-5" />
-        </div>
-        <span className="text-lg font-bold text-foreground">جیم‌لیک</span>
+        <BrandMark className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground" iconClassName="size-5" />
+        <span className="text-lg font-bold text-foreground"><BrandName /></span>
       </div>
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-4">

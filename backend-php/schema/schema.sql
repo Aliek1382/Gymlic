@@ -858,11 +858,24 @@ CREATE TABLE sessions (
   user_id     CHAR(36)  NOT NULL,
   user_agent  VARCHAR(255) NULL,
   ip_address  VARCHAR(45) NULL,
+  impersonated_by CHAR(36) NULL,               -- a super admin viewing this user's panel (read_only)
+  read_only   TINYINT(1) NOT NULL DEFAULT 0,   -- only GET requests (and logout) are allowed
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at  DATETIME NOT NULL,
   KEY idx_sessions_user (user_id),
   KEY idx_sessions_expiry (expires_at),
-  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sessions_impersonator FOREIGN KEY (impersonated_by) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One row per user per day they used the panel (Auth::currentUser), for the
+-- admin's active-user charts.
+CREATE TABLE daily_active (
+  day     DATE     NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  PRIMARY KEY (day, user_id),
+  KEY idx_daily_active_user (user_id),
+  CONSTRAINT fk_daily_active_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;

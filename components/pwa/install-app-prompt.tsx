@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { GymlicMark } from "@/components/brand/gymlic-mark";
+import { BrandMark } from "@/components/brand/brand-mark";
 
 const DISMISSED_KEY = "gymlic:install-prompt-dismissed-at";
 // Dismissing hides the prompt for a fortnight rather than for good: someone
@@ -121,9 +121,7 @@ export function InstallAppPrompt() {
   return (
     <>
       <div className="mb-6 flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <GymlicMark className="size-5" />
-        </div>
+        <BrandMark className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground" iconClassName="size-5" />
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">نصب اپلیکیشن</p>

@@ -1,4 +1,4 @@
-import { GymlicMark } from "@/components/brand/gymlic-mark";
+import { BrandMark, BrandName } from "@/components/brand/brand-mark";
 
 export function AuthShell({
   title,
@@ -13,10 +13,8 @@ export function AuthShell({
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <GymlicMark className="size-6" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">جیم‌لیک</h1>
+          <BrandMark className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground" iconClassName="size-6" />
+          <h1 className="text-2xl font-bold text-foreground"><BrandName /></h1>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">

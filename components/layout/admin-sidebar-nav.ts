@@ -18,11 +18,13 @@ import {
   Library,
   Megaphone,
   MessageSquareText,
+  Palette,
   ReceiptText,
   Settings,
   Tags,
   TicketPercent,
   ToggleRight,
+  TrendingUp,
   Trophy,
   UserCog,
   Users,
@@ -38,13 +40,18 @@ export interface AdminNavItem {
 }
 
 export interface AdminNavGroup {
-  /** No title for the first group: it holds only the overview. */
+  /** No title for the first group: the overview and the stats. */
   title?: string;
   items: AdminNavItem[];
 }
 
 export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
-  { items: [{ label: "نمای کلی", href: "/admin", icon: LayoutGrid }] },
+  {
+    items: [
+      { label: "نمای کلی", href: "/admin", icon: LayoutGrid },
+      { label: "آمار رشد و استفاده", href: "/admin/stats", icon: TrendingUp, permission: "users.view" },
+    ],
+  },
   {
     title: "کاربران",
     items: [
@@ -82,6 +89,7 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
     items: [
       { label: "مدیریت بخش‌ها", href: "/admin/features", icon: ToggleRight, permission: "settings" },
       { label: "تنظیمات سایت", href: "/admin/settings", icon: Settings, permission: "settings" },
+      { label: "برند و ظاهر", href: "/admin/branding", icon: Palette, permission: "settings" },
     ],
   },
   {

@@ -5,6 +5,9 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { OfflineBanner } from "@/components/pwa/offline-banner";
 import { OfflineSync } from "@/components/pwa/offline-sync";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
+import { BrandTheme } from "@/components/brand/brand-theme";
+import { ViewAsBanner } from "@/features/view-as/components/view-as-banner";
+import { BRAND_BOOT_SCRIPT } from "@/lib/brand-theme";
 import "./globals.css";
 
 const vazirmatn = Vazirmatn({
@@ -50,7 +53,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fa" dir="rtl" className={vazirmatn.variable}>
+    // suppressHydrationWarning: the brand script above sets style on <html> before React hydrates.
+    <html lang="fa" dir="rtl" className={vazirmatn.variable} suppressHydrationWarning>
       <body className="antialiased">
         {/* Chrome fires beforeinstallprompt exactly once, typically before
             React has hydrated, and the event is lost if nothing is listening.
@@ -61,7 +65,12 @@ export default function RootLayout({
             __html: `window.__gymlicInstallPrompt=null;window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__gymlicInstallPrompt=e;window.dispatchEvent(new Event("gymlic:installavailable"))});`,
           }}
         />
+        {/* The admin's main color from the last visit, before the first
+            paint (see lib/brand-theme.ts); BrandTheme keeps it current. */}
+        <script dangerouslySetInnerHTML={{ __html: BRAND_BOOT_SCRIPT }} />
         <QueryProvider>
+          <BrandTheme />
+          <ViewAsBanner />
           <ServiceWorkerRegistrar />
           <OfflineSync />
           <OfflineBanner />

@@ -57,12 +57,15 @@ final class AdminUsersController
         }
 
         $roles = AdminAccess::rolesReady();
+        // An admin's view of the account is not the account signing in.
+        $own = Auth::viewSessionsReady() ? ' AND s.impersonated_by IS NULL' : '';
+        $own2 = Auth::viewSessionsReady() ? ' AND s2.impersonated_by IS NULL' : '';
         $stmt = Database::connection()->prepare(
             'SELECT p.id, p.first_name, p.last_name, p.email, p.phone, p.birth_date, p.account_type, p.avatar_url,
                     p.is_suspended, p.is_platform_admin, p.created_at,
                     ' . ($roles ? 'p.admin_role_id, r.name AS admin_role_name,' : 'NULL AS admin_role_id, NULL AS admin_role_name,') . '
-                    (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = p.id AND s.expires_at > NOW()) AS last_login_at,
-                    (SELECT COUNT(*) FROM sessions s2 WHERE s2.user_id = p.id AND s2.expires_at > NOW()) AS session_count,
+                    (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = p.id AND s.expires_at > NOW()' . $own . ') AS last_login_at,
+                    (SELECT COUNT(*) FROM sessions s2 WHERE s2.user_id = p.id AND s2.expires_at > NOW()' . $own2 . ') AS session_count,
                     ' . self::linkCountSql('p.id') . ' AS link_count
              FROM profiles p'
             . ($roles ? ' LEFT JOIN admin_roles r ON r.id = p.admin_role_id' : '')
@@ -192,7 +195,8 @@ final class AdminUsersController
 
         $stmt = Database::connection()->prepare(
             'SELECT LEFT(SHA2(token, 256), 16) AS id, user_agent, ip_address, created_at, expires_at
-             FROM sessions WHERE user_id = :id AND expires_at > NOW()
+             FROM sessions WHERE user_id = :id AND expires_at > NOW()'
+            . (Auth::viewSessionsReady() ? ' AND impersonated_by IS NULL' : '') . '
              ORDER BY created_at DESC'
         );
         $stmt->execute(['id' => $params['id']]);
@@ -231,6 +235,44 @@ final class AdminUsersController
         ]);
 
         Response::ok(['count' => $stmt->rowCount()]);
+    }
+
+    /** How long a view of someone's panel lasts before it has to be opened again. */
+    private const VIEW_TTL_SECONDS = 3600;
+
+    /**
+     * A read-only session on a user's account, for a super admin to see
+     * their panel exactly as they do while helping them (support). Nothing
+     * can be changed through it (Auth::currentUser), it is not the user
+     * being active, it never shows among their devices, and it ends after an
+     * hour or when the admin closes the view. Never on another admin.
+     */
+    public static function viewAs(array $params): void
+    {
+        $admin = Auth::requireAdmin(AdminAccess::SUPER);
+        if (!Auth::viewSessionsReady()) {
+            Response::error(
+                409,
+                'migration_required',
+                'برای این کار ابتدا به‌روزرسانی «آمار رشد و نمایش پنل کاربر برای پشتیبانی (فاز ۹)» را از صفحهٔ «به‌روزرسانی دیتابیس» اجرا کنید.'
+            );
+            return;
+        }
+        $user = Security::targetFor($admin, $params['id']);
+        if (AdminAccess::isAdminAccount($user)) {
+            Response::error(409, 'admin_target', 'پنل مدیران را نمی‌شود از این راه دید.');
+            return;
+        }
+        if ($user['account_type'] === null) {
+            Response::error(409, 'no_role', 'این کاربر هنوز نقشش را انتخاب نکرده و پنلی برای دیدن ندارد.');
+            return;
+        }
+
+        $pdo = Database::connection();
+        $session = Auth::createViewSession($user['id'], $admin['id'], self::VIEW_TTL_SECONDS);
+        AdminController::logActivity($pdo, null, $admin['id'], $user['id'], 'user_viewed_as', []);
+
+        Response::ok($session);
     }
 
     private static function currentToken(): string

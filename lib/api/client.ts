@@ -10,6 +10,7 @@
 
 import { clearPersistedQueries } from "@/lib/query-persist";
 import { clearQueue, enqueue, isQueueable, type Queued } from "@/lib/offline-queue";
+import { clearViewAs, getViewAsToken } from "@/lib/view-as";
 
 const TOKEN_STORAGE_KEY = "gymlic.token";
 
@@ -34,6 +35,9 @@ export function getApiBaseUrl(): string {
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
+  // A tab showing a user's panel to an admin (lib/view-as.ts) uses that view's session.
+  const viewAs = getViewAsToken();
+  if (viewAs) return viewAs;
   try {
     return window.localStorage.getItem(TOKEN_STORAGE_KEY);
   } catch {
@@ -44,6 +48,12 @@ export function getToken(): string | null {
 
 export function setToken(token: string | null): void {
   if (typeof window === "undefined") return;
+  // Signing out of a view ends the view; the admin's own session and the
+  // offline data that belongs to it stay as they are.
+  if (getViewAsToken()) {
+    if (token === null) clearViewAs();
+    return;
+  }
   // A queued write, and the offline copy of the data, belong to the session
   // that made them. On logout, or when a different token replaces this one,
   // both go: the next person on this browser must neither see them nor cause
@@ -86,6 +96,16 @@ async function request<T>(
   path: string,
   options: { body?: unknown; formData?: FormData; queueable?: boolean } = {}
 ): Promise<T | Queued> {
+  // A view of a user's panel only reads; the API refuses anything else
+  // anyway, this just spares the round trip.
+  if (method !== "GET" && path !== "/auth/logout" && getViewAsToken()) {
+    throw new ApiError(
+      "این نمای فقط‌خواندنی پنل کاربر است و هیچ تغییری در آن ذخیره نمی‌شود.",
+      403,
+      "read_only_session"
+    );
+  }
+
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;

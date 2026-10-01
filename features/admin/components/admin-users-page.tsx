@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Eye,
   KeyRound,
   Laptop,
   Loader2,
@@ -67,6 +68,7 @@ import {
 import { useAdminCan } from "../hooks/use-admin-access";
 import { ExportButton } from "./export-button";
 import { AdminAccessDialog, ProfileEditDialog, SessionsDialog } from "./user-account-dialogs";
+import { openUserPanel } from "@/features/view-as/services/view-as-service";
 
 const FILTERS: { value: UserFilter; label: string }[] = [
   { value: "", label: "همه" },
@@ -114,6 +116,10 @@ export function AdminUsersPage() {
   const rows = data ?? [];
   const close = () => setAction(null);
 
+  function viewPanel(userId: string) {
+    openUserPanel(userId).catch((error) => toast.error(getErrorMessage(error, "باز کردن پنل کاربر ناموفق بود.")));
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -122,7 +128,8 @@ export function AdminUsersPage() {
           <p className="text-sm text-muted-foreground">
             همهٔ حساب‌های سایت، از جمله مدیران باشگاه و کسانی که ثبت‌نام کرده‌اند ولی هنوز نقش
             انتخاب نکرده‌اند. از منوی هر ردیف: ویرایش پروفایل، دستگاه‌های فعال، تغییر نقش، رمز تازه،
-            مسدودسازی، و (برای مدیر کل) دسترسی مدیریت.
+            مسدودسازی، و (برای مدیر کل) دسترسی مدیریت و دیدن پنل کاربر به‌صورت فقط‌خواندنی برای
+            پشتیبانی.
           </p>
         </div>
         <ExportButton kind="users" />
@@ -270,6 +277,12 @@ export function AdminUsersPage() {
                                 <DropdownMenuItem onClick={() => setAction({ kind: "admin", user })}>
                                   <ShieldCheck />
                                   دسترسی مدیریت
+                                </DropdownMenuItem>
+                              )}
+                              {isSuper && !isMe && !isAdminAccount && user.account_type && (
+                                <DropdownMenuItem onClick={() => viewPanel(user.id)}>
+                                  <Eye />
+                                  دیدن پنل کاربر (فقط‌خواندنی)
                                 </DropdownMenuItem>
                               )}
                               {mayChange && !isMe && (
