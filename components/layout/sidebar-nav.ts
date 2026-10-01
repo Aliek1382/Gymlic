@@ -8,6 +8,7 @@ import {
   Calendar,
   CalendarCheck,
   CalendarDays,
+  CircleHelp,
   ClipboardList,
   Dumbbell,
   LayoutGrid,
@@ -160,6 +161,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
     },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
+    { label: "راهنمای استفاده", href: "/help", icon: CircleHelp },
     {
       label: "حساب من",
       icon: UserCog,
