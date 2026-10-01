@@ -72,12 +72,14 @@ export async function purgeReceipts(): Promise<{ deleted: number; freed_bytes: n
 /** Deletes one request's receipt file right away (a club's payment request, or a trainer's). */
 export async function deleteReceipt(
   requestId: string,
-  kind: "payment-request" | "trainer-payment" = "payment-request"
+  kind: "payment-request" | "trainer-payment" | "membership-payment" = "payment-request"
 ): Promise<void> {
-  const path =
-    kind === "trainer-payment"
-      ? `/admin/trainer-billing/requests/${requestId}/receipt`
-      : `/admin/payment-requests/${requestId}/receipt`;
+  const path = {
+    "payment-request": `/admin/payment-requests/${requestId}/receipt`,
+    "trainer-payment": `/admin/trainer-billing/requests/${requestId}/receipt`,
+    // A club manager deleting a receipt of their own club's member payments.
+    "membership-payment": `/member-payments/${requestId}/receipt`,
+  }[kind];
   await api.delete(path);
 }
 

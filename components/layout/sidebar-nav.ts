@@ -9,6 +9,7 @@ import {
   CalendarCheck,
   CalendarDays,
   CircleHelp,
+  CreditCard,
   ClipboardList,
   Dumbbell,
   Headset,
@@ -66,6 +67,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
     { label: "مربیان", href: "/trainers", icon: Dumbbell },
     { label: "کلاس‌ها", href: "/classes", icon: Calendar },
     { label: "امور مالی", href: "/finance", icon: Wallet },
+    { label: "پرداخت‌های اعضا", href: "/member-payments", icon: Receipt },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
     { label: "پشتیبانی", href: "/support", icon: Headset },
     { label: "تنظیمات", href: "/settings", icon: Settings },
@@ -210,6 +212,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
     { label: "برنامه تمرینی", href: "/workout", icon: Dumbbell },
     { label: "برنامه غذایی", href: "/nutrition", icon: Apple },
     { label: "جلسات خصوصی", href: "/session-packages", icon: CalendarCheck },
+    { label: "عضویت من", href: "/membership", icon: CreditCard },
     { label: "پرسشنامه‌ها", href: "/questionnaires", icon: ClipboardList },
     {
       label: "ارتباطات",

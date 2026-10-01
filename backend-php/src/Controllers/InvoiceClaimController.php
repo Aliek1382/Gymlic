@@ -5,6 +5,7 @@ namespace Gymlic\Controllers;
 
 use Gymlic\Acl;
 use Gymlic\Auth;
+use Gymlic\CardInfo;
 use Gymlic\Database;
 use Gymlic\Receipts;
 use Gymlic\Response;
@@ -59,12 +60,12 @@ final class InvoiceClaimController
         }
         $data = Validate::body();
 
-        $card = self::digits($data['card_number'] ?? '');
-        if ($card !== '' && !self::validCard($card)) {
+        $card = CardInfo::digits($data['card_number'] ?? '');
+        if ($card !== '' && !CardInfo::validCard($card)) {
             Response::error(400, 'invalid_card', 'شمارهٔ کارت باید ۱۶ رقم و معتبر باشد.');
             return;
         }
-        $sheba = self::digits(preg_replace('/^\s*IR/i', '', (string) ($data['sheba'] ?? '')) ?? '');
+        $sheba = CardInfo::shebaDigits($data['sheba'] ?? '');
         if ($sheba !== '' && strlen($sheba) !== 24) {
             Response::error(400, 'invalid_sheba', 'شمارهٔ شبا باید ۲۴ رقم (بعد از IR) باشد.');
             return;
@@ -316,36 +317,6 @@ final class InvoiceClaimController
         $id = $stmt->fetchColumn();
 
         return $id === false ? null : (string) $id;
-    }
-
-    /** Latin digits only (Persian ones converted), everything else dropped. */
-    private static function digits(mixed $value): string
-    {
-        $value = strtr((string) $value, [
-            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
-            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
-        ]);
-        return preg_replace('/\D+/', '', $value) ?? '';
-    }
-
-    /** 16 digits that pass the Luhn check every Iranian bank card does. */
-    private static function validCard(string $card): bool
-    {
-        if (strlen($card) !== 16) {
-            return false;
-        }
-        $sum = 0;
-        for ($i = 0; $i < 16; $i++) {
-            $d = (int) $card[$i];
-            if ($i % 2 === 0) {
-                $d *= 2;
-                if ($d > 9) {
-                    $d -= 9;
-                }
-            }
-            $sum += $d;
-        }
-        return $sum % 10 === 0;
     }
 
     private static function text(mixed $value, int $max): ?string

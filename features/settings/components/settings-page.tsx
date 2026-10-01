@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { ClubProfileForm, MembershipPlansManager } from "@/features/club";
+import { ClubPaymentInfoCard } from "@/features/member-payments/components/club-payment-info-card";
 import { SettingsView } from "./settings-view";
 
 export function SettingsPage() {
@@ -37,6 +38,7 @@ export function SettingsPage() {
             <TabsList>
               <TabsTrigger value="club">اطلاعات باشگاه</TabsTrigger>
               <TabsTrigger value="plans">طرح‌های عضویت</TabsTrigger>
+              <TabsTrigger value="payment">دریافت پرداخت</TabsTrigger>
               <TabsTrigger value="account">حساب کاربری</TabsTrigger>
             </TabsList>
 
@@ -46,6 +48,10 @@ export function SettingsPage() {
 
             <TabsContent value="plans">
               <MembershipPlansManager clubId={clubId} />
+            </TabsContent>
+
+            <TabsContent value="payment">
+              <ClubPaymentInfoCard clubId={clubId} />
             </TabsContent>
 
             <TabsContent value="account">
