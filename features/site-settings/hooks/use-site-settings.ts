@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
@@ -13,6 +13,7 @@ import {
   removeBrandLogo,
   updateSiteSetting,
   uploadBrandLogo,
+  withDefaults,
   type AdminSettingKey,
   type AdminSiteSettings,
   type SiteSettings,
@@ -34,7 +35,9 @@ export function usePublicSettings(): SiteSettings {
     refetchInterval: 5 * 60_000,
     refetchOnWindowFocus: true,
   });
-  return data ?? DEFAULT_SITE_SETTINGS;
+  // The offline cache (lib/query-persist.ts) can hand back a snapshot saved
+  // before a group existed, which never passed through getPublicSettings.
+  return useMemo(() => (data ? withDefaults(data) : DEFAULT_SITE_SETTINGS), [data]);
 }
 
 /**

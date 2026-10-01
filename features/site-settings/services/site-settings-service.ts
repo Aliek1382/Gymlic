@@ -91,7 +91,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
  * keeps its defaults, and a partial group is filled in field by field —
  * components destructure these groups, and one undefined takes the page down.
  */
-function withDefaults(data: Partial<SiteSettings> | null | undefined): SiteSettings {
+export function withDefaults(data: Partial<SiteSettings> | null | undefined): SiteSettings {
   const out: Record<string, unknown> = { ...DEFAULT_SITE_SETTINGS };
   for (const [key, value] of Object.entries(data ?? {})) {
     if (value === null || value === undefined) continue;
