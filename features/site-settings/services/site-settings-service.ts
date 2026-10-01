@@ -87,6 +87,24 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
 };
 
 /**
+ * A group missing from the answer (a backend older than that group, or a null)
+ * keeps its defaults, and a partial group is filled in field by field —
+ * components destructure these groups, and one undefined takes the page down.
+ */
+function withDefaults(data: Partial<SiteSettings> | null | undefined): SiteSettings {
+  const out: Record<string, unknown> = { ...DEFAULT_SITE_SETTINGS };
+  for (const [key, value] of Object.entries(data ?? {})) {
+    if (value === null || value === undefined) continue;
+    const base = out[key];
+    out[key] =
+      base && typeof base === "object" && typeof value === "object" && !Array.isArray(value)
+        ? { ...base, ...value }
+        : value;
+  }
+  return out as unknown as SiteSettings;
+}
+
+/**
  * Never throws: if the endpoint is unreachable (offline, or a backend that
  * predates it) the site runs on defaults — everything on, nothing blocked —
  * which is exactly how it behaved before these settings existed.
@@ -94,7 +112,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
 export async function getPublicSettings(): Promise<SiteSettings> {
   try {
     const data = await api.get<Partial<SiteSettings>>("/settings/public");
-    return { ...DEFAULT_SITE_SETTINGS, ...data };
+    return withDefaults(data);
   } catch {
     return DEFAULT_SITE_SETTINGS;
   }
