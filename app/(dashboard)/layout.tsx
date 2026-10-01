@@ -17,7 +17,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { data: context, isPending } = useAuthContext();
+  const { data: context, isPending, isError } = useAuthContext();
   const { maintenance } = usePublicSettings();
 
   // The Redirect Rules used to run in a Server Component, before any HTML was
@@ -28,7 +28,8 @@ export default function DashboardLayout({
     if (isPending) return;
 
     if (!context) {
-      router.replace("/login");
+      // An error is a failed request (offline), not a missing session.
+      if (!isError) router.replace("/login");
       return;
     }
     // Rule 2 / Rule 7 — role must be chosen before anything else.
@@ -51,7 +52,16 @@ export default function DashboardLayout({
     ) {
       router.replace("/invitation");
     }
-  }, [context, isPending, router]);
+  }, [context, isPending, isError, router]);
+
+  if (isError && !context) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-center text-sm text-muted-foreground">
+        ارتباط با سرور برقرار نشد و داده‌ای از قبل ذخیره نشده است. اتصال اینترنت را
+        بررسی کنید و صفحه را دوباره بارگذاری کنید.
+      </div>
+    );
+  }
 
   if (isPending || !context) return <RouteLoading />;
 

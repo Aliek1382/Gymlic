@@ -1,4 +1,4 @@
-import { api, fullName } from "@/lib/api/client";
+import { ApiError, api, fullName } from "@/lib/api/client";
 import type {
   AccountType,
   ClubStatus,
@@ -72,7 +72,12 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   let data: MeResponse;
   try {
     data = await api.get<MeResponse>("/auth/me");
-  } catch {
+  } catch (error) {
+    // No connection says nothing about the session, so it must not read as
+    // "signed out": throwing keeps the last known context (restored from the
+    // offline snapshot) instead of replacing it with null and sending the
+    // user to the login page.
+    if (error instanceof ApiError && error.status === 0) throw error;
     return null;
   }
 

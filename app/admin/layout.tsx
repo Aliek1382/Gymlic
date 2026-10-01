@@ -13,7 +13,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { data: admin, isPending } = useAdminContext();
+  const { data: admin, isPending, isError } = useAdminContext();
 
   // Not authenticated, or authenticated but not a platform admin — either
   // way this route group does not exist for them.
@@ -23,8 +23,8 @@ export default function AdminLayout({
   // anything through it is the API, which re-checks is_platform_admin on every
   // admin endpoint.
   useEffect(() => {
-    if (!isPending && !admin) router.replace("/dashboard");
-  }, [admin, isPending, router]);
+    if (!isPending && !isError && !admin) router.replace("/dashboard");
+  }, [admin, isPending, isError, router]);
 
   if (isPending || !admin) return <RouteLoading />;
 
