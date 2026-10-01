@@ -24,7 +24,7 @@ import { NotificationBell } from "@/features/notifications";
 import { SupportMenu } from "@/features/site-settings";
 import { GlobalSearch } from "./global-search";
 import { MobileSidebar } from "./mobile-sidebar";
-import { SIDEBAR_NAV } from "./sidebar-nav";
+import { SIDEBAR_NAV, flattenNav } from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
 
 interface DashboardHeaderProps {
@@ -47,7 +47,7 @@ export function DashboardHeader({
   const pathname = usePathname();
   const initials = fullName.trim().slice(0, 2) || "کا";
   const pageTitle =
-    SIDEBAR_NAV[accountType].find(
+    flattenNav(SIDEBAR_NAV[accountType]).find(
       (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
     )?.label ?? "داشبورد";
 

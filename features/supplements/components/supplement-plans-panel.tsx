@@ -88,13 +88,24 @@ function PlanCard({ plan }: { plan: SupplementPlan }) {
   );
 }
 
-/** "Supplements" section of an athlete's profile, for their trainer. */
-export function SupplementPlansPanel({ athleteId }: { athleteId: string }) {
+/**
+ * An athlete's supplement plans, for their trainer. `embedded` drops the card
+ * chrome so it can sit inside another dialog (the nutrition plan one).
+ */
+export function SupplementPlansPanel({
+  athleteId,
+  embedded = false,
+}: {
+  athleteId: string;
+  embedded?: boolean;
+}) {
   const plans = useSupplementPlans(athleteId);
+  const Wrapper = embedded ? "div" : Card;
+  const gutter = embedded ? "" : "px-6";
 
   return (
-    <Card className="gap-4 py-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6">
+    <Wrapper className={embedded ? "space-y-4" : "gap-4 py-5"}>
+      <div className={`flex flex-wrap items-center justify-between gap-3 ${gutter}`}>
         <div>
           <h2 className="text-base font-bold text-foreground">برنامه مکمل</h2>
           <p className="text-xs text-muted-foreground">
@@ -104,7 +115,7 @@ export function SupplementPlansPanel({ athleteId }: { athleteId: string }) {
         <SupplementPlanDialog athleteId={athleteId} />
       </div>
 
-      <div className="space-y-3 px-6">
+      <div className={`space-y-3 ${gutter}`}>
         {plans.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : plans.isError ? (
@@ -119,6 +130,6 @@ export function SupplementPlansPanel({ athleteId }: { athleteId: string }) {
           plans.data.map((plan) => <PlanCard key={plan.id} plan={plan} />)
         )}
       </div>
-    </Card>
+    </Wrapper>
   );
 }

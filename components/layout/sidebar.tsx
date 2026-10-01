@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Plus } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, LogOut, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,124 @@ import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { MessagesNavBadge } from "@/features/messages/components/messages-nav-badge";
 import { featureForPath, useFeatureCheck } from "@/features/site-settings";
-import { SIDEBAR_NAV } from "./sidebar-nav";
+import {
+  SIDEBAR_NAV,
+  isNavGroup,
+  type SidebarNavEntry,
+  type SidebarNavItem,
+} from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
+
+function isItemActive(pathname: string, item: SidebarNavItem) {
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+function NavLink({
+  item,
+  pathname,
+  onNavigate,
+  nested = false,
+}: {
+  item: SidebarNavItem;
+  pathname: string;
+  onNavigate?: () => void;
+  nested?: boolean;
+}) {
+  const Icon = item.icon;
+  const badge = item.href === "/messages" ? <MessagesNavBadge /> : null;
+  const link = (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
+        nested && "py-2",
+        isItemActive(pathname, item)
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground hover:bg-muted"
+      )}
+    >
+      <Icon className="size-[18px]" />
+      {item.label}
+      {badge}
+    </Link>
+  );
+
+  if (!item.description) return link;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="left" className="max-w-56 text-center">
+        {item.description}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function NavEntry({
+  entry,
+  pathname,
+  onNavigate,
+  expanded,
+  onToggle,
+}: {
+  entry: SidebarNavEntry;
+  pathname: string;
+  onNavigate?: () => void;
+  expanded: Record<string, boolean>;
+  onToggle: (label: string, next: boolean) => void;
+}) {
+  if (!isNavGroup(entry)) {
+    return <NavLink item={entry} pathname={pathname} onNavigate={onNavigate} />;
+  }
+
+  const Icon = entry.icon;
+  const hasActive = entry.children.some((child) => isItemActive(pathname, child));
+  // A group holding the current page is open until the user closes it; any
+  // other group stays closed until opened.
+  const open = expanded[entry.label] ?? hasActive;
+  const hasMessages = entry.children.some((child) => child.href === "/messages");
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => onToggle(entry.label, !open)}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
+          hasActive && !open
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground"
+        )}
+      >
+        <Icon className="size-[18px]" />
+        {entry.label}
+        {!open && hasMessages && <MessagesNavBadge />}
+        <ChevronDown
+          className={cn(
+            "mr-auto size-4 text-muted-foreground transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open && (
+        <div className="mr-5 mt-1 space-y-1 border-r border-sidebar-border pr-2">
+          {entry.children.map((child) => (
+            <NavLink
+              key={child.href}
+              item={child}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              nested
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SidebarContent({
   accountType,
@@ -29,9 +146,14 @@ export function SidebarContent({
   const pathname = usePathname();
   const signOut = useSignOut();
   const isEnabled = useFeatureCheck();
-  const items = SIDEBAR_NAV[accountType].filter((item) =>
-    isEnabled(featureForPath(item.href))
-  );
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const entries = SIDEBAR_NAV[accountType].flatMap((entry): SidebarNavEntry[] => {
+    if (!isNavGroup(entry)) return isEnabled(featureForPath(entry.href)) ? [entry] : [];
+    const children = entry.children.filter((child) =>
+      isEnabled(featureForPath(child.href))
+    );
+    return children.length > 0 ? [{ ...entry, children }] : [];
+  });
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar">
@@ -44,48 +166,18 @@ export function SidebarContent({
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-4">
         <TooltipProvider delayDuration={300}>
-          {items.map((item) => {
-            const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const Icon = item.icon;
-            const badge = item.href === "/messages" ? <MessagesNavBadge /> : null;
-            const linkClassName = cn(
-              "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
-              isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground hover:bg-muted"
-            );
-
-            if (!item.description) {
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={linkClassName}
-                >
-                  <Icon className="size-[18px]" />
-                  {item.label}
-                  {badge}
-                </Link>
-              );
-            }
-
-            return (
-              <Tooltip key={item.href}>
-                <TooltipTrigger asChild>
-                  <Link href={item.href} onClick={onNavigate} className={linkClassName}>
-                    <Icon className="size-[18px]" />
-                    {item.label}
-                    {badge}
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="left" className="max-w-56 text-center">
-                  {item.description}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+          {entries.map((entry) => (
+            <NavEntry
+              key={isNavGroup(entry) ? entry.label : entry.href}
+              entry={entry}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              expanded={expanded}
+              onToggle={(label, next) =>
+                setExpanded((current) => ({ ...current, [label]: next }))
+              }
+            />
+          ))}
         </TooltipProvider>
       </nav>
 

@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bell,
   Bookmark,
+  BookOpen,
   Calendar,
   CalendarCheck,
   CalendarDays,
@@ -12,7 +13,7 @@ import {
   LayoutGrid,
   LineChart,
   MessageCircle,
-  Pill,
+  MessagesSquare,
   Receipt,
   Ruler,
   Salad,
@@ -21,6 +22,7 @@ import {
   Trophy,
   User,
   UserCircle,
+  UserCog,
   UserPen,
   Users,
   Wallet,
@@ -35,8 +37,26 @@ export interface SidebarNavItem {
   description?: string;
 }
 
+/** A collapsible menu entry that holds several pages, so the sidebar stays short. */
+export interface SidebarNavGroup {
+  label: string;
+  icon: LucideIcon;
+  children: SidebarNavItem[];
+}
+
+export type SidebarNavEntry = SidebarNavItem | SidebarNavGroup;
+
+export function isNavGroup(entry: SidebarNavEntry): entry is SidebarNavGroup {
+  return "children" in entry;
+}
+
+/** Every page in the menu, groups unfolded — for the page title and quick search. */
+export function flattenNav(entries: SidebarNavEntry[]): SidebarNavItem[] {
+  return entries.flatMap((entry) => (isNavGroup(entry) ? entry.children : [entry]));
+}
+
 // Dashboard Pack — اصلاح شماره ۴: Sidebar is Dynamic per role.
-export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
+export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
   club: [
     { label: "داشبورد", href: "/dashboard", icon: LayoutGrid },
     { label: "اعضا", href: "/members", icon: Users },
@@ -49,50 +69,60 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
   trainer: [
     { label: "داشبورد", href: "/dashboard", icon: LayoutGrid },
     { label: "ورزشکاران", href: "/athletes", icon: Users },
-    { label: "برنامه‌های تمرینی", href: "/workout-programs", icon: Dumbbell },
-    { label: "برنامه‌های غذایی", href: "/nutrition-programs", icon: Apple },
     {
-      label: "پیام‌ها",
-      href: "/messages",
-      icon: MessageCircle,
-      description:
-        "گفتگوی مستقیم با هر ورزشکار درباره برنامه‌هایی که برایش نوشته‌اید.",
+      label: "برنامه‌ها",
+      icon: ClipboardList,
+      children: [
+        { label: "برنامه‌های تمرینی", href: "/workout-programs", icon: Dumbbell },
+        { label: "برنامه‌های غذایی", href: "/nutrition-programs", icon: Apple },
+        {
+          label: "قالب‌ها",
+          href: "/templates",
+          icon: Bookmark,
+          description:
+            "قالب‌های آماده برای برنامه تمرینی و غذایی بسازید تا هنگام نوشتن برنامه برای ورزشکاران سریع‌تر شروع کنید.",
+        },
+      ],
     },
     {
-      label: "تیکت‌ها",
-      href: "/tickets",
-      icon: Ticket,
-      description: "درخواست‌های رسمی ورزشکاران را با شمارهٔ پیگیری ببینید و وضعیتشان را مدیریت کنید.",
+      label: "کتابخانه‌ها",
+      icon: BookOpen,
+      children: [
+        { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
+        {
+          label: "کتابخانه غذاها",
+          href: "/foods",
+          icon: Salad,
+          description: "غذاها و مکمل‌ها در یک کتابخانه، در دو زبانه.",
+        },
+      ],
     },
     {
-      label: "قالب‌ها",
-      href: "/templates",
-      icon: Bookmark,
-      description:
-        "قالب‌های آماده برای برنامه تمرینی و غذایی بسازید تا هنگام نوشتن برنامه برای ورزشکاران سریع‌تر شروع کنید.",
+      label: "ارتباطات",
+      icon: MessagesSquare,
+      children: [
+        {
+          label: "پیام‌ها",
+          href: "/messages",
+          icon: MessageCircle,
+          description:
+            "گفتگوی مستقیم با هر ورزشکار درباره برنامه‌هایی که برایش نوشته‌اید.",
+        },
+        {
+          label: "تیکت‌ها",
+          href: "/tickets",
+          icon: Ticket,
+          description:
+            "درخواست‌های رسمی ورزشکاران را با شمارهٔ پیگیری ببینید و وضعیتشان را مدیریت کنید.",
+        },
+      ],
     },
-    { label: "کتابخانه حرکات", href: "/exercises", icon: LineChart },
-    { label: "کتابخانه غذاها", href: "/foods", icon: Salad },
-    { label: "کتابخانه مکمل‌ها", href: "/supplements", icon: Pill },
     {
       label: "پیشرفت ورزشکاران",
       href: "/progress",
       icon: Ruler,
       description:
         "نمودار روند وزن، BMI، درصد چربی بدن، دور کمر و دور سینه‌ی هر ورزشکار را ببینید.",
-    },
-    {
-      label: "درآمد من",
-      href: "/earnings",
-      icon: Wallet,
-      description:
-        "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
-    },
-    {
-      label: "امتیاز من",
-      href: "/points",
-      icon: Trophy,
-      description: "امتیاز و سطح خود را ببینید و بدانید هر امتیاز را برای چه کاری گرفته‌اید.",
     },
     {
       label: "پرسشنامه‌ها",
@@ -102,13 +132,6 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
         "فرم دلخواه بسازید، برای ورزشکاران بفرستید و پاسخ‌ها را جدولی و خلاصه ببینید.",
     },
     {
-      label: "فاکتورهای من",
-      href: "/invoices",
-      icon: Receipt,
-      description:
-        "فاکتورهایی که برای برنامه‌های ورزشکاران صادر کرده‌اید و وضعیت پرداخت هرکدام.",
-    },
-    {
       label: "تقویم",
       href: "/calendar",
       icon: CalendarDays,
@@ -116,15 +139,47 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
         "جلسات خصوصی زمان‌بندی‌شده و یادآوری‌های خودتان را در تقویم شمسی ماهانه ببینید.",
     },
     {
-      label: "رزومهٔ من",
-      href: "/trainer-resume",
-      icon: UserPen,
-      description:
-        "بیوگرافی، افتخارات، مدارک، جدول تعرفه و شبکه‌های اجتماعی‌تان را برای شاگردانتان بنویسید.",
+      label: "مالی",
+      icon: Wallet,
+      children: [
+        {
+          label: "درآمد من",
+          href: "/earnings",
+          icon: Wallet,
+          description:
+            "شهریه‌های دریافتی از شاگردانتان را ثبت کنید و درآمد ماهانه و روند آن را ببینید.",
+        },
+        {
+          label: "فاکتورهای من",
+          href: "/invoices",
+          icon: Receipt,
+          description:
+            "فاکتورهایی که برای برنامه‌های ورزشکاران صادر کرده‌اید و وضعیت پرداخت هرکدام.",
+        },
+      ],
     },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
-    { label: "تنظیمات", href: "/settings", icon: Settings },
+    {
+      label: "حساب من",
+      icon: UserCog,
+      children: [
+        { label: "تنظیمات و پروفایل", href: "/settings", icon: Settings },
+        {
+          label: "رزومهٔ من",
+          href: "/trainer-resume",
+          icon: UserPen,
+          description:
+            "بیوگرافی، افتخارات، مدارک، جدول تعرفه و شبکه‌های اجتماعی‌تان را برای شاگردانتان بنویسید.",
+        },
+        {
+          label: "امتیاز من",
+          href: "/points",
+          icon: Trophy,
+          description: "امتیاز و سطح خود را ببینید و بدانید هر امتیاز را برای چه کاری گرفته‌اید.",
+        },
+      ],
+    },
   ],
   athlete: [
     { label: "داشبورد", href: "/dashboard", icon: LayoutGrid },
@@ -132,12 +187,24 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavItem[]> = {
     { label: "برنامه غذایی", href: "/nutrition", icon: Apple },
     { label: "جلسات خصوصی", href: "/session-packages", icon: CalendarCheck },
     { label: "پرسشنامه‌ها", href: "/questionnaires", icon: ClipboardList },
-    { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
-    { label: "تیکت‌ها", href: "/tickets", icon: Ticket },
+    {
+      label: "ارتباطات",
+      icon: MessagesSquare,
+      children: [
+        { label: "پیام‌ها", href: "/messages", icon: MessageCircle },
+        { label: "تیکت‌ها", href: "/tickets", icon: Ticket },
+      ],
+    },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },
-    { label: "رزومهٔ مربی", href: "/trainer-resume", icon: UserPen },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
-    { label: "پروفایل", href: "/profile", icon: UserCircle },
+    {
+      label: "حساب من",
+      icon: UserCog,
+      children: [
+        { label: "پروفایل", href: "/profile", icon: UserCircle },
+        { label: "رزومهٔ مربی", href: "/trainer-resume", icon: UserPen },
+      ],
+    },
   ],
 };
 
