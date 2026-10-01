@@ -8,6 +8,7 @@
  * of the same host, where cross-site cookies are unreliable.
  */
 
+import { clearPersistedQueries } from "@/lib/query-persist";
 import { clearQueue, enqueue, isQueueable, type Queued } from "@/lib/offline-queue";
 
 const TOKEN_STORAGE_KEY = "gymlic.token";
@@ -43,10 +44,14 @@ export function getToken(): string | null {
 
 export function setToken(token: string | null): void {
   if (typeof window === "undefined") return;
-  // A queued write belongs to the session that made it. On logout, or when a
-  // different token replaces this one, the queue goes — the next person on
-  // this browser must neither see it nor cause it to be sent.
-  if (token !== getToken()) void clearQueue();
+  // A queued write, and the offline copy of the data, belong to the session
+  // that made them. On logout, or when a different token replaces this one,
+  // both go: the next person on this browser must neither see them nor cause
+  // a queued write to be sent.
+  if (token !== getToken()) {
+    void clearQueue();
+    void clearPersistedQueries();
+  }
   try {
     if (token === null) {
       window.localStorage.removeItem(TOKEN_STORAGE_KEY);

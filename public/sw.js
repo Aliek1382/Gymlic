@@ -1,24 +1,27 @@
 /**
  * Gymlic service worker.
  *
- * The one invariant this file must keep: nothing tenant-scoped is ever
- * written to a cache. The panel is multi-tenant behind Supabase RLS, so a
- * cached HTML document or API payload could be replayed to the next account
- * signed in on the same device — a data leak no amount of clearing after the
- * fact fixes reliably. Only build output is stored, which is public and
- * content-hashed.
+ * The one invariant this file must keep: no response that carries an
+ * account's data is ever written to a cache. The site is a static export, so
+ * the HTML documents and RSC payloads served from this origin are the same
+ * for everyone — they are an app shell, with no tenant data in them, and are
+ * safe to keep so the installed app can open without a connection. All account
+ * data comes from the API on another origin, and that is never touched here:
+ * it falls through to the network. What the app shows offline is the last
+ * synced data persisted by lib/query-persist.ts, which is tied to the signed-in
+ * session and wiped at logout.
  *
- * Concretely, everything below falls through to the network untouched:
- *   - Supabase (and any other origin), so no authenticated payload is stored
- *   - navigations, which return the tenant's rendered HTML
- *   - Next.js RSC payloads (/dashboard?_rsc=...), which carry the same data
- *
- * Keep it that way. Adding a rule that caches any of those re-opens the leak.
+ * Keep it that way. A rule that caches any cross-origin or authenticated
+ * response re-opens the leak.
  */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const ASSET_CACHE = `gymlic-assets-${CACHE_VERSION}`;
 const OFFLINE_CACHE = `gymlic-offline-${CACHE_VERSION}`;
+const PAGE_CACHE = `gymlic-pages-${CACHE_VERSION}`;
+// With a stored copy to fall back on, a hung connection is treated as offline
+// after this long instead of leaving the app on a blank screen.
+const NETWORK_TIMEOUT_MS = 4000;
 const OFFLINE_URL = "/offline.html";
 
 // Content-hashed build output and the installed app's icons. A new deploy
@@ -45,7 +48,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const keep = new Set([ASSET_CACHE, OFFLINE_CACHE]);
+      const keep = new Set([ASSET_CACHE, OFFLINE_CACHE, PAGE_CACHE]);
       const keys = await caches.keys();
       await Promise.all(
         keys
@@ -57,6 +60,58 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function withTrailingSlash(url) {
+  const copy = new URL(url.href);
+  if (!copy.pathname.endsWith("/") && !copy.pathname.split("/").pop().includes(".")) {
+    copy.pathname += "/";
+  }
+  return copy.href;
+}
+
+async function shellResponse(request, url) {
+  const cache = await caches.open(PAGE_CACHE);
+  const isNavigation = request.mode === "navigate";
+  const cached =
+    (await cache.match(request)) ??
+    (isNavigation ? await cache.match(withTrailingSlash(url)) : undefined);
+
+  try {
+    const network = fetch(request);
+    network.catch(() => undefined); // a late failure after the timeout is not unhandled
+    const response = cached
+      ? await Promise.race([
+          network,
+          new Promise((_, reject) => setTimeout(reject, NETWORK_TIMEOUT_MS)),
+        ])
+      : await network;
+
+    const type = response.headers.get("content-type") || "";
+    const storable =
+      response.status === 200 &&
+      response.type === "basic" &&
+      (isNavigation ? type.includes("text/html") : true);
+    if (storable) {
+      // A response that followed a redirect can't answer a navigation, so it
+      // is stored as a fresh copy under the URL it ended at.
+      const copy = response.redirected
+        ? new Response(await response.clone().blob(), {
+            status: 200,
+            headers: response.headers,
+          })
+        : response.clone();
+      await cache.put(response.redirected ? response.url : request, copy);
+    }
+    return response;
+  } catch {
+    if (cached) return cached;
+    if (isNavigation) {
+      const offline = await caches.match(OFFLINE_URL, { cacheName: OFFLINE_CACHE });
+      return offline ?? Response.error();
+    }
+    return Response.error();
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
@@ -65,21 +120,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first with an offline fallback. The document itself is never
-  // stored, so a signed-in page is never replayed to anyone.
-  if (request.mode === "navigate") {
-    event.respondWith(
-      (async () => {
-        try {
-          return await fetch(request);
-        } catch {
-          const cached = await caches.match(OFFLINE_URL, {
-            cacheName: OFFLINE_CACHE,
-          });
-          return cached ?? Response.error();
-        }
-      })()
-    );
+  // App shell: documents and the router's RSC payloads. Network-first so a
+  // new deploy is picked up as soon as there is a connection; the last good
+  // copy answers when there is none. Only a plain 200 is stored.
+  const isRsc = url.searchParams.has("_rsc") || request.headers.has("RSC");
+  if (request.mode === "navigate" || isRsc) {
+    event.respondWith(shellResponse(request, url));
     return;
   }
 

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Vazirmatn } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { OfflineBanner } from "@/components/pwa/offline-banner";
 import { OfflineSync } from "@/components/pwa/offline-sync";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import "./globals.css";
@@ -63,6 +64,7 @@ export default function RootLayout({
         <QueryProvider>
           <ServiceWorkerRegistrar />
           <OfflineSync />
+          <OfflineBanner />
           {children}
           <Toaster position="top-center" richColors dir="rtl" />
         </QueryProvider>
