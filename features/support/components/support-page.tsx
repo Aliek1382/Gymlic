@@ -47,7 +47,7 @@ import { SupportThread } from "./support-thread";
 
 const LIST_KEY = ["support", "mine"] as const;
 
-/** /support — a club owner's or trainer's tickets to the Gymlic team; one ticket is ?id=. */
+/** /support — a club owner's, trainer's or athlete's tickets to the Gymlic team; one ticket is ?id=. */
 export function SupportPage() {
   const router = useRouter();
   const ticketId = useSearchParams().get("id");
@@ -55,7 +55,7 @@ export function SupportPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: LIST_KEY, queryFn: listMySupportTickets });
 
   return (
-    <RoleGate allow={["club", "trainer"]}>
+    <RoleGate allow={["club", "trainer", "athlete"]}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

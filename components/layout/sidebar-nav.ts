@@ -8,6 +8,7 @@ import {
   Calendar,
   CalendarCheck,
   CalendarDays,
+  CircleHelp,
   ClipboardList,
   Dumbbell,
   Headset,
@@ -170,6 +171,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
     },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
+    { label: "راهنمای استفاده", href: "/help", icon: CircleHelp },
     {
       label: "پشتیبانی",
       href: "/support",
@@ -213,6 +215,12 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
     },
     { label: "پیشرفت", href: "/progress", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
+    {
+      label: "پشتیبانی",
+      href: "/support",
+      icon: Headset,
+      description: "مشکل یا سؤالتان را مستقیم برای تیم جیم‌لیک بفرستید (برای درخواست از مربی، «تیکت‌ها» را بزنید).",
+    },
     {
       label: "حساب من",
       icon: UserCog,
