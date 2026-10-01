@@ -1,4 +1,6 @@
 import { api, setToken } from "@/lib/api/client";
+import { isViewAsTab } from "@/lib/view-as";
+import { endViewAs } from "@/features/view-as/services/view-as-service";
 import { removeCurrentDeviceSubscription } from "@/features/push/services/push-service";
 import type { AccountType, InvitationRole } from "@/types/database.types";
 
@@ -190,6 +192,12 @@ export async function joinViaInvitation(
 }
 
 export async function signOut() {
+  // Leaving a view of a user's panel: end that session only. This browser's
+  // push subscription belongs to the admin and stays.
+  if (isViewAsTab()) {
+    await endViewAs();
+    return;
+  }
   // Before the token goes: this browser must stop receiving the signed-out
   // user's notifications (the next person to sign in here would see them).
   await removeCurrentDeviceSubscription();

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, LogOut } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { GymlicMark } from "@/components/brand/gymlic-mark";
+import { BrandMark, BrandName } from "@/components/brand/brand-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
 import { useAdminCan } from "@/features/admin/hooks/use-admin-access";
 import { ADMIN_SIDEBAR_GROUPS } from "./admin-sidebar-nav";
@@ -23,11 +23,9 @@ export function AdminSidebarContent({ onNavigate }: { onNavigate?: () => void })
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar">
       <div className="flex shrink-0 items-center gap-2.5 px-6 py-6">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <GymlicMark className="size-5" />
-        </div>
+        <BrandMark className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground" iconClassName="size-5" />
         <div>
-          <span className="block text-lg font-bold text-foreground">جیم‌لیک</span>
+          <span className="block text-lg font-bold text-foreground"><BrandName /></span>
           <span className="block text-xs font-medium text-muted-foreground">
             پنل مدیریت کل
           </span>

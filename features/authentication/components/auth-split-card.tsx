@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GymlicMark } from "@/components/brand/gymlic-mark";
+import { BrandMark, BrandName } from "@/components/brand/brand-mark";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { SupportContact, usePublicSettings } from "@/features/site-settings";
 import { SitePageLinks } from "@/features/site-pages/components/site-page-links";
@@ -48,10 +48,8 @@ export function AuthSplitCard() {
       <div className="flex w-full max-w-4xl overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-[58%]">
           <div className="mb-8 flex items-center justify-end gap-2.5 lg:hidden">
-            <span className="text-lg font-bold text-foreground">جیم‌لیک</span>
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <GymlicMark className="size-4" />
-            </div>
+            <span className="text-lg font-bold text-foreground"><BrandName /></span>
+            <BrandMark className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground" iconClassName="size-4" />
           </div>
 
           {mode === "login" ? (

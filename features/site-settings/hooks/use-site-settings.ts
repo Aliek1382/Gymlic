@@ -10,7 +10,9 @@ import {
   getAdminSiteSettings,
   getPublicSettings,
   isFeatureEnabled,
+  removeBrandLogo,
   updateSiteSetting,
+  uploadBrandLogo,
   type AdminSettingKey,
   type AdminSiteSettings,
   type SiteSettings,
@@ -69,6 +71,20 @@ export function useUpdateSiteSetting<K extends AdminSettingKey>(key: K) {
       // admin flips builds on this value, and must not build on a stale one.
       queryClient.setQueryData<AdminSiteSettings>(ADMIN_KEY, (old) =>
         old ? { ...old, settings: { ...old.settings, [key]: saved } } : old
+      );
+      void queryClient.invalidateQueries({ queryKey: ["site-settings"] });
+    },
+  });
+}
+
+/** Uploads a new logo, or with null goes back to the Gymlic mark. */
+export function useSetBrandLogo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File | null) => (file ? uploadBrandLogo(file) : removeBrandLogo()),
+    onSuccess: (saved) => {
+      queryClient.setQueryData<AdminSiteSettings>(ADMIN_KEY, (old) =>
+        old ? { ...old, settings: { ...old.settings, branding: saved } } : old
       );
       void queryClient.invalidateQueries({ queryKey: ["site-settings"] });
     },

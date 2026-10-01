@@ -42,6 +42,7 @@ const ADMIN_ACTIONS = [
   "backup_downloaded",
   "delivery_retried",
   "sessions_revoked",
+  "user_viewed_as",
   "two_factor_enabled",
   "login_unlocked",
   "admin_role_saved",
@@ -91,6 +92,7 @@ const ACTION_LABEL: Record<string, string> = {
   backup_downloaded: "دانلود نسخهٔ پشتیبان",
   delivery_retried: "ارسال دوبارهٔ پیامک/ایمیل",
   sessions_revoked: "خارج‌کردن کاربر از دستگاه‌ها",
+  user_viewed_as: "دیدن پنل کاربر (فقط‌خواندنی)",
   two_factor_enabled: "روشن‌کردن ورود دومرحله‌ای",
   login_unlocked: "باز کردن قفل ورود",
   admin_role_saved: "ذخیرهٔ نقش مدیریتی",
@@ -174,6 +176,7 @@ const SETTINGS_GROUP_LABEL: Record<string, string> = {
   security: "امنیت ورود",
   billing: "اطلاعات پرداخت",
   templates: "قالب متن اعلان‌ها",
+  branding: "برند و ظاهر",
 };
 
 export function AdminActivityPage() {

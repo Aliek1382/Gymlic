@@ -26,6 +26,7 @@ import { GlobalSearch } from "./global-search";
 import { MobileSidebar } from "./mobile-sidebar";
 import { SIDEBAR_NAV, flattenNav } from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
+import { BrandName } from "@/components/brand/brand-mark";
 
 interface DashboardHeaderProps {
   accountType: AccountType;
@@ -107,7 +108,7 @@ export function DashboardHeader({
       <GlobalSearch accountType={accountType} />
 
       <div className="hidden items-center gap-1.5 text-sm text-muted-foreground lg:flex">
-        <span className="text-foreground">جیم‌لیک</span>
+        <span className="text-foreground"><BrandName /></span>
         <ChevronLeft className="size-4" />
         <span className="font-medium text-foreground">{pageTitle}</span>
       </div>

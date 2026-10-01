@@ -81,9 +81,10 @@ final class Broadcasts
         if ($audience['inactive_days'] > 0) {
             // last_seen_at once phase 7's SQL has run; before that, the last
             // sign-in is the best there is.
+            $own = Database::hasColumn('sessions', 'impersonated_by') ? ' AND s.impersonated_by IS NULL' : '';
             $seen = Database::hasColumn('profiles', 'last_seen_at')
-                ? 'COALESCE(p.last_seen_at, (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = p.id), p.created_at)'
-                : 'COALESCE((SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = p.id), p.created_at)';
+                ? "COALESCE(p.last_seen_at, (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = p.id{$own}), p.created_at)"
+                : "COALESCE((SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = p.id{$own}), p.created_at)";
             $where[] = "{$seen} < ?";
             $bind[] = date('Y-m-d H:i:s', time() - $audience['inactive_days'] * 86400);
         }

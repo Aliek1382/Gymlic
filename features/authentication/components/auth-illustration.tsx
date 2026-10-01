@@ -1,6 +1,6 @@
 import { Dumbbell, TrendingUp, Users } from "lucide-react";
 
-import { GymlicMark } from "@/components/brand/gymlic-mark";
+import { BrandMark, BrandName } from "@/components/brand/brand-mark";
 
 export function AuthIllustration({
   title,
@@ -10,7 +10,7 @@ export function AuthIllustration({
   description: string;
 }) {
   return (
-    <div className="relative hidden overflow-hidden bg-gradient-to-br from-primary to-[#1f2f9e] p-10 text-primary-foreground lg:flex lg:w-[42%] lg:flex-col lg:justify-between">
+    <div className="relative hidden overflow-hidden bg-gradient-to-br from-primary to-[var(--primary-deep)] p-10 text-primary-foreground lg:flex lg:w-[42%] lg:flex-col lg:justify-between">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.15]"
@@ -49,10 +49,8 @@ export function AuthIllustration({
       </div>
 
       <div className="relative flex items-center gap-2.5">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-white/15">
-          <GymlicMark className="size-4 text-white" />
-        </div>
-        <span className="text-lg font-bold">جیم‌لیک</span>
+        <BrandMark className="flex size-9 items-center justify-center rounded-xl bg-white/15" iconClassName="size-4 text-white" />
+        <span className="text-lg font-bold"><BrandName /></span>
       </div>
     </div>
   );

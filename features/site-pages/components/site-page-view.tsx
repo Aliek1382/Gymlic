@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 
-import { GymlicMark } from "@/components/brand/gymlic-mark";
+import { BrandMark, BrandName } from "@/components/brand/brand-mark";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getSitePage } from "../services/site-pages-service";
@@ -27,10 +27,8 @@ export function SitePageView() {
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <GymlicMark className="size-5" />
-            </div>
-            <span className="text-lg font-bold text-foreground">جیم‌لیک</span>
+            <BrandMark className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground" iconClassName="size-5" />
+            <span className="text-lg font-bold text-foreground"><BrandName /></span>
           </Link>
           <Link href="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowRight className="size-4" />

@@ -243,8 +243,22 @@ final class AuthController
         $stmt->execute(['id' => $user['id']]);
         $trainer = $stmt->fetch() ?: null;
 
-        // What the panel shows of /admin: null for a regular user.
-        $admin = AdminAccess::of($user);
+        // What the panel shows of /admin: null for a regular user, and for
+        // an admin's read-only view of someone's panel.
+        $session = Auth::session();
+        $viewAs = null;
+        if (($session['impersonated_by'] ?? null) !== null) {
+            $stmt = $pdo->prepare("SELECT CONCAT_WS(' ', first_name, last_name) FROM profiles WHERE id = :id");
+            $stmt->execute(['id' => $session['impersonated_by']]);
+            $viewAs = [
+                'admin_name' => (string) ($stmt->fetchColumn() ?: ''),
+                'read_only'  => $session['read_only'],
+                'expires_at' => $session['expires_at'],
+                // Seconds, so the browser's clock and timezone don't matter.
+                'expires_in' => max(0, strtotime($session['expires_at']) - time()),
+            ];
+        }
+        $admin = $viewAs === null ? AdminAccess::of($user) : null;
 
         Response::ok([
             'user'        => self::profilePublic($user) + ['is_suspended' => (bool) $user['is_suspended']],
@@ -255,6 +269,7 @@ final class AuthController
             ],
             'membership'  => $membership,
             'trainer'     => $trainer,
+            'view_as'     => $viewAs,
         ]);
     }
 

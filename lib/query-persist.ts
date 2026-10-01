@@ -19,6 +19,8 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
+import { isViewAsTab } from "@/lib/view-as";
+
 const DB_NAME = "gymlic-offline-data";
 const STORE = "snapshot";
 const KEY = "queries";
@@ -39,6 +41,9 @@ function available(): boolean {
 }
 
 function readToken(): string | null {
+  // A tab viewing a user's panel keeps nothing: their data must not land in
+  // the admin's offline copy, and the admin's must not show in the view.
+  if (isViewAsTab()) return null;
   try {
     return window.localStorage.getItem(TOKEN_KEY);
   } catch {

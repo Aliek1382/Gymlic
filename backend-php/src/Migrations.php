@@ -181,6 +181,16 @@ final class Migrations
                 ['described', 'foods', 'Fresh Fruit Juice'],
             ],
         ],
+        [
+            'id'    => 'analytics',
+            'file'  => 'analytics-update.sql',
+            'title' => 'آمار رشد و نمایش پنل کاربر برای پشتیبانی (فاز ۹)',
+            'check' => [
+                ['table', 'daily_active'],
+                ['column', 'sessions', 'impersonated_by'],
+                ['column', 'sessions', 'read_only'],
+            ],
+        ],
     ];
 
     /**
