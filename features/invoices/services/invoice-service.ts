@@ -1,5 +1,10 @@
 import { api, query, type ListResponse } from "@/lib/api/client";
 import type {
+  DiscountCodeInput,
+  DiscountCodeRow,
+} from "@/features/admin/services/admin-billing-service";
+import type { DiscountQuote } from "@/features/finance/services/finance-service";
+import type {
   ClaimStatus,
   Invoice,
   InvoiceClaim,
@@ -43,6 +48,9 @@ interface ClaimRow {
   receipt_is_pdf: boolean;
   receipt_purged_at: string | null;
   duplicate_tracking: boolean;
+  discount_code?: string | null;
+  list_price_toman?: number | null;
+  discount_toman?: number;
 }
 
 interface PayToRow {
@@ -69,6 +77,9 @@ function toClaim(row: ClaimRow | null | undefined): InvoiceClaim | null {
     receiptIsPdf: row.receipt_is_pdf,
     receiptPurged: row.receipt_purged_at !== null,
     duplicateTracking: row.duplicate_tracking,
+    discountCode: row.discount_code ?? null,
+    listPriceToman: row.list_price_toman ?? null,
+    discountToman: row.discount_toman ?? 0,
   };
 }
 
@@ -113,9 +124,20 @@ export async function listInvoices(athleteId?: string): Promise<Invoice[]> {
 }
 
 /** The athlete's invoices; claimsEnabled is false until the server has the "I paid" tables. */
-export async function listMyInvoices(): Promise<{ invoices: Invoice[]; claimsEnabled: boolean }> {
-  const data = await api.get<ListResponse<InvoiceRow> & { claims_enabled?: boolean }>("/invoices/mine");
-  return { invoices: data.items.map(toInvoice), claimsEnabled: data.claims_enabled === true };
+export async function listMyInvoices(): Promise<{
+  invoices: Invoice[];
+  claimsEnabled: boolean;
+  /** Whether the trainer's discount codes can be entered with a payment. */
+  discountsEnabled: boolean;
+}> {
+  const data = await api.get<
+    ListResponse<InvoiceRow> & { claims_enabled?: boolean; discounts_enabled?: boolean }
+  >("/invoices/mine");
+  return {
+    invoices: data.items.map(toInvoice),
+    claimsEnabled: data.claims_enabled === true,
+    discountsEnabled: data.discounts_enabled === true,
+  };
 }
 
 export async function createInvoice(input: {
@@ -146,12 +168,18 @@ export async function cancelInvoice(id: string): Promise<void> {
 }
 
 /** The athlete says they paid: tracking code, last four digits and (usually) a receipt. */
+/** What the trainer's discount code takes off an invoice, before the athlete files the payment. */
+export async function checkInvoiceDiscount(invoiceId: string, code: string): Promise<DiscountQuote> {
+  return api.post<DiscountQuote>(`/invoices/${invoiceId}/discount-check`, { code });
+}
+
 export async function submitInvoiceClaim(input: {
   invoiceId: string;
   trackingCode: string;
   cardLast4: string;
   paidAt?: string;
   note?: string;
+  discountCode?: string;
   receipt?: File | null;
 }): Promise<void> {
   const fields: Record<string, string> = {
@@ -160,6 +188,7 @@ export async function submitInvoiceClaim(input: {
   };
   if (input.paidAt) fields.paid_at = input.paidAt;
   if (input.note) fields.note = input.note;
+  if (input.discountCode) fields.discount_code = input.discountCode;
 
   const path = `/invoices/${input.invoiceId}/claim`;
   if (input.receipt) {
@@ -195,4 +224,45 @@ export async function getTrainerPaymentInfo(): Promise<{ ready: boolean; info: T
 
 export async function saveTrainerPaymentInfo(info: TrainerPaymentInfo): Promise<void> {
   await api.put("/payment-info", info);
+}
+
+// ---------------------------------------------------------------------------
+// The trainer's discount codes for their athletes
+// ---------------------------------------------------------------------------
+
+// The server calls the once-per-person rule once_per_athlete; the discount
+// dialog shared with the other codes calls it once_per_club, so it is renamed
+// here in both directions.
+type AthleteDiscountRow = Omit<DiscountCodeRow, "once_per_club"> & { once_per_athlete: boolean };
+
+export async function listAthleteDiscounts(): Promise<{
+  ready: boolean;
+  items: DiscountCodeRow[];
+  plans: { id: string; name: string; price_toman: number; is_active: boolean }[];
+}> {
+  const data = await api.get<{
+    ready: boolean;
+    items: AthleteDiscountRow[];
+    plans: { id: string; name: string; price_toman: number; is_active: boolean }[];
+  }>("/athlete-discount-codes");
+  return {
+    ...data,
+    items: data.items.map(({ once_per_athlete, ...row }) => ({ ...row, once_per_club: once_per_athlete })),
+  };
+}
+
+function toAthleteDiscountPayload({ once_per_club, ...input }: DiscountCodeInput) {
+  return { ...input, once_per_athlete: once_per_club };
+}
+
+export async function createAthleteDiscount(input: DiscountCodeInput): Promise<void> {
+  await api.post("/athlete-discount-codes", toAthleteDiscountPayload(input));
+}
+
+export async function updateAthleteDiscount(id: string, input: DiscountCodeInput): Promise<void> {
+  await api.patch(`/athlete-discount-codes/${id}`, toAthleteDiscountPayload(input));
+}
+
+export async function deleteAthleteDiscount(id: string): Promise<void> {
+  await api.delete(`/athlete-discount-codes/${id}`);
 }

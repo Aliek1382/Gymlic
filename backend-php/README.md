@@ -280,5 +280,32 @@ answer `ready: false` / 409 and the pages hide the feature.
 - Receipt files (`GET /member-payments/{id}/receipt`: the athlete, or a manager
   of that club) are deleted by the same cleanup as the others, N days after the
   review; a manager can also delete one by hand.
-- Not covered: discount codes on membership plans, and a reminder when a
-  membership is about to end.
+- Discount codes on membership plans are below; a reminder when a membership
+  is about to end is not covered.
+
+### Discount codes made by clubs and trainers
+
+The database step is `schema/member-discounts-update.sql` (after
+`member-payments-update.sql` and `invoice-claims-update.sql`); until it has run
+the code boxes and tabs are simply off.
+
+- **A club's codes for its membership plans** (`club_discount_codes`, unique
+  per club): owner or reception manage them in "پرداخت‌های اعضا" → "کدهای
+  تخفیف" (`/clubs/{id}/discount-codes`). The athlete enters a code in the pay
+  dialog (`POST /member-payments/discount-check`, then `discount_code` on
+  `POST /member-payments`); the request stores the plan price, the discount and
+  the discounted `amount_toman`, so approving puts the discounted amount in the
+  club's revenue.
+- **A trainer's codes for their athletes' invoices** (`athlete_discount_codes`,
+  unique per trainer): managed in "فاکتورهای من" → "کدهای تخفیف"
+  (`/athlete-discount-codes`). The athlete enters it with "پرداخت کردم"
+  (`POST /invoices/{id}/discount-check`, then `discount_code` on the claim); the
+  claim keeps the discount, the trainer sees the amount that should have been
+  paid, and approving settles the invoice for that amount
+  (`InvoiceController::settle`'s `$paidAmount`).
+- The rules are the platform codes' (`DiscountCodes`): percent or amount, one
+  plan or all (club codes only), a cap on total uses, once per person, an
+  expiry date, active/inactive. A use is a pending or approved payment, so a
+  rejected one gives its use back. A code can never make a payment free (percent
+  is capped at 99, and a code that would take the whole price is refused when
+  used), and a used code can be switched off but not deleted.

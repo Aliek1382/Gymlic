@@ -61,6 +61,10 @@ export interface DiscountManagerConfig {
   /** Shown while the database update for the codes has not been run. */
   notReady: string;
   emptyText: string;
+  /** Codes that are not tied to a plan (a trainer's): hides the plan choice. */
+  hidePlanScope?: boolean;
+  /** Highest percent a code may give; 100 (the default) for the platform's own, 99 where a code may not make it free. */
+  maxPercent?: number;
 }
 
 function describe(code: Pick<DiscountCodeRow, "kind" | "value">): string {
@@ -219,6 +223,7 @@ function DiscountDialog({
   onSaved: () => void;
 }) {
   const existing = code && code !== "new" ? code : null;
+  const maxPercent = config.maxPercent ?? 100;
   const [text, setText] = useState(existing?.code ?? "");
   const [kind, setKind] = useState<DiscountKind>(existing?.kind ?? "percent");
   const [value, setValue] = useState(existing ? String(existing.value) : "");
@@ -252,8 +257,10 @@ function DiscountDialog({
       toast.error("کد باید ۳ تا ۴۰ حرف انگلیسی، عدد، - یا _ باشد.");
       return;
     }
-    if (numericValue === null || !Number.isInteger(numericValue) || numericValue < 1 || (kind === "percent" && numericValue > 100)) {
-      toast.error(kind === "percent" ? "درصد تخفیف باید بین ۱ و ۱۰۰ باشد." : "مبلغ تخفیف را وارد کنید.");
+    if (numericValue === null || !Number.isInteger(numericValue) || numericValue < 1 || (kind === "percent" && numericValue > maxPercent)) {
+      toast.error(
+        kind === "percent" ? `درصد تخفیف باید بین ۱ و ${formatNumber(maxPercent)} باشد.` : "مبلغ تخفیف را وارد کنید."
+      );
       return;
     }
     const uses = maxUses.trim() === "" ? null : parseLocaleNumber(maxUses);
@@ -343,6 +350,7 @@ function DiscountDialog({
             </div>
           </div>
 
+          {!config.hidePlanScope && (
           <div className="space-y-2">
             <Label>برای پلن</Label>
             <Select value={planId} onValueChange={setPlanId}>
@@ -365,6 +373,7 @@ function DiscountDialog({
               </p>
             )}
           </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="discount-max-uses">

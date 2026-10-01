@@ -7,6 +7,8 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\CardInfo;
 use Gymlic\Database;
+use Gymlic\DiscountCodes;
+use Gymlic\Discounts;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
@@ -98,7 +100,7 @@ final class InvoiceClaimController
         }
 
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT id, trainer_id, athlete_id, item_type, status FROM invoices WHERE id = :id');
+        $stmt = $pdo->prepare('SELECT id, trainer_id, athlete_id, item_type, status, amount_toman FROM invoices WHERE id = :id');
         $stmt->execute(['id' => $params['id']]);
         $invoice = $stmt->fetch();
         if ($invoice === false || $invoice['athlete_id'] !== $user['id']) {
@@ -119,6 +121,23 @@ final class InvoiceClaimController
 
         $multipart = str_starts_with(strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? '')), 'multipart/form-data');
         $data = $multipart ? $_POST : Validate::body();
+
+        // The trainer's discount code, checked now and again (with the code
+        // locked) when the claim is stored.
+        $code = Discounts::normalizeCode($data['discount_code'] ?? '');
+        if ($code !== '' && !DiscountCodes::trainerReady()) {
+            Response::error(409, 'discounts_unavailable', 'کد تخفیف فعلاً پذیرفته نمی‌شود.');
+            return;
+        }
+        if ($code !== '') {
+            $quote = DiscountCodes::evaluate(
+                $pdo, DiscountCodes::TRAINER, $invoice['trainer_id'], $code, (int) $invoice['amount_toman'], null, $user['id']
+            );
+            if (!$quote['ok']) {
+                Response::error(409, $quote['error'], $quote['message']);
+                return;
+            }
+        }
 
         $fields = Receipts::parseFields($data);
         if (isset($fields['error'])) {
@@ -142,22 +161,44 @@ final class InvoiceClaimController
         }
 
         $id = Uuid::v4();
+        $row = [
+            'id'            => $id,
+            'invoice_id'    => $invoice['id'],
+            'athlete_id'    => $user['id'],
+            'tracking_code' => $fields['row']['tracking_code'],
+            'card_last4'    => $fields['row']['card_last4'],
+            'paid_at'       => $fields['row']['paid_at'],
+            'note'          => self::text($data['note'] ?? '', 500),
+            'receipt_path'  => $file,
+        ];
+
+        $pdo->beginTransaction();
         try {
+            if ($code !== '') {
+                $locked = DiscountCodes::evaluate(
+                    $pdo, DiscountCodes::TRAINER, $invoice['trainer_id'], $code, (int) $invoice['amount_toman'], null, $user['id'], true
+                );
+                if (!$locked['ok']) {
+                    $pdo->rollBack();
+                    Receipts::remove($file);
+                    Response::error(409, $locked['error'], $locked['message']);
+                    return;
+                }
+                $row += [
+                    'discount_code_id' => $locked['code']['id'],
+                    'list_price_toman' => $locked['list_price'],
+                    'discount_toman'   => $locked['discount'],
+                ];
+            }
             $pdo->prepare(
-                'INSERT INTO invoice_payment_claims
-                   (id, invoice_id, athlete_id, tracking_code, card_last4, paid_at, note, receipt_path)
-                 VALUES (:id, :invoice_id, :athlete_id, :tracking_code, :card_last4, :paid_at, :note, :receipt_path)'
-            )->execute([
-                'id'            => $id,
-                'invoice_id'    => $invoice['id'],
-                'athlete_id'    => $user['id'],
-                'tracking_code' => $fields['row']['tracking_code'],
-                'card_last4'    => $fields['row']['card_last4'],
-                'paid_at'       => $fields['row']['paid_at'],
-                'note'          => self::text($data['note'] ?? '', 500),
-                'receipt_path'  => $file,
-            ]);
+                'INSERT INTO invoice_payment_claims (' . implode(', ', array_keys($row)) . ')
+                 VALUES (:' . implode(', :', array_keys($row)) . ')'
+            )->execute($row);
+            $pdo->commit();
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             Receipts::remove($file);
             throw $e;
         }
@@ -183,6 +224,44 @@ final class InvoiceClaimController
         Response::ok(['id' => $id], 201);
     }
 
+    /** POST /invoices/{id}/discount-check {code}: what the trainer's code takes off this invoice. */
+    public static function checkDiscount(array $params): void
+    {
+        $user = Auth::requireUser();
+        $data = Validate::required(Validate::body(), ['code']);
+        if (!self::ready()) {
+            return;
+        }
+        if (!DiscountCodes::trainerReady()) {
+            Response::error(409, 'discounts_unavailable', 'کد تخفیف فعلاً پذیرفته نمی‌شود.');
+            return;
+        }
+
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT trainer_id, athlete_id, status, amount_toman FROM invoices WHERE id = :id');
+        $stmt->execute(['id' => $params['id']]);
+        $invoice = $stmt->fetch();
+        if ($invoice === false || $invoice['athlete_id'] !== $user['id'] || $invoice['status'] !== 'pending') {
+            Response::error(404, 'not_found', 'Invoice not found.');
+            return;
+        }
+
+        $result = DiscountCodes::evaluate(
+            $pdo, DiscountCodes::TRAINER, $invoice['trainer_id'], (string) $data['code'], (int) $invoice['amount_toman'], null, $user['id']
+        );
+        if (!$result['ok']) {
+            Response::error(409, $result['error'], $result['message']);
+            return;
+        }
+
+        Response::ok([
+            'code'             => $result['code']['code'],
+            'list_price_toman' => $result['list_price'],
+            'discount_toman'   => $result['discount'],
+            'final_toman'      => $result['final'],
+        ]);
+    }
+
     // ---- Trainer: review -------------------------------------------------
 
     /** POST /invoices/{id}/claim/approve: the money arrived; settles the invoice. */
@@ -198,8 +277,23 @@ final class InvoiceClaimController
             return;
         }
 
+        // A claim filed with the trainer's own discount code was paid at the
+        // discounted price, so that is what the invoice is settled for.
+        $paidAmount = null;
+        if (DiscountCodes::trainerReady()) {
+            $claim = Database::connection()->prepare(
+                "SELECT list_price_toman, discount_toman FROM invoice_payment_claims
+                 WHERE invoice_id = :id AND status = 'pending' ORDER BY created_at DESC LIMIT 1"
+            );
+            $claim->execute(['id' => $invoice['id']]);
+            $claim = $claim->fetch();
+            if ($claim !== false && (int) $claim['discount_toman'] > 0) {
+                $paidAmount = max(1, (int) $claim['list_price_toman'] - (int) $claim['discount_toman']);
+            }
+        }
+
         // Settling closes the claim as approved in the same transaction.
-        if (!InvoiceController::settle($invoice, 'card_transfer', null, $user['id'])) {
+        if (!InvoiceController::settle($invoice, 'card_transfer', null, $user['id'], $paidAmount)) {
             Response::error(409, 'not_pending', 'Only a pending invoice can be marked paid.');
             return;
         }

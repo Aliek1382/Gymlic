@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\DiscountCodes;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Uuid;
@@ -148,6 +149,8 @@ final class InvoiceController
             'items'          => self::withPayTo(self::withClaims(self::present($stmt->fetchAll()), false)),
             // Whether an athlete can say "I paid" (the claims database update has run).
             'claims_enabled' => Receipts::claimsReady(),
+            // Whether the trainer's discount codes can be entered on a claim.
+            'discounts_enabled' => DiscountCodes::trainerReady(),
         ]);
     }
 
@@ -177,20 +180,24 @@ final class InvoiceController
      * Marks a pending invoice paid and everything that follows from it: a
      * session package is activated, a claim the athlete filed is closed as
      * approved, and the athlete is told. False when the invoice was not
-     * pending (someone else settled or cancelled it first).
+     * pending (someone else settled or cancelled it first). Pass $paidAmount
+     * to settle it for less than its amount (a discount code was used).
      */
-    public static function settle(array $invoice, string $method, ?string $note, string $actorId): bool
+    public static function settle(array $invoice, string $method, ?string $note, string $actorId, ?int $paidAmount = null): bool
     {
         $pdo = Database::connection();
         // Settling and activating a session package are one step: a paid
         // invoice with no sessions behind it would leave the athlete stuck.
         $pdo->beginTransaction();
         try {
+            // $paidAmount is the discounted price when the athlete paid with a
+            // trainer's discount code; the invoice then records what was paid.
             $stmt = $pdo->prepare(
-                "UPDATE invoices SET status = 'paid', payment_method = :method, note = :note, paid_at = NOW()
+                "UPDATE invoices SET status = 'paid', payment_method = :method, note = :note, paid_at = NOW(),
+                        amount_toman = COALESCE(:paid, amount_toman)
                  WHERE id = :id AND status = 'pending'"
             );
-            $stmt->execute(['method' => $method, 'note' => $note, 'id' => $invoice['id']]);
+            $stmt->execute(['method' => $method, 'note' => $note, 'paid' => $paidAmount, 'id' => $invoice['id']]);
 
             if ($stmt->rowCount() === 0) {
                 $pdo->rollBack();
@@ -425,12 +432,15 @@ final class InvoiceController
                          WHERE o.tracking_code = c.tracking_code AND o.invoice_id <> c.invoice_id
                            AND oi.trainer_id = ci.trainer_id) AS duplicate_tracking'
             : ', 0 AS duplicate_tracking';
+        $discounts = DiscountCodes::trainerReady();
+        $discountColumns = $discounts ? ', c.list_price_toman, c.discount_toman, dc.code AS discount_code' : '';
+        $discountJoin = $discounts ? ' LEFT JOIN athlete_discount_codes dc ON dc.id = c.discount_code_id' : '';
         $stmt = Database::connection()->prepare(
             "SELECT c.id, c.invoice_id, c.status, c.tracking_code, c.card_last4, c.paid_at, c.note,
                     c.trainer_note, c.reviewed_at, c.created_at, c.receipt_purged_at,
                     (c.receipt_path IS NOT NULL) AS has_receipt,
-                    (c.receipt_path LIKE '%.pdf') AS receipt_is_pdf{$duplicate}
-             FROM invoice_payment_claims c
+                    (c.receipt_path LIKE '%.pdf') AS receipt_is_pdf{$duplicate}{$discountColumns}
+             FROM invoice_payment_claims c{$discountJoin}
              WHERE c.invoice_id IN ({$marks}) ORDER BY c.created_at DESC"
         );
         $stmt->execute($ids);
@@ -438,7 +448,7 @@ final class InvoiceController
         $latest = [];
         foreach ($stmt->fetchAll() as $claim) {
             // Newest first, so the first one seen for an invoice is its latest.
-            $latest[$claim['invoice_id']] ??= Cast::row($claim, [], [], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
+            $latest[$claim['invoice_id']] ??= Cast::row($claim, [], ['list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
         }
         foreach ($rows as &$row) {
             $row['claim'] = $latest[$row['id']] ?? null;

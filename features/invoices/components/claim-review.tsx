@@ -80,6 +80,13 @@ export function ClaimReview({ invoice }: { invoice: Invoice }) {
           {" · "}کارت ••••{" "}
           <span dir="ltr" className="font-mono text-foreground">{claim.cardLast4}</span>
         </p>
+        {claim.discountToman > 0 && claim.listPriceToman != null && (
+          <p className="font-medium text-foreground">
+            با کد تخفیف <span dir="ltr" className="font-mono">{claim.discountCode}</span>: باید{" "}
+            {formatNumber(claim.listPriceToman - claim.discountToman)} تومان واریز شده باشد (
+            {formatNumber(claim.discountToman)} تومان تخفیف)
+          </p>
+        )}
         <p>
           مبلغ فاکتور: {formatNumber(invoice.amountToman)} تومان
           {claim.paidAt && <> · واریز: {formatPersianDate(new Date(claim.paidAt.replace(" ", "T")))}</>}
@@ -107,7 +114,11 @@ export function ClaimReview({ invoice }: { invoice: Invoice }) {
             <DialogTitle>{mode === "approve" ? "تأیید پرداخت" : "رد پرداخت"}</DialogTitle>
             <DialogDescription>
               {mode === "approve"
-                ? `دریافت ${formatNumber(invoice.amountToman)} تومان به‌صورت کارت‌به‌کارت ثبت می‌شود و محتوا بلافاصله برای ورزشکار باز می‌شود. اول مطمئن شوید پول به حساب شما نشسته است.`
+                ? `دریافت ${formatNumber(
+                    claim.discountToman > 0 && claim.listPriceToman != null
+                      ? claim.listPriceToman - claim.discountToman
+                      : invoice.amountToman
+                  )} تومان به‌صورت کارت‌به‌کارت ثبت می‌شود و محتوا بلافاصله برای ورزشکار باز می‌شود. اول مطمئن شوید پول به حساب شما نشسته است.`
                 : "ورزشکار با دلیل شما مطلع می‌شود و می‌تواند دوباره پرداخت را ثبت کند."}
             </DialogDescription>
           </DialogHeader>

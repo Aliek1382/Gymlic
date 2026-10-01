@@ -8,6 +8,8 @@ use Gymlic\Auth;
 use Gymlic\CardInfo;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\DiscountCodes;
+use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Receipts;
 use Gymlic\Response;
@@ -121,6 +123,7 @@ final class MemberPaymentController
 
         $pdo = Database::connection();
         $billing = Settings::get('billing');
+        $discounts = DiscountCodes::clubReady();
         $stmt = $pdo->prepare(
             "SELECT m.id AS membership_id, m.club_id, c.name AS club_name, m.plan_id, p.name AS plan_name, m.expires_at
              FROM memberships m
@@ -144,14 +147,17 @@ final class MemberPaymentController
             $plans->execute(['id' => $row['club_id']]);
 
             $requests = $pdo->prepare(
-                "SELECT id, plan_name, amount_toman, tracking_code, card_last4, paid_at, note, status, review_note,
-                        reviewed_at, created_at, receipt_purged_at,
-                        (receipt_path IS NOT NULL) AS has_receipt, (receipt_path LIKE '%.pdf') AS receipt_is_pdf
-                 FROM membership_payment_requests WHERE club_id = :club AND athlete_id = :athlete
-                 ORDER BY created_at DESC LIMIT 20"
+                "SELECT r.id, r.plan_name, r.amount_toman, r.tracking_code, r.card_last4, r.paid_at, r.note, r.status,
+                        r.review_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
+                        (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE '%.pdf') AS receipt_is_pdf"
+                . ($discounts ? ', r.list_price_toman, r.discount_toman, d.code AS discount_code' : '') . "
+                 FROM membership_payment_requests r"
+                . ($discounts ? ' LEFT JOIN club_discount_codes d ON d.id = r.discount_code_id' : '') . "
+                 WHERE r.club_id = :club AND r.athlete_id = :athlete
+                 ORDER BY r.created_at DESC LIMIT 20"
             );
             $requests->execute(['club' => $row['club_id'], 'athlete' => $user['id']]);
-            $requests = Cast::rows($requests->fetchAll(), [], ['amount_toman'], ['has_receipt', 'receipt_is_pdf']);
+            $requests = Cast::rows($requests->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf']);
 
             $expires = $row['expires_at'];
             $clubs[] = [
@@ -171,6 +177,7 @@ final class MemberPaymentController
 
         Response::ok([
             'ready'    => true,
+            'discounts_enabled' => $discounts,
             'clubs'    => $clubs,
             'receipts' => [
                 'required'       => $billing['receipt_required'],
@@ -178,6 +185,63 @@ final class MemberPaymentController
                 'retention_days' => $billing['receipt_retention_days'],
             ],
         ]);
+    }
+
+    /** POST /member-payments/discount-check {plan_id, code}: the price a club's code gives, before filing. */
+    public static function checkDiscount(): void
+    {
+        $user = Auth::requireUser();
+        $data = Validate::required(Validate::body(), ['plan_id', 'code']);
+        if (!self::requireReady()) {
+            return;
+        }
+        if (!DiscountCodes::clubReady()) {
+            Response::error(409, 'discounts_unavailable', 'کد تخفیف فعلاً پذیرفته نمی‌شود.');
+            return;
+        }
+
+        $pdo = Database::connection();
+        $plan = self::planFor($pdo, (string) $data['plan_id'], $user['id']);
+        if ($plan === null) {
+            Response::error(404, 'plan_not_found', 'این طرح عضویت در دسترس نیست.');
+            return;
+        }
+
+        $result = DiscountCodes::evaluate(
+            $pdo, DiscountCodes::CLUB, $plan['club_id'], (string) $data['code'], (int) $plan['price_toman'], $plan['id'], $user['id']
+        );
+        if (!$result['ok']) {
+            Response::error(409, $result['error'], $result['message']);
+            return;
+        }
+
+        Response::ok([
+            'code'             => $result['code']['code'],
+            'list_price_toman' => $result['list_price'],
+            'discount_toman'   => $result['discount'],
+            'final_toman'      => $result['final'],
+        ]);
+    }
+
+    /** An active plan of a club the athlete is an active athlete member of, else null. */
+    private static function planFor(PDO $pdo, string $planId, string $athleteId): ?array
+    {
+        $plan = $pdo->prepare(
+            'SELECT p.id, p.club_id, p.name, p.price_toman, p.duration_days, c.name AS club_name
+             FROM club_membership_plans p JOIN clubs c ON c.id = p.club_id
+             WHERE p.id = :id AND p.is_active = 1'
+        );
+        $plan->execute(['id' => $planId]);
+        $plan = $plan->fetch();
+        if ($plan === false) {
+            return null;
+        }
+        $check = $pdo->prepare(
+            "SELECT 1 FROM memberships WHERE club_id = :club AND user_id = :user AND role = 'athlete' AND status = 'active'"
+        );
+        $check->execute(['club' => $plan['club_id'], 'user' => $athleteId]);
+
+        return $check->fetchColumn() !== false ? $plan : null;
     }
 
     /** POST /member-payments (multipart with the receipt, or JSON without). */
@@ -192,24 +256,9 @@ final class MemberPaymentController
         $data = Validate::required($multipart ? $_POST : Validate::body(), ['plan_id']);
 
         $pdo = Database::connection();
-        $plan = $pdo->prepare(
-            'SELECT p.id, p.club_id, p.name, p.price_toman, p.duration_days, c.name AS club_name
-             FROM club_membership_plans p JOIN clubs c ON c.id = p.club_id
-             WHERE p.id = :id AND p.is_active = 1'
-        );
-        $plan->execute(['id' => (string) $data['plan_id']]);
-        $plan = $plan->fetch();
-
-        $member = false;
-        if ($plan !== false) {
-            $check = $pdo->prepare(
-                "SELECT 1 FROM memberships WHERE club_id = :club AND user_id = :user AND role = 'athlete' AND status = 'active'"
-            );
-            $check->execute(['club' => $plan['club_id'], 'user' => $user['id']]);
-            $member = $check->fetchColumn() !== false;
-        }
+        $plan = self::planFor($pdo, (string) $data['plan_id'], $user['id']);
         // The same answer whether the plan does not exist or is another club's.
-        if ($plan === false || !$member) {
+        if ($plan === null) {
             Response::error(404, 'plan_not_found', 'این طرح عضویت در دسترس نیست.');
             return;
         }
@@ -225,6 +274,23 @@ final class MemberPaymentController
         if ($waiting->fetchColumn() !== false) {
             Response::error(409, 'request_pending', 'پرداخت قبلی شما هنوز در انتظار تأیید باشگاه است.');
             return;
+        }
+
+        // A club's discount code, checked now (so a bad one stops before the
+        // receipt is stored) and again, with the code locked, when filed.
+        $code = Discounts::normalizeCode($data['discount_code'] ?? '');
+        if ($code !== '' && !DiscountCodes::clubReady()) {
+            Response::error(409, 'discounts_unavailable', 'کد تخفیف فعلاً پذیرفته نمی‌شود.');
+            return;
+        }
+        if ($code !== '') {
+            $quote = DiscountCodes::evaluate(
+                $pdo, DiscountCodes::CLUB, $plan['club_id'], $code, (int) $plan['price_toman'], $plan['id'], $user['id']
+            );
+            if (!$quote['ok']) {
+                Response::error(409, $quote['error'], $quote['message']);
+                return;
+            }
         }
 
         $fields = Receipts::parseFields($data);
@@ -249,29 +315,50 @@ final class MemberPaymentController
         }
 
         $id = Uuid::v4();
+        $row = [
+            'id'            => $id,
+            'club_id'       => $plan['club_id'],
+            'athlete_id'    => $user['id'],
+            'plan_id'       => $plan['id'],
+            // The plan as it is now: the club may edit or delete it later.
+            'plan_name'     => $plan['name'],
+            'duration_days' => (int) $plan['duration_days'],
+            'amount_toman'  => (int) $plan['price_toman'],
+            'tracking_code' => $fields['row']['tracking_code'],
+            'card_last4'    => $fields['row']['card_last4'],
+            'paid_at'       => $fields['row']['paid_at'],
+            'note'          => self::text($data['note'] ?? '', 500),
+            'receipt_path'  => $file,
+        ];
+
+        $pdo->beginTransaction();
         try {
+            if ($code !== '') {
+                $locked = DiscountCodes::evaluate(
+                    $pdo, DiscountCodes::CLUB, $plan['club_id'], $code, (int) $plan['price_toman'], $plan['id'], $user['id'], true
+                );
+                if (!$locked['ok']) {
+                    $pdo->rollBack();
+                    Receipts::remove($file);
+                    Response::error(409, $locked['error'], $locked['message']);
+                    return;
+                }
+                $row['amount_toman'] = $locked['final'];
+                $row += [
+                    'discount_code_id' => $locked['code']['id'],
+                    'list_price_toman' => $locked['list_price'],
+                    'discount_toman'   => $locked['discount'],
+                ];
+            }
             $pdo->prepare(
-                'INSERT INTO membership_payment_requests
-                   (id, club_id, athlete_id, plan_id, plan_name, duration_days, amount_toman, tracking_code, card_last4,
-                    paid_at, note, receipt_path)
-                 VALUES (:id, :club_id, :athlete_id, :plan_id, :plan_name, :duration_days, :amount, :tracking_code,
-                         :card_last4, :paid_at, :note, :receipt_path)'
-            )->execute([
-                'id'            => $id,
-                'club_id'       => $plan['club_id'],
-                'athlete_id'    => $user['id'],
-                'plan_id'       => $plan['id'],
-                // The plan as it is now: the club may edit or delete it later.
-                'plan_name'     => $plan['name'],
-                'duration_days' => (int) $plan['duration_days'],
-                'amount'        => (int) $plan['price_toman'],
-                'tracking_code' => $fields['row']['tracking_code'],
-                'card_last4'    => $fields['row']['card_last4'],
-                'paid_at'       => $fields['row']['paid_at'],
-                'note'          => self::text($data['note'] ?? '', 500),
-                'receipt_path'  => $file,
-            ]);
+                'INSERT INTO membership_payment_requests (' . implode(', ', array_keys($row)) . ')
+                 VALUES (:' . implode(', :', array_keys($row)) . ')'
+            )->execute($row);
+            $pdo->commit();
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             Receipts::remove($file);
             throw $e;
         }
@@ -341,19 +428,22 @@ final class MemberPaymentController
         }
 
         $pdo = Database::connection();
+        $discounts = DiscountCodes::clubReady();
         $stmt = $pdo->prepare(
             "SELECT r.id, r.athlete_id, r.plan_name, r.duration_days, r.amount_toman, r.tracking_code, r.card_last4,
                     r.paid_at, r.note, r.status, r.review_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE '%.pdf') AS receipt_is_pdf,
                     a.first_name, a.last_name, a.phone,
                     EXISTS (SELECT 1 FROM membership_payment_requests o
-                            WHERE o.club_id = r.club_id AND o.tracking_code = r.tracking_code AND o.id <> r.id) AS duplicate_tracking
+                            WHERE o.club_id = r.club_id AND o.tracking_code = r.tracking_code AND o.id <> r.id) AS duplicate_tracking"
+            . ($discounts ? ', r.list_price_toman, r.discount_toman, d.code AS discount_code' : '') . "
              FROM membership_payment_requests r
-             JOIN profiles a ON a.id = r.athlete_id
+             JOIN profiles a ON a.id = r.athlete_id"
+            . ($discounts ? ' LEFT JOIN club_discount_codes d ON d.id = r.discount_code_id' : '') . "
              WHERE r.club_id = :club ORDER BY r.created_at DESC LIMIT 500"
         );
         $stmt->execute(['club' => $params['id']]);
-        $rows = Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'duration_days'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
+        $rows = Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'duration_days', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
 
         // When the file goes: the retention days after the review.
         $days = Settings::get('billing')['receipt_retention_days'];
@@ -430,7 +520,12 @@ final class MemberPaymentController
                 'club'   => $request['club_id'],
                 'amount' => $request['amount_toman'],
                 'member' => $request['athlete_id'],
-                'note'   => mb_substr('پرداخت کارت‌به‌کارت · ' . $request['plan_name'] . ' · کد پیگیری ' . $request['tracking_code'], 0, 500),
+                'note'   => mb_substr(
+                    'پرداخت کارت‌به‌کارت · ' . $request['plan_name'] . ' · کد پیگیری ' . $request['tracking_code']
+                    . ((int) ($request['discount_toman'] ?? 0) > 0 ? ' · با ' . number_format((int) $request['discount_toman']) . ' تومان تخفیف' : ''),
+                    0,
+                    500
+                ),
                 'by'     => $user['id'],
                 'on'     => $today,
             ]);
