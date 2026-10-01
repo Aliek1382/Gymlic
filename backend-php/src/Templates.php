@@ -290,6 +290,22 @@ final class Templates
             'title' => 'تیکت #{number} بسته شد', 'body' => '{subject}',
             'vars' => ['number' => 'شمارهٔ تیکت', 'subject' => 'موضوع'],
         ],
+        // ---- trainer verification
+        'trainer_verification_requested' => [
+            'group' => 'coaching', 'label' => 'درخواست تأیید مدارک مربی', 'to' => 'مدیران با دسترسی مدیریت کاربران',
+            'title' => 'درخواست تأیید مدارک', 'body' => '{name} مدارکش را برای گرفتن نشان «مربی تأییدشده» فرستاد.',
+            'vars' => ['name' => 'نام مربی'],
+        ],
+        'trainer_verified' => [
+            'group' => 'coaching', 'label' => 'تأیید مدارک مربی', 'to' => 'مربی',
+            'title' => 'مدارک شما تأیید شد', 'body' => 'از این پس نشان «مربی تأییدشده» کنار نام شما دیده می‌شود.',
+            'vars' => [],
+        ],
+        'trainer_verification_rejected' => [
+            'group' => 'coaching', 'label' => 'رد مدارک مربی', 'to' => 'مربی',
+            'title' => 'مدارک شما تأیید نشد', 'body' => '{reason}',
+            'vars' => ['reason' => 'توضیح مدیر'],
+        ],
     ];
 
     private const TITLE_MAX = 255;

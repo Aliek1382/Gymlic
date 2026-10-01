@@ -12,6 +12,8 @@ use Gymlic\Settings;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use Gymlic\Templates;
+use Gymlic\Tiers;
+use Gymlic\TrainerVerification;
 use PDO;
 
 final class AuthController
@@ -234,7 +236,7 @@ final class AuthController
         $membership = $stmt->fetch() ?: null;
 
         $stmt = $pdo->prepare(
-            "SELECT p.id, p.first_name, p.last_name, p.avatar_url
+            'SELECT p.id, p.first_name, p.last_name, p.avatar_url, ' . TrainerVerification::flagSql('p.id') . " AS is_verified
              FROM trainer_athletes ta
              JOIN profiles p ON p.id = ta.trainer_id
              WHERE ta.athlete_id = :id AND ta.status = 'active'
@@ -242,6 +244,9 @@ final class AuthController
         );
         $stmt->execute(['id' => $user['id']]);
         $trainer = $stmt->fetch() ?: null;
+        if ($trainer !== null) {
+            $trainer['is_verified'] = (bool) $trainer['is_verified'];
+        }
 
         // What the panel shows of /admin: null for a regular user, and for
         // an admin's read-only view of someone's panel.
@@ -270,7 +275,15 @@ final class AuthController
             'membership'  => $membership,
             'trainer'     => $trainer,
             'view_as'     => $viewAs,
+            // The plan tier that decides which sections open (Tiers); null = not limited.
+            'tier'        => self::tierInfo($pdo, $user),
         ]);
+    }
+
+    private static function tierInfo(\PDO $pdo, array $user): ?array
+    {
+        $tier = Tiers::effective($pdo, $user);
+        return $tier === null ? null : ['key' => $tier, 'label' => Tiers::label($tier)];
     }
 
     public static function chooseRole(): void

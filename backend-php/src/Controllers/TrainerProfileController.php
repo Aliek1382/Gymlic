@@ -4,9 +4,12 @@ declare(strict_types=1);
 namespace Gymlic\Controllers;
 
 use Gymlic\Acl;
+use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Templates;
+use Gymlic\TrainerVerification;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 
@@ -25,6 +28,39 @@ final class TrainerProfileController
     private const MAX_DESCRIPTION = 500;
     private const MAX_PRICE_TOMAN = 100_000_000_000;
     private const SOCIAL_KEYS = ['instagram', 'telegram', 'website'];
+
+    /**
+     * POST /trainer-profile/verification — sends the saved certificates to
+     * the admins for the "verified trainer" badge.
+     */
+    public static function requestVerification(): void
+    {
+        $user = self::requireTrainer();
+        $pdo = Database::connection();
+        if (!TrainerVerification::ready()) {
+            self::fail('verification_not_ready', 'تأیید مدارک هنوز فعال نشده است.');
+        }
+        $profile = self::load($user['id']);
+        if ($profile['certificates'] === []) {
+            self::fail('no_certificates', 'اول دست‌کم یک تصویر مدرک در رزومه بارگذاری و ذخیره کنید.');
+        }
+        $status = $profile['verification']['status'] ?? 'none';
+        if ($status === 'pending' || $status === 'verified') {
+            self::fail('already_' . $status, $status === 'pending' ? 'مدارک شما در حال بررسی است.' : 'مدارک شما قبلاً تأیید شده است.');
+        }
+
+        $pdo->prepare(
+            "UPDATE trainer_profiles SET verification_status = 'pending', verification_note = NULL,
+                    verification_requested_at = NOW() WHERE trainer_id = :id"
+        )->execute(['id' => $user['id']]);
+
+        $name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) ?: (string) $user['email'];
+        foreach (AdminAccess::holders($pdo, 'users.manage') as $adminId) {
+            Templates::notify($pdo, 'trainer_verification_requested', $adminId, $user['id'], 'broadcast', ['name' => $name], '/admin/verifications');
+        }
+
+        Response::ok(self::load($user['id']));
+    }
 
     /** GET /trainer-profile — the trainer's own résumé, for editing. */
     public static function mine(): void
@@ -93,7 +129,11 @@ final class TrainerProfileController
             return;
         }
 
-        Response::ok(['trainer' => $trainer] + self::load($trainerId));
+        // The athlete sees the badge, never the admin's notes on the review.
+        $profile = self::load($trainerId);
+        $trainer['is_verified'] = ($profile['verification']['status'] ?? 'none') === 'verified';
+        unset($profile['verification']);
+        Response::ok(['trainer' => $trainer] + $profile);
     }
 
     /** POST /trainer-profile/certificates — stores one image and returns its URL; the DB is untouched. */
@@ -121,6 +161,8 @@ final class TrainerProfileController
         $stmt->execute(['id' => $trainerId]);
         $row = $stmt->fetch();
 
+        $verification = TrainerVerification::of(Database::connection(), $trainerId);
+
         if ($row === false) {
             return [
                 'bio'           => null,
@@ -129,6 +171,7 @@ final class TrainerProfileController
                 'pricing_table' => [],
                 'social_links'  => new \stdClass(),
                 'updated_at'    => null,
+                'verification'  => $verification,
             ];
         }
 
@@ -145,6 +188,8 @@ final class TrainerProfileController
             'pricing_table' => $pricing,
             'social_links'  => json_decode($row['social_links'] ?? '{}') ?: new \stdClass(),
             'updated_at'    => $row['updated_at'],
+            // null before operations-update.sql; the athlete's view shows only the badge.
+            'verification'  => $verification,
         ];
     }
 

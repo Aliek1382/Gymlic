@@ -22,6 +22,9 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+// Warnings and crashes also show up in the admin's error log.
+Gymlic\ErrorLog::registerCli();
+
 $sent = Gymlic\Controllers\CalendarController::sendDueReminders();
 // Supplement-plan reminders ride the same cron. Guarded so that a host whose
 // supplement tables don't exist yet (backend deployed before the SQL ran) still

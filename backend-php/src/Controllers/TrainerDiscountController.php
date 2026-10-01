@@ -10,6 +10,7 @@ use Gymlic\Discounts;
 use Gymlic\Response;
 use Gymlic\TrainerBilling;
 use Gymlic\TrainerDiscounts;
+use Gymlic\Trash;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use PDO;
@@ -135,7 +136,11 @@ final class TrainerDiscountController
             return;
         }
 
-        $pdo->prepare('DELETE FROM trainer_discount_codes WHERE id = :id')->execute(['id' => $params['id']]);
+        if (Trash::ready()) {
+            TrashController::trash($pdo, 'trainer_discount', [['trainer_discount_codes', 'id', $params['id']]], (string) $code, null, $admin['id']);
+        } else {
+            $pdo->prepare('DELETE FROM trainer_discount_codes WHERE id = :id')->execute(['id' => $params['id']]);
+        }
         AdminController::logActivity($pdo, null, $admin['id'], null, 'trainer_discount_code_deleted', ['code' => $code]);
         Response::ok(['ok' => true]);
     }

@@ -161,6 +161,7 @@ CREATE TABLE plans (
   price_toman   BIGINT NOT NULL,
   duration_days INT NOT NULL,
   max_members   INT NULL,
+  tier          VARCHAR(20) NULL,   -- free | silver | gold | diamond (Tiers); NULL = not set
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -175,6 +176,7 @@ CREATE TABLE subscriptions (
   id         CHAR(36) NOT NULL PRIMARY KEY,
   club_id    CHAR(36) NOT NULL,
   plan_name  VARCHAR(255) NOT NULL,
+  tier       VARCHAR(20) NULL,      -- the plan's tier when bought; NULL = not limited by tier
   status     ENUM('active','expiring','expired') NOT NULL DEFAULT 'active',
   started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NOT NULL,
@@ -714,6 +716,7 @@ CREATE TABLE trainer_plans (
   price_toman   BIGINT NOT NULL,
   duration_days INT NOT NULL,
   max_athletes  INT NULL,
+  tier          VARCHAR(20) NULL,   -- free | silver | gold | diamond (Tiers); NULL = not set
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -724,6 +727,7 @@ CREATE TABLE trainer_plans (
 CREATE TABLE trainer_subscriptions (
   trainer_id   CHAR(36) NOT NULL PRIMARY KEY,
   plan_name    VARCHAR(255) NOT NULL,
+  tier         VARCHAR(20) NULL,    -- the plan's tier when bought; NULL = not limited by tier
   max_athletes INT NULL,
   started_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at   DATETIME NOT NULL,
@@ -1093,6 +1097,39 @@ CREATE TABLE daily_active (
   CONSTRAINT fk_daily_active_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- PHP and browser errors, one row per kind of error (ErrorLog).
+CREATE TABLE error_logs (
+  id          CHAR(36) NOT NULL PRIMARY KEY,
+  fingerprint CHAR(40) NOT NULL,
+  source      ENUM('server','browser') NOT NULL,
+  message     VARCHAR(1000) NOT NULL,
+  location    VARCHAR(500) NULL,
+  detail      TEXT NULL,
+  url         VARCHAR(500) NULL,
+  user_id     CHAR(36) NULL,
+  user_agent  VARCHAR(255) NULL,
+  occurrences INT NOT NULL DEFAULT 1,
+  first_seen  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  resolved_at DATETIME NULL,
+  UNIQUE KEY uq_error_logs_fingerprint (fingerprint),
+  KEY idx_error_logs_last_seen (last_seen),
+  CONSTRAINT fk_error_logs_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- What an admin deleted, restorable for 30 days (Trash): the rows as JSON.
+CREATE TABLE trash (
+  id         CHAR(36) NOT NULL PRIMARY KEY,
+  kind       VARCHAR(30) NOT NULL,
+  label      VARCHAR(255) NOT NULL,
+  summary    VARCHAR(500) NULL,
+  payload    LONGTEXT NOT NULL,
+  deleted_by CHAR(36) NULL,
+  deleted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_trash_deleted_at (deleted_at),
+  CONSTRAINT fk_trash_deleted_by FOREIGN KEY (deleted_by) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =========================================================================
@@ -1158,6 +1195,12 @@ CREATE TABLE trainer_profiles (
   certificates   JSON NULL,   -- array of image URLs (output of UploadController)
   pricing_table  JSON NULL,   -- array of {"title":"...", "price_toman":..., "description":"..."}
   social_links   JSON NULL,   -- {"instagram":"...", "telegram":"...", "website":"..."}
+  -- The admin's check of the certificates; 'verified' shows the badge.
+  verification_status ENUM('none','pending','verified','rejected') NOT NULL DEFAULT 'none',
+  verification_note   VARCHAR(500) NULL,
+  verification_requested_at DATETIME NULL,
+  verified_at    DATETIME NULL,
+  verified_by    CHAR(36) NULL,
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_trainer_profiles_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

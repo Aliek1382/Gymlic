@@ -8,9 +8,10 @@ use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Templates;
+use Gymlic\Tiers;
 use Gymlic\Uuid;
 use Gymlic\Validate;
-use Gymlic\Templates;
 use Throwable;
 
 final class MemberController
@@ -330,6 +331,12 @@ final class MemberController
         $club = $pdo->prepare('SELECT member_capacity FROM clubs WHERE id = :id');
         $club->execute(['id' => $clubId]);
         $capacity = $club->fetch()['member_capacity'] ?? null;
+
+        // With no plan running, the free tier's cap (Tiers) when the admin set one.
+        $freeCap = Tiers::freeCap('max_members');
+        if ($freeCap !== null && !Tiers::clubHasRunning($pdo, $clubId)) {
+            $capacity = $capacity === null ? $freeCap : min((int) $capacity, $freeCap);
+        }
 
         return [
             'active_members'  => (int) $active->fetch()['c'],

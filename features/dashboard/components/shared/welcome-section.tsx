@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Calendar, ChevronDown, UserRound } from "lucide-react";
 
 import { formatPersianDate } from "@/lib/persian";
+import { VerifiedTrainerBadge } from "@/features/trainer-resume/components/verified-badge";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -16,10 +17,12 @@ export function WelcomeSection({
   name,
   subtitle,
   trainerName,
+  trainerVerified = false,
 }: {
   name: string;
   subtitle: string;
   trainerName?: string | null;
+  trainerVerified?: boolean;
 }) {
   const greeting = useMemo(getGreeting, []);
   const today = useMemo(() => formatPersianDate(new Date()), []);
@@ -35,6 +38,7 @@ export function WelcomeSection({
           <div className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
             <UserRound className="size-3.5" />
             مربی شما: {trainerName}
+            {trainerVerified && <VerifiedTrainerBadge compact className="bg-transparent px-0" />}
           </div>
         )}
       </div>

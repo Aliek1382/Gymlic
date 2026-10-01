@@ -2,6 +2,11 @@ import type { LucideIcon } from "lucide-react";
 import type { AdminRequirement } from "@/features/admin/hooks/use-admin-access";
 import {
   Activity,
+  BadgeCheck,
+  Bug,
+  HardDrive,
+  Layers,
+  Trash2,
   Banknote,
   BookOpen,
   CalendarClock,
@@ -61,6 +66,7 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
       { label: "مربی‌ها", href: "/admin/trainers", icon: Dumbbell, permission: "users.view" },
       { label: "ورزشکاران", href: "/admin/athletes", icon: UsersRound, permission: "users.view" },
       { label: "همهٔ کاربران", href: "/admin/users", icon: UserCog, permission: "users.view" },
+      { label: "تأیید مدارک مربی", href: "/admin/verifications", icon: BadgeCheck, permission: "users.manage" },
     ],
   },
   {
@@ -70,6 +76,7 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
       { label: "اشتراک باشگاه‌ها", href: "/admin/subscriptions", icon: CalendarClock, permission: "finance" },
       { label: "پلن‌ها", href: "/admin/plans", icon: Tags, permission: "finance" },
       { label: "اشتراک مربیان", href: "/admin/trainer-billing", icon: UserCheck, permission: "finance" },
+      { label: "سطح پلن‌ها", href: "/admin/tiers", icon: Layers, permission: "finance" },
       { label: "کدهای تخفیف", href: "/admin/discounts", icon: TicketPercent, permission: "finance" },
       { label: "اطلاعات پرداخت", href: "/admin/billing", icon: Landmark, permission: "finance" },
       { label: "گزارش مالی", href: "/admin/reports", icon: Banknote, permission: "finance" },
@@ -109,6 +116,9 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
       { label: "سلامت سایت", href: "/admin/system", icon: Activity, permission: "system" },
       { label: "به‌روزرسانی دیتابیس", href: "/admin/database", icon: DatabaseZap, permission: "super" },
       { label: "صف پیامک و ایمیل", href: "/admin/deliveries", icon: Inbox, permission: "system" },
+      { label: "خطاهای سایت", href: "/admin/errors", icon: Bug, permission: "system" },
+      { label: "فضای هاست", href: "/admin/storage", icon: HardDrive, permission: "system" },
+      { label: "سطل زباله", href: "/admin/trash", icon: Trash2 },
       { label: "لاگ فعالیت", href: "/admin/activity", icon: History, permission: "activity" },
     ],
   },

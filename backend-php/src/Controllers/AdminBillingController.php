@@ -10,11 +10,13 @@ use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Response;
 use Gymlic\Subscriptions;
+use Gymlic\Templates;
+use Gymlic\Tiers;
 use Gymlic\TrainerBilling;
 use Gymlic\TrainerDiscounts;
+use Gymlic\Trash;
 use Gymlic\Uuid;
 use Gymlic\Validate;
-use Gymlic\Templates;
 use PDO;
 use Throwable;
 
@@ -130,6 +132,7 @@ final class AdminBillingController
         $amount = (int) $amount;
 
         $expiresAt = Subscriptions::extend($pdo, $club['id'], (int) $plan['duration_days'], $plan['name']);
+        Tiers::setClubTier($pdo, $club['id'], Tiers::planTier($pdo, 'plans', $plan['id']));
 
         // The plan's member cap, as approving a payment for it would. A
         // suspended club stays suspended: that was a separate decision.
@@ -209,6 +212,10 @@ final class AdminBillingController
         // The end of the chosen day, so "until 1405/07/30" includes the 30th.
         $expiresAt = $date . ' 23:59:59';
         Subscriptions::set($pdo, $club['id'], $planName, $expiresAt);
+        // Set by hand, the tier too when the dialog sends one ('' = none).
+        if (array_key_exists('tier', $data)) {
+            Tiers::setClubTier($pdo, $club['id'], Tiers::valid($data['tier']) ? $data['tier'] : null);
+        }
         $pdo->prepare('UPDATE clubs SET member_capacity = :cap WHERE id = :id')
             ->execute(['cap' => $capacity, 'id' => $club['id']]);
 
@@ -492,7 +499,11 @@ final class AdminBillingController
             return;
         }
 
-        $pdo->prepare('DELETE FROM discount_codes WHERE id = :id')->execute(['id' => $params['id']]);
+        if (Trash::ready()) {
+            TrashController::trash($pdo, 'discount', [['discount_codes', 'id', $params['id']]], (string) $code, null, $admin['id']);
+        } else {
+            $pdo->prepare('DELETE FROM discount_codes WHERE id = :id')->execute(['id' => $params['id']]);
+        }
         AdminController::logActivity($pdo, null, $admin['id'], null, 'discount_code_deleted', ['code' => $code]);
         Response::ok(['ok' => true]);
     }

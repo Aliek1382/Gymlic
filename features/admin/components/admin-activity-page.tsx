@@ -42,6 +42,16 @@ const ADMIN_ACTIONS = [
   "backup_downloaded",
   "delivery_retried",
   "sessions_revoked",
+  "user_deleted",
+  "club_deleted",
+  "trash_restored",
+  "trash_purged",
+  "errors_resolved",
+  "errors_cleared",
+  "storage_cleaned",
+  "trainer_verification",
+  "plan_tier_set",
+  "weekly_report_sent",
   "user_viewed_as",
   "two_factor_enabled",
   "login_unlocked",
@@ -92,6 +102,16 @@ const ACTION_LABEL: Record<string, string> = {
   backup_downloaded: "دانلود نسخهٔ پشتیبان",
   delivery_retried: "ارسال دوبارهٔ پیامک/ایمیل",
   sessions_revoked: "خارج‌کردن کاربر از دستگاه‌ها",
+  user_deleted: "حذف حساب (به سطل زباله)",
+  club_deleted: "حذف باشگاه (به سطل زباله)",
+  trash_restored: "بازگرداندن از سطل زباله",
+  trash_purged: "پاک‌کردن همیشگی از سطل زباله",
+  errors_resolved: "رفع‌شده‌کردن خطاها",
+  errors_cleared: "پاک‌کردن خطاهای رفع‌شده",
+  storage_cleaned: "پاک‌کردن فایل‌های بی‌استفاده",
+  trainer_verification: "بررسی مدارک مربی",
+  plan_tier_set: "تعیین سطح پلن",
+  weekly_report_sent: "ارسال گزارش هفتگی",
   user_viewed_as: "دیدن پنل کاربر (فقط‌خواندنی)",
   two_factor_enabled: "روشن‌کردن ورود دومرحله‌ای",
   login_unlocked: "باز کردن قفل ورود",
@@ -129,6 +149,23 @@ const EXPORT_LABEL: Record<string, string> = {
 function billingDetail(log: { action: string; metadata: Record<string, unknown> }): string {
   const m = log.metadata ?? {};
   switch (log.action) {
+    case "user_deleted":
+    case "club_deleted":
+      return String(m.name ?? "");
+    case "trash_restored":
+    case "trash_purged":
+      return String(m.label ?? "");
+    case "errors_resolved":
+    case "errors_cleared":
+      return `${formatNumber(Number(m.count ?? 0))} مورد`;
+    case "storage_cleaned":
+      return `${formatNumber(Number(m.deleted ?? 0))} فایل`;
+    case "trainer_verification":
+      return m.decision === "verify" ? "تأیید" : m.decision === "reject" ? `رد${m.note ? `: ${String(m.note)}` : ""}` : "برداشتن نشان";
+    case "plan_tier_set":
+      return `${String(m.plan ?? "")} ← ${m.tier ? String(m.tier) : "بدون سطح"}`;
+    case "weekly_report_sent":
+      return `${formatNumber(Number(m.sent ?? 0))} گیرنده`;
     case "subscription_renewed":
       return `${String(m.plan ?? "")}${Number(m.amount) > 0 ? ` · ${formatToman(Number(m.amount))} تومان` : ""}`;
     case "subscription_gifted":
@@ -177,6 +214,8 @@ const SETTINGS_GROUP_LABEL: Record<string, string> = {
   billing: "اطلاعات پرداخت",
   templates: "قالب متن اعلان‌ها",
   branding: "برند و ظاهر",
+  reports: "گزارش هفتگی",
+  tiers: "سطح پلن‌ها",
 };
 
 export function AdminActivityPage() {

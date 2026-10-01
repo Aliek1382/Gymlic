@@ -28,6 +28,9 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+// Warnings and crashes also show up in the admin's error log.
+Gymlic\ErrorLog::registerCli();
+
 if (!Gymlic\Receipts::ready()) {
     echo date('Y-m-d H:i:s'), " receipts: database update not run yet, nothing to do\n";
     exit;

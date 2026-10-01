@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNumber, formatToman } from "@/lib/persian";
 import type { SocialKey, TrainerResumeView } from "../types/trainer-resume-types";
+import { VerifiedTrainerBadge } from "./verified-badge";
 
 const SOCIAL_ICON = {
   instagram: { icon: AtSign, label: "اینستاگرام" },
@@ -31,7 +32,10 @@ export function TrainerResumeViewCard({ resume }: { resume: TrainerResumeView })
           <AvatarFallback>{resume.trainerName.slice(0, 2)}</AvatarFallback>
         </Avatar>
         <div className="space-y-2">
-          <h2 className="text-lg font-bold text-foreground">{resume.trainerName}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-bold text-foreground">{resume.trainerName}</h2>
+            {resume.trainerVerified && <VerifiedTrainerBadge />}
+          </div>
           {socials.length > 0 && (
             <div className="flex gap-2">
               {socials.map((key) => {

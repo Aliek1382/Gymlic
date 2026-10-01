@@ -11,6 +11,7 @@ import {
   Pencil,
   Search,
   ShieldCheck,
+  Trash2,
   UserCog,
   UserRoundX,
   Users,
@@ -69,6 +70,8 @@ import { useAdminCan } from "../hooks/use-admin-access";
 import { ExportButton } from "./export-button";
 import { AdminAccessDialog, ProfileEditDialog, SessionsDialog } from "./user-account-dialogs";
 import { openUserPanel } from "@/features/view-as/services/view-as-service";
+import { deleteUser } from "../services/admin-ops-service";
+import { UserBulkBar } from "./user-bulk-actions";
 
 const FILTERS: { value: UserFilter; label: string }[] = [
   { value: "", label: "همه" },
@@ -93,7 +96,8 @@ type Action =
   | { kind: "role"; user: AdminUserRow }
   | { kind: "password"; user: AdminUserRow }
   | { kind: "admin"; user: AdminUserRow }
-  | { kind: "suspend"; user: AdminUserRow };
+  | { kind: "suspend"; user: AdminUserRow }
+  | { kind: "delete"; user: AdminUserRow };
 
 export function AdminUsersPage() {
   const queryClient = useQueryClient();
@@ -106,6 +110,9 @@ export function AdminUsersPage() {
   const can = useAdminCan();
   const isSuper = can("super");
   const canManage = can("users.manage");
+  const canNotify = can("notifications");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const canSelect = canManage || canNotify;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin", "users", filter, q],
@@ -115,6 +122,13 @@ export function AdminUsersPage() {
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
   const rows = data ?? [];
   const close = () => setAction(null);
+  const toggle = (id: string) =>
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   function viewPanel(userId: string) {
     openUserPanel(userId).catch((error) => toast.error(getErrorMessage(error, "باز کردن پنل کاربر ناموفق بود.")));
@@ -128,8 +142,8 @@ export function AdminUsersPage() {
           <p className="text-sm text-muted-foreground">
             همهٔ حساب‌های سایت، از جمله مدیران باشگاه و کسانی که ثبت‌نام کرده‌اند ولی هنوز نقش
             انتخاب نکرده‌اند. از منوی هر ردیف: ویرایش پروفایل، دستگاه‌های فعال، تغییر نقش، رمز تازه،
-            مسدودسازی، و (برای مدیر کل) دسترسی مدیریت و دیدن پنل کاربر به‌صورت فقط‌خواندنی برای
-            پشتیبانی.
+            مسدودسازی، و (برای مدیر کل) دسترسی مدیریت، دیدن پنل کاربر به‌صورت فقط‌خواندنی برای
+            پشتیبانی و حذف حساب. با تیک‌زدن چند ردیف، کارها را گروهی انجام دهید.
           </p>
         </div>
         <ExportButton kind="users" />
@@ -181,6 +195,19 @@ export function AdminUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {canSelect && (
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-[var(--primary)]"
+                        aria-label="انتخاب همهٔ ردیف‌ها"
+                        checked={rows.length > 0 && rows.every((row) => selected.has(row.id))}
+                        onChange={(event) =>
+                          setSelected(event.target.checked ? new Set(rows.map((row) => row.id)) : new Set())
+                        }
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>کاربر</TableHead>
                   <TableHead>نقش</TableHead>
                   <TableHead>تماس</TableHead>
@@ -198,6 +225,17 @@ export function AdminUsersPage() {
                   const mayChange = canManage && (isSuper || !isAdminAccount);
                   return (
                     <TableRow key={user.id} className={user.is_suspended ? "opacity-60" : undefined}>
+                      {canSelect && (
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            className="size-4 accent-[var(--primary)]"
+                            aria-label={`انتخاب ${name}`}
+                            checked={selected.has(user.id)}
+                            onChange={() => toggle(user.id)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar className="size-8">
@@ -297,6 +335,12 @@ export function AdminUsersPage() {
                                   </DropdownMenuItem>
                                 </>
                               )}
+                              {isSuper && !isMe && !isAdminAccount && (
+                                <DropdownMenuItem variant="destructive" onClick={() => setAction({ kind: "delete", user })}>
+                                  <Trash2 />
+                                  حذف حساب
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
@@ -306,6 +350,13 @@ export function AdminUsersPage() {
                 })}
               </TableBody>
             </Table>
+            <UserBulkBar
+              ids={[...selected].filter((id) => rows.some((row) => row.id === id))}
+              canManage={canManage}
+              canNotify={canNotify}
+              onClear={() => setSelected(new Set())}
+              onDone={refresh}
+            />
             {rows.length >= 300 && (
               <p className="px-6 text-xs text-muted-foreground">
                 فقط {formatNumber(300)} کاربر آخر نشان داده شده؛ برای پیدا کردن بقیه جستجو کنید.
@@ -324,6 +375,25 @@ export function AdminUsersPage() {
       <ProfileEditDialog user={action?.kind === "edit" ? action.user : null} onClose={close} onDone={refresh} />
       <SessionsDialog user={action?.kind === "sessions" ? action.user : null} onClose={close} onDone={refresh} />
       <AdminAccessDialog user={action?.kind === "admin" ? action.user : null} onClose={close} onDone={refresh} />
+      {action?.kind === "delete" && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && close()}
+          title={`حذف حساب ${fullName(action.user.first_name, action.user.last_name)}`}
+          description={
+            action.user.account_type === "club"
+              ? "این حساب، باشگاهی که مدیرش است و همهٔ اطلاعات باشگاه (اعضا، پلن‌ها، پرداخت‌ها) به سطل زباله می‌رود و تا ۳۰ روز از «سطل زباله» قابل بازگرداندن است."
+              : "این حساب و هر چه فقط مال اوست (برنامه‌ها، پیام‌ها، پرداخت‌ها و…) به سطل زباله می‌رود و تا ۳۰ روز از «سطل زباله» قابل بازگرداندن است."
+          }
+          confirmLabel="حذف"
+          errorMessage="حذف حساب انجام نشد."
+          onConfirm={async () => {
+            await deleteUser(action.user.id);
+            toast.success("حساب به سطل زباله رفت.");
+            refresh();
+          }}
+        />
+      )}
       {action?.kind === "suspend" && (
         <ConfirmDialog
           open

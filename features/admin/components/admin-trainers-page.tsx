@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listAdminProfiles } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
+import { VerifiedTrainerBadge } from "@/features/trainer-resume/components/verified-badge";
 
 export function AdminTrainersPage() {
   const { data } = useQuery({
@@ -88,6 +89,7 @@ export function AdminTrainersPage() {
                           </AvatarFallback>
                         </Avatar>
                         <p className="font-medium text-foreground">{name}</p>
+                        {trainer.is_verified && <VerifiedTrainerBadge compact />}
                       </Link>
                     </TableCell>
                     <TableCell>

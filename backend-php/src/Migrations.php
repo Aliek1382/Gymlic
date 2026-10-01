@@ -240,6 +240,28 @@ final class Migrations
                 ['column', 'sessions', 'read_only'],
             ],
         ],
+        [
+            'id'    => 'operations',
+            'file'  => 'operations-update.sql',
+            'title' => 'لاگ خطاها، سطل زباله و تأیید مدارک مربی (فاز ۱۰)',
+            'check' => [
+                ['table', 'error_logs'],
+                ['table', 'trash'],
+                ['column', 'trainer_profiles', 'verification_status'],
+                ['column', 'trainer_profiles', 'verified_by'],
+            ],
+        ],
+        [
+            'id'    => 'tiers',
+            'file'  => 'tiers-update.sql',
+            'title' => 'سطح پلن‌ها: رایگان، نقره‌ای، طلایی و الماسی (فاز ۱۰؛ بعد از «اشتراک مربی»)',
+            'check' => [
+                ['column', 'plans', 'tier'],
+                ['column', 'subscriptions', 'tier'],
+                ['column', 'trainer_plans', 'tier'],
+                ['column', 'trainer_subscriptions', 'tier'],
+            ],
+        ],
     ];
 
     /**
