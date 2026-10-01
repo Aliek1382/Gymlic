@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Wallet, X } from "lucide-react";
+import { Loader2, Paperclip, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatToman } from "@/lib/persian";
+import { formatToman, toAsciiDigits } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import {
   checkDiscountCode,
   getBillingInfo,
+  prepareReceipt,
   submitPaymentRequest,
   type DiscountQuote,
 } from "../services/finance-service";
@@ -53,6 +54,7 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
   const [code, setCode] = useState("");
   const [quote, setQuote] = useState<DiscountQuote | null>(null);
   const [checking, setChecking] = useState(false);
+  const [receipt, setReceipt] = useState<File | null>(null);
 
   const { data: billing } = useQuery({
     queryKey: ["finance", "billing-info"],
@@ -62,8 +64,16 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
 
   const form = useForm<PaymentRequestFormInput, unknown, PaymentRequestFormValues>({
     resolver: zodResolver(paymentRequestFormSchema),
-    defaultValues: { planId: "", amountToman: 0, referenceNote: "" },
+    defaultValues: {
+      planId: "",
+      amountToman: 0,
+      referenceNote: "",
+      trackingCode: "",
+      cardLast4: "",
+      paidAt: "",
+    },
   });
+  const rules = billing?.receipts ?? null;
   const planId = form.watch("planId");
   const plan = plans.find((p) => p.id === planId);
 
@@ -106,10 +116,50 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
       form.setError("amountToman", { message: "مبلغ را وارد کنید." });
       return;
     }
+
+    // The rules come from the server; before its database update there is
+    // nothing to ask for and the request goes as it always did.
+    const trackingCode = toAsciiDigits(values.trackingCode ?? "").replace(/\s+/g, "");
+    const cardLast4 = toAsciiDigits(values.cardLast4 ?? "").trim();
+    if (rules) {
+      if (!/^[A-Za-z0-9_/-]{4,40}$/.test(trackingCode)) {
+        form.setError("trackingCode", { message: "کد پیگیری باید بین ۴ تا ۴۰ حرف یا رقم باشد." });
+        return;
+      }
+      if (!/^\d{4}$/.test(cardLast4)) {
+        form.setError("cardLast4", { message: "چهار رقم آخر کارت را وارد کنید." });
+        return;
+      }
+      if (rules.required && !receipt) {
+        toast.error("تصویر یا فایل رسید پرداخت را پیوست کنید.");
+        return;
+      }
+    }
+
     try {
-      await submitPaymentRequest({ ...values, discountCode: quote?.code });
+      const prepared = rules && receipt ? await prepareReceipt(receipt) : null;
+      if (prepared && prepared.size > rules!.max_mb * 1024 * 1024) {
+        toast.error(`حجم رسید باید حداکثر ${rules!.max_mb} مگابایت باشد.`);
+        return;
+      }
+      await submitPaymentRequest({
+        ...values,
+        trackingCode: rules ? trackingCode : undefined,
+        cardLast4: rules ? cardLast4 : undefined,
+        paidAt: rules ? values.paidAt : undefined,
+        receipt: prepared,
+        discountCode: quote?.code,
+      });
       toast.success("درخواست پرداخت ثبت شد و در انتظار تایید مدیریت است.");
-      form.reset({ planId: "", amountToman: 0, referenceNote: "" });
+      form.reset({
+        planId: "",
+        amountToman: 0,
+        referenceNote: "",
+        trackingCode: "",
+        cardLast4: "",
+        paidAt: "",
+      });
+      setReceipt(null);
       setCode("");
       setQuote(null);
       setOpen(false);
@@ -225,12 +275,94 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
             )}
           </div>
 
+          {rules && (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="payment-tracking">کد پیگیری واریز</Label>
+                  <Input
+                    id="payment-tracking"
+                    dir="ltr"
+                    inputMode="text"
+                    maxLength={40}
+                    autoComplete="off"
+                    {...form.register("trackingCode")}
+                  />
+                  {form.formState.errors.trackingCode && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.trackingCode.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payment-last4">چهار رقم آخر کارت شما</Label>
+                  <Input
+                    id="payment-last4"
+                    dir="ltr"
+                    inputMode="numeric"
+                    maxLength={4}
+                    autoComplete="off"
+                    {...form.register("cardLast4")}
+                  />
+                  {form.formState.errors.cardLast4 && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.cardLast4.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment-receipt">
+                  تصویر رسید{" "}
+                  <span className="text-muted-foreground">
+                    {rules.required ? "(الزامی)" : "(اختیاری)"}
+                  </span>
+                </Label>
+                <label
+                  htmlFor="payment-receipt"
+                  className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-input px-4 py-3 text-sm text-muted-foreground hover:bg-accent"
+                >
+                  <Paperclip className="size-4 shrink-0" />
+                  <span className="truncate">{receipt ? receipt.name : "انتخاب عکس یا فایل PDF"}</span>
+                </label>
+                <input
+                  id="payment-receipt"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="sr-only"
+                  onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  عکس قبل از ارسال کوچک می‌شود. حداکثر {rules.max_mb} مگابایت
+                  {rules.retention_days > 0
+                    ? `؛ فایل ${rules.retention_days} روز پس از بررسی درخواست حذف می‌شود.`
+                    : "."}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment-paid-at">
+                  زمان واریز <span className="text-muted-foreground">(اختیاری)</span>
+                </Label>
+                <Input
+                  id="payment-paid-at"
+                  type="datetime-local"
+                  dir="ltr"
+                  {...form.register("paidAt")}
+                />
+              </div>
+            </>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="payment-reference">توضیح / کد پیگیری (اختیاری)</Label>
+            <Label htmlFor="payment-reference">
+              {rules ? "توضیح" : "توضیح / کد پیگیری"} (اختیاری)
+            </Label>
             <Input
               id="payment-reference"
               {...form.register("referenceNote")}
-              placeholder="مثلاً کد پیگیری واریز بانکی"
+              placeholder={rules ? "هر توضیحی که برای بررسی لازم است" : "مثلاً کد پیگیری واریز بانکی"}
             />
           </div>
 

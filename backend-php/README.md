@@ -136,3 +136,34 @@ cheap, and the interval guard makes extra runs harmless. The database step is
 `schema/assessment-reminders-update.sql` (run by hand in phpMyAdmin before
 deploying the backend). If the athlete has opted in to SMS/email, the copy goes
 out through the notification-dispatch cron like any other notification.
+
+## Payment receipts (club → platform subscription payments)
+
+A club's payment request carries a bank tracking code, the last four digits of
+the card it paid from (both always required), an optional paid-at time and a
+receipt photo/PDF (required unless the admin switches that off in
+`/admin/billing`). The database step is `schema/payment-receipts-update.sql`
+(run from the admin panel's database page, or by hand in phpMyAdmin). Until it
+has run the backend behaves exactly as before: `Receipts::ready()` is false and
+the payment dialog shows none of the new fields.
+
+- Files are stored in `public/uploads/receipts/` under random names. The
+  folder gets its own `.htaccess` (`Require all denied`), so nothing there is
+  readable by URL; `GET /payment-requests/{id}/receipt` streams a file to the
+  club that filed it and to admins with the finance permission.
+- Images are shrunk in the browser (max 1400px, about 400 KB) and re-encoded
+  again in `src/Receipts.php` (JPEG, 1400px, quality 75, EXIF dropped). PDFs
+  are kept as sent, up to the admin's size ceiling (default 3 MB).
+- A file is deleted N days after its request is **reviewed** (default 7, set in
+  `/admin/billing`, 0 = keep). Requests still waiting keep theirs. Files no
+  request points to are swept too. An admin can also delete one receipt from
+  `/admin/payments`, or run the cleanup from `/admin/billing`.
+- The cleanup is `cron/receipt-cleanup.php`, once a day:
+
+```
+30 3 * * * php /home/USER/path/to/backend-php/cron/receipt-cleanup.php
+```
+
+  Without the cron entry the same cleanup still runs, at most every six hours,
+  when a club files a request or an admin opens the payment requests. Its last
+  run shows up under "سلامت سایت" in `/admin/system` like the other cron jobs.

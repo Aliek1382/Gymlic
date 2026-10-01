@@ -10,6 +10,8 @@ use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
+use Gymlic\Receipts;
+use Gymlic\Settings;
 use Gymlic\Response;
 use Gymlic\Security;
 use Gymlic\SmsGateway;
@@ -28,11 +30,13 @@ final class AdminController
     public static function submitPaymentRequest(): void
     {
         $user = Auth::requireUser();
-        $data = Validate::required(Validate::body(), ['plan_id', 'amount_toman']);
+        // Multipart once a receipt is attached; plain JSON from an older page.
+        $multipart = str_starts_with(strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? '')), 'multipart/form-data');
+        $data = Validate::required($multipart ? $_POST : Validate::body(), ['plan_id', 'amount_toman']);
 
         $pdo = Database::connection();
 
-        $club = $pdo->prepare('SELECT id FROM clubs WHERE owner_id = :owner_id');
+        $club = $pdo->prepare('SELECT id, name FROM clubs WHERE owner_id = :owner_id');
         $club->execute(['owner_id' => $user['id']]);
         $clubRow = $club->fetch();
 
@@ -71,6 +75,33 @@ final class AdminController
             'reference_note' => Validate::nullableString($data['reference_note'] ?? null),
         ];
 
+        // Tracking code, last four card digits and receipt (once the
+        // database has the columns; before that the request is as it was).
+        $receiptFile = null;
+        if (Receipts::ready()) {
+            $billing = Settings::get('billing');
+            $fields = self::receiptFields($data);
+            if (isset($fields['error'])) {
+                Response::error(400, $fields['error'][0], $fields['error'][1]);
+                return;
+            }
+            $row += $fields['row'];
+
+            $upload = $_FILES['receipt'] ?? null;
+            if ($upload !== null && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $stored = Receipts::store($upload, $billing['receipt_max_mb']);
+                if (!$stored['ok']) {
+                    Response::error($stored['status'], $stored['code'], $stored['message']);
+                    return;
+                }
+                $receiptFile = $stored['file'];
+                $row['receipt_path'] = $receiptFile;
+            } elseif ($billing['receipt_required']) {
+                Response::error(400, 'receipt_required', 'تصویر یا فایل رسید پرداخت را پیوست کنید.');
+                return;
+            }
+        }
+
         $pdo->beginTransaction();
         try {
             if ($code !== '') {
@@ -79,6 +110,7 @@ final class AdminController
                 $result = Discounts::evaluate($pdo, $code, $planRow, $clubRow['id'], true);
                 if (!$result['ok']) {
                     $pdo->rollBack();
+                    Receipts::remove($receiptFile);
                     Response::error(409, $result['error'], $result['message']);
                     return;
                 }
@@ -96,10 +128,73 @@ final class AdminController
             $pdo->commit();
         } catch (Throwable $e) {
             $pdo->rollBack();
+            Receipts::remove($receiptFile);
             throw $e;
         }
 
+        self::notifyFinance($pdo, $user['id'], (string) $clubRow['name'], $amount);
+        if ($receiptFile !== null) {
+            Receipts::purgeIfDue($pdo);
+        }
+
         Response::ok(['id' => $id], 201);
+    }
+
+    /**
+     * The tracking code, last four card digits and optional payment time from
+     * the request, cleaned up (Persian digits become Latin).
+     *
+     * @return array{row: array<string, mixed>}|array{error: array{0: string, 1: string}}
+     */
+    private static function receiptFields(array $data): array
+    {
+        $digits = static fn (mixed $v): string => strtr(trim((string) $v), [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]);
+
+        $tracking = preg_replace('/\s+/', '', $digits($data['tracking_code'] ?? '')) ?? '';
+        if (preg_match('/^[A-Za-z0-9_\/-]{4,40}$/', $tracking) !== 1) {
+            return ['error' => ['invalid_tracking_code', 'کد پیگیری باید بین ۴ تا ۴۰ حرف یا رقم باشد.']];
+        }
+        $last4 = $digits($data['card_last4'] ?? '');
+        if (preg_match('/^[0-9]{4}$/', $last4) !== 1) {
+            return ['error' => ['invalid_card_last4', 'چهار رقم آخر کارت پرداخت‌کننده را وارد کنید.']];
+        }
+
+        $paidAt = null;
+        $rawPaidAt = trim($digits($data['paid_at'] ?? ''));
+        if ($rawPaidAt !== '') {
+            $time = strtotime($rawPaidAt);
+            if ($time === false || $time > time() + 86400) {
+                return ['error' => ['invalid_paid_at', 'زمان واریز معتبر نیست.']];
+            }
+            $paidAt = date('Y-m-d H:i:s', $time);
+        }
+
+        return ['row' => ['tracking_code' => $tracking, 'card_last4' => $last4, 'paid_at' => $paidAt]];
+    }
+
+    /** Tells the admins who review payments that a request is waiting. Never throws. */
+    private static function notifyFinance(PDO $pdo, string $actorId, string $clubName, int $amount): void
+    {
+        try {
+            foreach (AdminAccess::holders($pdo, 'finance') as $adminId) {
+                Templates::notify(
+                    $pdo,
+                    'payment_submitted',
+                    $adminId,
+                    $actorId,
+                    'broadcast',
+                    ['club' => $clubName, 'amount' => number_format($amount)],
+                    '/admin/payments'
+                );
+            }
+        } catch (Throwable $e) {
+            error_log('payment submitted notice: ' . $e->getMessage());
+        }
     }
 
     /** The plan catalogue, readable by any signed-in user (RLS allowed all). */
@@ -125,12 +220,22 @@ final class AdminController
         $isAdmin = AdminAccess::can($user, 'finance');
 
         $discounts = Discounts::ready();
+        $receipts = Receipts::ready();
         $sql =
             'SELECT pr.id, pr.club_id, pr.plan_id, pr.amount_toman, pr.reference_note, pr.status,
                     pr.admin_note, pr.reviewed_at, pr.created_at,
                     c.name AS club_name, p.name AS plan_name,
                     (pr.submitted_by <> c.owner_id) AS recorded_by_admin'
-            . ($discounts ? ', pr.list_price_toman, pr.discount_toman, d.code AS discount_code' : '') . '
+            . ($discounts ? ', pr.list_price_toman, pr.discount_toman, d.code AS discount_code' : '')
+            . ($receipts
+                ? ', pr.tracking_code, pr.card_last4, pr.paid_at, pr.receipt_purged_at,
+                    (pr.receipt_path IS NOT NULL) AS has_receipt,
+                    (pr.receipt_path LIKE \'%.pdf\') AS receipt_is_pdf,
+                    (pr.tracking_code IS NOT NULL AND EXISTS (
+                        SELECT 1 FROM payment_requests o
+                        WHERE o.tracking_code = pr.tracking_code AND o.id <> pr.id
+                    )) AS duplicate_tracking'
+                : '') . '
              FROM payment_requests pr
              JOIN clubs c ON c.id = pr.club_id
              JOIN plans p ON p.id = pr.plan_id'
@@ -146,14 +251,33 @@ final class AdminController
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($bind);
 
-        Response::ok([
-            'items' => Cast::rows(
-                $stmt->fetchAll(),
-                [],
-                ['amount_toman', 'list_price_toman', 'discount_toman'],
-                ['recorded_by_admin']
-            ),
-        ]);
+        $rows = Cast::rows(
+            $stmt->fetchAll(),
+            [],
+            ['amount_toman', 'list_price_toman', 'discount_toman'],
+            ['recorded_by_admin', 'has_receipt', 'receipt_is_pdf', 'duplicate_tracking']
+        );
+
+        if ($receipts) {
+            // When the file goes: the retention days after the review.
+            $days = Settings::get('billing')['receipt_retention_days'];
+            foreach ($rows as &$row) {
+                // Whether another club used the same code is for admins only.
+                if (!$isAdmin) {
+                    $row['duplicate_tracking'] = false;
+                }
+                $row['receipt_expires_at'] = ($row['has_receipt'] && $days > 0 && $row['reviewed_at'] !== null)
+                    ? date('Y-m-d H:i:s', (int) strtotime($row['reviewed_at']) + $days * 86400)
+                    : null;
+            }
+            unset($row);
+
+            if ($isAdmin) {
+                Receipts::purgeIfDue(Database::connection());
+            }
+        }
+
+        Response::ok(['items' => $rows]);
     }
 
     // ---- Platform admin --------------------------------------------------

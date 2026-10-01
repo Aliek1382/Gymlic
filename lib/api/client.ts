@@ -154,9 +154,9 @@ export const api = {
     patch: <T>(path: string, body?: unknown) =>
       request<T>("PATCH", path, { body, queueable: true }),
   },
-  upload: <T>(path: string, file: File, fields?: Record<string, string>) => {
+  upload: <T>(path: string, file: File, fields?: Record<string, string>, fieldName = "file") => {
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append(fieldName, file);
     for (const [key, value] of Object.entries(fields ?? {})) {
       formData.append(key, value);
     }

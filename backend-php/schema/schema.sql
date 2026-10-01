@@ -193,6 +193,11 @@ CREATE TABLE payment_requests (
   submitted_by   CHAR(36) NOT NULL,
   amount_toman   BIGINT NOT NULL,
   reference_note TEXT NULL,
+  tracking_code      VARCHAR(40)  NULL,  -- bank tracking number the club typed
+  card_last4         CHAR(4)      NULL,  -- last four digits of the paying card
+  paid_at            DATETIME     NULL,  -- optional: when the transfer was made
+  receipt_path       VARCHAR(120) NULL,  -- file under uploads/receipts/, NULL once purged
+  receipt_purged_at  DATETIME     NULL,
   discount_code_id CHAR(36) NULL,  -- discount_codes; FK added at the end of this file
   list_price_toman BIGINT NULL,    -- the plan's price when a discount code was used
   discount_toman   BIGINT NOT NULL DEFAULT 0,
@@ -203,6 +208,7 @@ CREATE TABLE payment_requests (
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_payreq_club (club_id, created_at DESC),
   KEY idx_payreq_status (status),
+  KEY idx_payreq_tracking (tracking_code),
   CONSTRAINT fk_payreq_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
   CONSTRAINT fk_payreq_plan FOREIGN KEY (plan_id) REFERENCES plans(id),
   CONSTRAINT fk_payreq_submitter FOREIGN KEY (submitted_by) REFERENCES profiles(id),

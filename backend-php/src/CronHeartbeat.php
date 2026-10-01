@@ -21,6 +21,7 @@ final class CronHeartbeat
         'notification-dispatch' => ['ارسال پیامک و ایمیل اعلان‌ها', 5],
         'calendar-reminders'    => ['یادآور تقویم، مکمل‌ها و اعلان مرورگر', 5],
         'assessment-reminders'  => ['یادآور ارزیابی دوره‌ای', 1440],
+        'receipt-cleanup'       => ['حذف رسیدهای پرداختِ قدیمی', 1440],
     ];
 
     private function __construct()
