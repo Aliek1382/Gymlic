@@ -27,6 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DiscountCodesManager } from "@/features/admin/components/discount-codes-manager";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
@@ -36,8 +38,12 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
 import {
   approveMemberPayment,
+  createClubDiscount,
+  deleteClubDiscount,
+  listClubDiscounts,
   listClubMemberPayments,
   rejectMemberPayment,
+  updateClubDiscount,
   type ClubMemberPayment,
   type MemberPaymentStatus,
 } from "../services/member-payments-service";
@@ -91,6 +97,34 @@ export function ClubMemberPaymentsPage() {
             <p className="px-6 text-sm text-muted-foreground">پرداخت شهریه از سایت هنوز فعال نشده است.</p>
           </Card>
         ) : (
+          <Tabs defaultValue="payments" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="payments">پرداخت‌ها</TabsTrigger>
+              <TabsTrigger value="codes">کدهای تخفیف</TabsTrigger>
+            </TabsList>
+            <TabsContent value="codes" className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                کدهایی که خودتان برای طرح‌های عضویت می‌سازید؛ ورزشکار هنگام پرداخت وارد می‌کند و مبلغ با
+                تخفیف حساب می‌شود (و همان مبلغ در درآمد باشگاه ثبت می‌شود). هر پرداختِ در انتظار یا
+                تأییدشده یک بار استفاده حساب می‌شود؛ پرداختی که رد شود، استفاده‌اش برمی‌گردد. کدی که کل
+                مبلغ را بپوشاند پذیرفته نمی‌شود.
+              </p>
+              <DiscountCodesManager
+                config={{
+                  queryKey: ["member-payments", "club-discounts", clubId],
+                  load: () => listClubDiscounts(clubId),
+                  create: (input) => createClubDiscount(clubId, input),
+                  update: (id, input) => updateClubDiscount(clubId, id, input),
+                  remove: (id) => deleteClubDiscount(clubId, id),
+                  onceLabel: "هر عضو فقط یک بار",
+                  onceBadge: "یک بار برای هر عضو",
+                  notReady: "به‌روزرسانی «کد تخفیف برای طرح‌های عضویت باشگاه و فاکتورهای مربی» را از صفحهٔ «به‌روزرسانی دیتابیس» پنل مدیریت اجرا کنید.",
+                  emptyText: "با «کد جدید» اولین کد را بسازید.",
+                  maxPercent: 99,
+                }}
+              />
+            </TabsContent>
+            <TabsContent value="payments">
           <Card className="gap-4 py-5">
             <div className="flex gap-2 px-6">
               {(["pending", "reviewed"] as const).map((value) => (
@@ -137,6 +171,8 @@ export function ClubMemberPaymentsPage() {
               </Table>
             )}
           </Card>
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </RoleGate>
@@ -169,6 +205,14 @@ function PaymentRow({
         <p className="text-xs">
           {formatToman(payment.amount_toman)} تومان · {formatNumber(payment.duration_days)} روز
         </p>
+        {!!payment.discount_toman && payment.discount_toman > 0 && (
+          <p className="text-xs">
+            {payment.list_price_toman != null && (
+              <span className="line-through">{formatToman(payment.list_price_toman)}</span>
+            )}{" "}
+            با کد <span dir="ltr" className="font-mono">{payment.discount_code ?? "—"}</span>
+          </p>
+        )}
         {payment.note && <p className="max-w-48 truncate text-xs">«{payment.note}»</p>}
       </TableCell>
       <TableCell className="text-muted-foreground">

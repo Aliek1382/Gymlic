@@ -15,10 +15,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatNumber, formatPersianDate, toPersianDigits } from "@/lib/persian";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DiscountCodesManager } from "@/features/admin/components/discount-codes-manager";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { INVOICE_ITEM_LABEL, INVOICE_STATUS_LABEL, PAYMENT_METHOD_LABEL } from "../constants";
 import { useInvoices } from "../hooks/use-invoices";
+import {
+  createAthleteDiscount,
+  deleteAthleteDiscount,
+  listAthleteDiscounts,
+  updateAthleteDiscount,
+} from "../services/invoice-service";
 import { ClaimReview } from "./claim-review";
 import type { InvoiceStatus } from "../types/invoice-types";
 
@@ -52,6 +60,35 @@ export function InvoicesPage() {
           </p>
         </div>
 
+        <Tabs defaultValue="invoices" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="invoices">فاکتورها</TabsTrigger>
+          <TabsTrigger value="codes">کدهای تخفیف</TabsTrigger>
+        </TabsList>
+        <TabsContent value="codes" className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            کدهایی که خودتان برای ورزشکارانتان می‌سازید؛ ورزشکار هنگام «پرداخت کردم» کد را وارد می‌کند،
+            مبلغ کمتری واریز می‌کند و شما همان مبلغ را تأیید می‌کنید (فاکتور با مبلغ پرداخت‌شده بسته
+            می‌شود). هر پرداختِ در انتظار یا تأییدشده یک بار استفاده حساب می‌شود؛ پرداختی که رد شود،
+            استفاده‌اش برمی‌گردد. کدی که کل مبلغ را بپوشاند پذیرفته نمی‌شود.
+          </p>
+          <DiscountCodesManager
+            config={{
+              queryKey: ["invoices", "discount-codes"],
+              load: listAthleteDiscounts,
+              create: createAthleteDiscount,
+              update: updateAthleteDiscount,
+              remove: deleteAthleteDiscount,
+              onceLabel: "هر ورزشکار فقط یک بار",
+              onceBadge: "یک بار برای هر ورزشکار",
+              notReady: "به‌روزرسانی «کد تخفیف برای طرح‌های عضویت باشگاه و فاکتورهای مربی» هنوز اجرا نشده؛ از مدیر سایت بخواهید آن را اجرا کند.",
+              emptyText: "با «کد جدید» اولین کد را بسازید.",
+              hidePlanScope: true,
+              maxPercent: 99,
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="invoices" className="space-y-6">
         <div className="flex flex-wrap items-center gap-2">
           {FILTERS.map((item) => (
             <button
@@ -132,6 +169,8 @@ export function InvoicesPage() {
             </Table>
           )}
         </Card>
+        </TabsContent>
+        </Tabs>
       </div>
     </RoleGate>
   );

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, Loader2, Paperclip, Wallet } from "lucide-react";
+import { CalendarClock, Loader2, Paperclip, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -33,10 +33,11 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { PaymentInfoCard } from "@/features/finance/components/payment-info-card";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
-import { prepareReceipt } from "@/features/finance/services/finance-service";
+import { prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
 import {
+  checkMemberDiscount,
   getMyMembershipPayments,
   submitMemberPayment,
   type MemberPaymentStatus,
@@ -94,7 +95,12 @@ export function MyMembershipPage() {
           </Card>
         ) : (
           (data.clubs ?? []).map((club) => (
-            <ClubSection key={club.membership_id} club={club} rules={data.receipts} />
+            <ClubSection
+              key={club.membership_id}
+              club={club}
+              rules={data.receipts}
+              discountsEnabled={data.discounts_enabled === true}
+            />
           ))
         )}
       </div>
@@ -102,7 +108,15 @@ export function MyMembershipPage() {
   );
 }
 
-function ClubSection({ club, rules }: { club: MyClubMembership; rules?: ReceiptRules }) {
+function ClubSection({
+  club,
+  rules,
+  discountsEnabled,
+}: {
+  club: MyClubMembership;
+  rules?: ReceiptRules;
+  discountsEnabled: boolean;
+}) {
   const waiting = club.requests.some((request) => request.status === "pending");
   const lastRejected = !waiting && club.requests[0]?.status === "rejected" ? club.requests[0] : null;
   const hasAccount = !!club.pay_to && (club.pay_to.card_number || club.pay_to.sheba);
@@ -160,7 +174,14 @@ function ClubSection({ club, rules }: { club: MyClubMembership; rules?: ReceiptR
         ) : (
           <div className="grid grid-cols-1 gap-3 px-6 sm:grid-cols-2 lg:grid-cols-3">
             {club.plans.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} club={club} rules={rules} disabled={waiting} />
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                club={club}
+                rules={rules}
+                disabled={waiting}
+                discountsEnabled={discountsEnabled}
+              />
             ))}
           </div>
         )}
@@ -198,7 +219,15 @@ function ClubSection({ club, rules }: { club: MyClubMembership; rules?: ReceiptR
               {club.requests.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell className="text-foreground">{request.plan_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatToman(request.amount_toman)} تومان</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatToman(request.amount_toman)} تومان
+                    {!!request.discount_toman && request.discount_toman > 0 && (
+                      <p className="text-xs">
+                        با کد <span dir="ltr" className="font-mono">{request.discount_code}</span>،{" "}
+                        {formatToman(request.discount_toman)} تومان تخفیف
+                      </p>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[request.status]}>{STATUS_LABEL[request.status]}</Badge>
                   </TableCell>
@@ -235,11 +264,13 @@ function PlanCard({
   club,
   rules,
   disabled,
+  discountsEnabled,
 }: {
   plan: MembershipPlanOption;
   club: MyClubMembership;
   rules?: ReceiptRules;
   disabled: boolean;
+  discountsEnabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const current = club.plan_name === plan.name && club.status !== "expired";
@@ -255,7 +286,14 @@ function PlanCard({
       <Button size="sm" disabled={disabled} onClick={() => setOpen(true)}>
         {current ? "تمدید" : "پرداخت"}
       </Button>
-      <PayDialog plan={plan} club={club} rules={rules} open={open} onOpenChange={setOpen} />
+      <PayDialog
+        plan={plan}
+        club={club}
+        rules={rules}
+        discountsEnabled={discountsEnabled}
+        open={open}
+        onOpenChange={setOpen}
+      />
     </div>
   );
 }
@@ -264,12 +302,14 @@ function PayDialog({
   plan,
   club,
   rules,
+  discountsEnabled,
   open,
   onOpenChange,
 }: {
   plan: MembershipPlanOption;
   club: MyClubMembership;
   rules?: ReceiptRules;
+  discountsEnabled: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -281,6 +321,25 @@ function PayDialog({
   const [receipt, setReceipt] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [discountText, setDiscountText] = useState("");
+  const [quote, setQuote] = useState<DiscountQuote | null>(null);
+  const [checking, setChecking] = useState(false);
+  const price = quote ? quote.final_toman : plan.price_toman;
+
+  async function applyCode() {
+    if (!discountText.trim()) return;
+    setChecking(true);
+    try {
+      setQuote(await checkMemberDiscount(plan.id, discountText.trim()));
+      setError(null);
+      toast.success("کد تخفیف اعمال شد.");
+    } catch (e) {
+      setQuote(null);
+      toast.error(getErrorMessage(e, "بررسی کد تخفیف ناموفق بود."));
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function submit() {
     const code = toAsciiDigits(trackingCode).replace(/\s+/g, "");
@@ -311,6 +370,7 @@ function PayDialog({
         cardLast4: last4,
         paidAt: paidAt || undefined,
         note: note.trim() || undefined,
+        discountCode: quote?.code,
         receipt: prepared,
       });
       toast.success("پرداخت شما ثبت شد و در انتظار تأیید باشگاه است.");
@@ -319,6 +379,8 @@ function PayDialog({
       setPaidAt("");
       setNote("");
       setReceipt(null);
+      setDiscountText("");
+      setQuote(null);
       onOpenChange(false);
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     } catch (e) {
@@ -336,11 +398,68 @@ function PayDialog({
             پرداخت طرح «{plan.name}» · {club.club_name}
           </DialogTitle>
           <DialogDescription>
-            مبلغ {formatToman(plan.price_toman)} تومان را به کارت زیر واریز کنید و بعد اطلاعات پرداخت را ثبت کنید.
+            مبلغ {formatToman(price)} تومان را به کارت زیر واریز کنید و بعد اطلاعات پرداخت را ثبت کنید.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {discountsEnabled && (
+            <div className="space-y-2">
+              <Label htmlFor="mp-discount">
+                کد تخفیف <span className="text-muted-foreground">(اگر دارید)</span>
+              </Label>
+              {quote ? (
+                <div className="space-y-1 rounded-xl border border-success/30 bg-success-muted px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      کد <span dir="ltr" className="font-mono font-medium">{quote.code}</span> اعمال شد
+                    </span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setQuote(null)}
+                      aria-label="حذف کد تخفیف"
+                    >
+                      <X />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="line-through">{formatToman(quote.list_price_toman)}</span> ←{" "}
+                    <span className="font-medium text-foreground">{formatToman(quote.final_toman)} تومان</span>{" "}
+                    ({formatToman(quote.discount_toman)} تومان تخفیف)
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    id="mp-discount"
+                    dir="ltr"
+                    value={discountText}
+                    maxLength={40}
+                    className="font-mono uppercase"
+                    onChange={(e) => setDiscountText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void applyCode();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={applyCode}
+                    disabled={checking || !discountText.trim()}
+                  >
+                    {checking && <Loader2 className="animate-spin" />}
+                    اعمال
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           <PaymentInfoCard
             info={
               club.pay_to
