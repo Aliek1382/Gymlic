@@ -35,4 +35,6 @@ try {
 // Every notification is also pushed to phones and desktops; this sweep delivers
 // the ones nothing pushed at creation time (admin broadcasts, or a push that never ran).
 $pushed = Gymlic\Controllers\PushController::deliverPending();
-echo date('Y-m-d H:i:s'), " reminders sent: {$sent}, supplement reminders: {$supplements}, notifications pushed: {$pushed}\n";
+$summary = "reminders sent: {$sent}, supplement reminders: {$supplements}, notifications pushed: {$pushed}";
+Gymlic\CronHeartbeat::record('calendar-reminders', $summary);
+echo date('Y-m-d H:i:s'), " {$summary}\n";

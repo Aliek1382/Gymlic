@@ -7,7 +7,7 @@ import { LayoutDashboard, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { useSignOut } from "@/features/authentication/hooks/use-sign-out";
-import { ADMIN_SIDEBAR_NAV } from "./admin-sidebar-nav";
+import { ADMIN_SIDEBAR_GROUPS } from "./admin-sidebar-nav";
 
 export function AdminSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -27,31 +27,40 @@ export function AdminSidebarContent({ onNavigate }: { onNavigate?: () => void })
         </div>
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-4">
-        {ADMIN_SIDEBAR_NAV.map((item) => {
-          const isActive =
-            item.href === "/admin"
-              ? pathname === "/admin"
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
+      <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-2">
+        {ADMIN_SIDEBAR_GROUPS.map((group, index) => (
+          <div key={group.title ?? index} className="space-y-1">
+            {group.title && (
+              <p className="px-3.5 pb-1 text-[11px] font-semibold text-muted-foreground">
+                {group.title}
+              </p>
+            )}
+            {group.items.map((item) => {
+              const isActive =
+                item.href === "/admin"
+                  ? pathname === "/admin"
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const Icon = item.icon;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-muted"
-              )}
-            >
-              <Icon className="size-[18px]" />
-              {item.label}
-            </Link>
-          );
-        })}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-muted"
+                  )}
+                >
+                  <Icon className="size-[18px]" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="shrink-0 space-y-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
