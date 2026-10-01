@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -131,7 +132,7 @@ final class InvoiceController
         $stmt = Database::connection()->prepare($sql . ' ORDER BY i.created_at DESC');
         $stmt->execute($bind);
 
-        Response::ok(['items' => self::present($stmt->fetchAll())]);
+        Response::ok(['items' => self::withClaims(self::present($stmt->fetchAll()), true)]);
     }
 
     public static function listMine(): void
@@ -143,7 +144,11 @@ final class InvoiceController
         );
         $stmt->execute(['athlete_id' => $user['id']]);
 
-        Response::ok(['items' => self::present($stmt->fetchAll())]);
+        Response::ok([
+            'items'          => self::withPayTo(self::withClaims(self::present($stmt->fetchAll()), false)),
+            // Whether an athlete can say "I paid" (the claims database update has run).
+            'claims_enabled' => Receipts::claimsReady(),
+        ]);
     }
 
     public static function markPaid(array $params): void
@@ -159,6 +164,23 @@ final class InvoiceController
             return;
         }
 
+        $note = Validate::nullableString(isset($data['note']) ? (string) $data['note'] : null);
+        if (!self::settle($invoice, $method, $note, $user['id'])) {
+            Response::error(409, 'not_pending', 'Only a pending invoice can be marked paid.');
+            return;
+        }
+
+        Response::ok(['ok' => true]);
+    }
+
+    /**
+     * Marks a pending invoice paid and everything that follows from it: a
+     * session package is activated, a claim the athlete filed is closed as
+     * approved, and the athlete is told. False when the invoice was not
+     * pending (someone else settled or cancelled it first).
+     */
+    public static function settle(array $invoice, string $method, ?string $note, string $actorId): bool
+    {
         $pdo = Database::connection();
         // Settling and activating a session package are one step: a paid
         // invoice with no sessions behind it would leave the athlete stuck.
@@ -168,20 +190,21 @@ final class InvoiceController
                 "UPDATE invoices SET status = 'paid', payment_method = :method, note = :note, paid_at = NOW()
                  WHERE id = :id AND status = 'pending'"
             );
-            $stmt->execute([
-                'method' => $method,
-                'note'   => Validate::nullableString(isset($data['note']) ? (string) $data['note'] : null),
-                'id'     => $invoice['id'],
-            ]);
+            $stmt->execute(['method' => $method, 'note' => $note, 'id' => $invoice['id']]);
 
             if ($stmt->rowCount() === 0) {
                 $pdo->rollBack();
-                Response::error(409, 'not_pending', 'Only a pending invoice can be marked paid.');
-                return;
+                return false;
             }
 
             if ($invoice['item_type'] === 'session_package') {
                 SessionPackageController::activate($invoice['item_id']);
+            }
+            if (Receipts::claimsReady()) {
+                $pdo->prepare(
+                    "UPDATE invoice_payment_claims SET status = 'approved', reviewed_at = NOW()
+                     WHERE invoice_id = :id AND status = 'pending'"
+                )->execute(['id' => $invoice['id']]);
             }
 
             $pdo->commit();
@@ -200,14 +223,14 @@ final class InvoiceController
                 default           => 'invoice_paid',
             },
             $invoice['athlete_id'],
-            $user['id'],
+            $actorId,
             'invoice_paid',
             [],
             self::linkFor($invoice['item_type']),
             ['invoice_id' => $invoice['id']]
         );
 
-        Response::ok(['ok' => true]);
+        return true;
     }
 
     public static function cancel(array $params): void
@@ -231,6 +254,13 @@ final class InvoiceController
             // An unpaid package has nothing left to wait for once its bill is void.
             if ($invoice['item_type'] === 'session_package') {
                 SessionPackageController::cancelUnpaid($invoice['item_id']);
+            }
+            if (Receipts::claimsReady()) {
+                $pdo->prepare(
+                    "UPDATE invoice_payment_claims
+                     SET status = 'rejected', trainer_note = 'فاکتور لغو شد.', reviewed_at = NOW()
+                     WHERE invoice_id = :id AND status = 'pending'"
+                )->execute(['id' => $invoice['id']]);
             }
 
             $pdo->commit();
@@ -329,7 +359,7 @@ final class InvoiceController
         return strtoupper(substr($id, 0, 8));
     }
 
-    private static function linkFor(string $itemType): string
+    public static function linkFor(string $itemType): string
     {
         return match ($itemType) {
             'nutrition_plan'  => '/nutrition',
@@ -359,6 +389,94 @@ final class InvoiceController
         foreach ($rows as &$row) {
             $row['number'] = self::number($row['id']);
         }
+        return $rows;
+    }
+
+    /** The plan, package or questionnaire title an invoice is for. */
+    public static function titleOf(string $invoiceId): string
+    {
+        $stmt = Database::connection()->prepare(self::listSql() . ' WHERE i.id = :id');
+        $stmt->execute(['id' => $invoiceId]);
+        $row = $stmt->fetch();
+
+        return $row === false ? '' : (string) ($row['item_title'] ?? '');
+    }
+
+    /**
+     * Gives each invoice its latest "I paid" claim (or null). The trainer's
+     * view also learns whether another claim to them used the same tracking
+     * code; the athlete's does not.
+     */
+    private static function withClaims(array $rows, bool $forTrainer): array
+    {
+        if (!Receipts::claimsReady() || $rows === []) {
+            foreach ($rows as &$row) {
+                $row['claim'] = null;
+            }
+            return $rows;
+        }
+
+        $ids = array_column($rows, 'id');
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $duplicate = $forTrainer
+            ? ', EXISTS (SELECT 1 FROM invoice_payment_claims o
+                         JOIN invoices oi ON oi.id = o.invoice_id
+                         JOIN invoices ci ON ci.id = c.invoice_id
+                         WHERE o.tracking_code = c.tracking_code AND o.invoice_id <> c.invoice_id
+                           AND oi.trainer_id = ci.trainer_id) AS duplicate_tracking'
+            : ', 0 AS duplicate_tracking';
+        $stmt = Database::connection()->prepare(
+            "SELECT c.id, c.invoice_id, c.status, c.tracking_code, c.card_last4, c.paid_at, c.note,
+                    c.trainer_note, c.reviewed_at, c.created_at, c.receipt_purged_at,
+                    (c.receipt_path IS NOT NULL) AS has_receipt,
+                    (c.receipt_path LIKE '%.pdf') AS receipt_is_pdf{$duplicate}
+             FROM invoice_payment_claims c
+             WHERE c.invoice_id IN ({$marks}) ORDER BY c.created_at DESC"
+        );
+        $stmt->execute($ids);
+
+        $latest = [];
+        foreach ($stmt->fetchAll() as $claim) {
+            // Newest first, so the first one seen for an invoice is its latest.
+            $latest[$claim['invoice_id']] ??= Cast::row($claim, [], [], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
+        }
+        foreach ($rows as &$row) {
+            $row['claim'] = $latest[$row['id']] ?? null;
+        }
+
+        return $rows;
+    }
+
+    /** Where an athlete sends the money for each still-pending invoice: the trainer's card details. */
+    private static function withPayTo(array $rows): array
+    {
+        $trainerIds = array_values(array_unique(array_column(
+            array_filter($rows, static fn (array $r): bool => $r['status'] === 'pending'),
+            'trainer_id'
+        )));
+        $info = [];
+        if ($trainerIds !== [] && Database::hasTable('trainer_payment_info')) {
+            $marks = implode(',', array_fill(0, count($trainerIds), '?'));
+            $stmt = Database::connection()->prepare(
+                "SELECT p.id, p.first_name, p.last_name, t.card_number, t.sheba, t.holder_name, t.bank_name
+                 FROM profiles p LEFT JOIN trainer_payment_info t ON t.trainer_id = p.id
+                 WHERE p.id IN ({$marks})"
+            );
+            $stmt->execute($trainerIds);
+            foreach ($stmt->fetchAll() as $t) {
+                $info[$t['id']] = [
+                    'trainer_name' => trim($t['first_name'] . ' ' . $t['last_name']),
+                    'card_number'  => $t['card_number'] ?? '',
+                    'sheba'        => $t['sheba'] ?? '',
+                    'holder_name'  => $t['holder_name'] ?? '',
+                    'bank_name'    => $t['bank_name'] ?? '',
+                ];
+            }
+        }
+        foreach ($rows as &$row) {
+            $row['pay_to'] = $row['status'] === 'pending' ? ($info[$row['trainer_id']] ?? null) : null;
+        }
+
         return $rows;
     }
 

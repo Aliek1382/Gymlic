@@ -17,10 +17,12 @@ import {
 import { deleteReceipt } from "@/features/admin/services/admin-billing-service";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatPersianDate } from "@/lib/persian";
-import { fetchReceiptBlob } from "../services/finance-service";
+import { fetchReceiptBlob, type ReceiptKind } from "../services/finance-service";
 
 interface ReceiptViewerProps {
+  /** The payment request, or the invoice claim when kind is "invoice-claim". */
   requestId: string;
+  kind?: ReceiptKind;
   isPdf?: boolean;
   /** Admins can delete the file before its time. */
   canDelete?: boolean;
@@ -29,14 +31,20 @@ interface ReceiptViewerProps {
 }
 
 /** The receipt image or PDF of a payment request, opened in a dialog. */
-export function ReceiptViewer({ requestId, isPdf = false, canDelete = false, expiresAt }: ReceiptViewerProps) {
+export function ReceiptViewer({
+  requestId,
+  kind = "payment-request",
+  isPdf = false,
+  canDelete = false,
+  expiresAt,
+}: ReceiptViewerProps) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: blob, isLoading, isError, error } = useQuery({
-    queryKey: ["payment-receipt", requestId],
-    queryFn: () => fetchReceiptBlob(requestId),
+    queryKey: ["payment-receipt", kind, requestId],
+    queryFn: () => fetchReceiptBlob(requestId, kind),
     enabled: open,
     // A receipt never changes, and is deleted rather than edited.
     staleTime: Infinity,

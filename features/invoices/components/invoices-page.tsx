@@ -19,6 +19,7 @@ import { RoleGate } from "@/features/authentication/components/role-gate";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { INVOICE_ITEM_LABEL, INVOICE_STATUS_LABEL, PAYMENT_METHOD_LABEL } from "../constants";
 import { useInvoices } from "../hooks/use-invoices";
+import { ClaimReview } from "./claim-review";
 import type { InvoiceStatus } from "../types/invoice-types";
 
 const FILTERS: { value: InvoiceStatus | "all"; label: string }[] = [
@@ -95,6 +96,7 @@ export function InvoicesPage() {
                   <TableHead>مبلغ (تومان)</TableHead>
                   <TableHead>وضعیت</TableHead>
                   <TableHead>تاریخ صدور</TableHead>
+                  <TableHead>پرداخت ثبت‌شده</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -117,6 +119,13 @@ export function InvoicesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{formatPersianDate(new Date(row.createdAt))}</TableCell>
+                    <TableCell className="min-w-64">
+                      {row.claim?.status === "pending" || row.claim?.status === "rejected" ? (
+                        <ClaimReview invoice={row} />
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

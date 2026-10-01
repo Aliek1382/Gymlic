@@ -20,6 +20,9 @@ use Throwable;
  *   admin sets how many), by cron/receipt-cleanup.php, and also on demand
  *   from the admin panel. Waiting requests keep theirs.
  *
+ * The same files, rules and cleanup serve the claims an athlete files against a
+ * trainer's invoice (invoice_payment_claims); see InvoiceClaimController.
+ *
  * Like Discounts, it only runs once its columns exist: the backend can reach
  * the host before payment-receipts-update.sql has been run.
  */
@@ -28,6 +31,9 @@ final class Receipts
     private const MAX_DIMENSION = 1400;
     private const JPEG_QUALITY = 75;
     private const NAME_PATTERN = '/^[0-9a-f]{32}\.(jpg|pdf)$/';
+
+    /** Tables whose rows point at a receipt file (receipt_path, status, reviewed_at / receipt_purged_at). */
+    private const SOURCES = ['payment_requests', 'invoice_payment_claims'];
 
     private function __construct()
     {
@@ -39,6 +45,50 @@ final class Receipts
         return Database::hasColumn('payment_requests', 'tracking_code')
             && Database::hasColumn('payment_requests', 'card_last4')
             && Database::hasColumn('payment_requests', 'receipt_path');
+    }
+
+    /** False until invoice-claims-update.sql has been run on this database. */
+    public static function claimsReady(): bool
+    {
+        return Database::hasColumn('invoice_payment_claims', 'receipt_path')
+            && Database::hasTable('trainer_payment_info');
+    }
+
+    /**
+     * The tracking code, last four card digits and optional payment time from
+     * a request, cleaned up (Persian digits become Latin).
+     *
+     * @return array{row: array<string, mixed>}|array{error: array{0: string, 1: string}}
+     */
+    public static function parseFields(array $data): array
+    {
+        $digits = static fn (mixed $v): string => strtr(trim((string) $v), [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]);
+
+        $tracking = preg_replace('/\\s+/', '', $digits($data['tracking_code'] ?? '')) ?? '';
+        if (preg_match('/^[A-Za-z0-9_\\/-]{4,40}$/', $tracking) !== 1) {
+            return ['error' => ['invalid_tracking_code', 'کد پیگیری باید بین ۴ تا ۴۰ حرف یا رقم باشد.']];
+        }
+        $last4 = $digits($data['card_last4'] ?? '');
+        if (preg_match('/^[0-9]{4}$/', $last4) !== 1) {
+            return ['error' => ['invalid_card_last4', 'چهار رقم آخر کارت پرداخت‌کننده را وارد کنید.']];
+        }
+
+        $paidAt = null;
+        $rawPaidAt = trim($digits($data['paid_at'] ?? ''));
+        if ($rawPaidAt !== '') {
+            $time = strtotime($rawPaidAt);
+            if ($time === false || $time > time() + 86400) {
+                return ['error' => ['invalid_paid_at', 'زمان واریز معتبر نیست.']];
+            }
+            $paidAt = date('Y-m-d H:i:s', $time);
+        }
+
+        return ['row' => ['tracking_code' => $tracking, 'card_last4' => $last4, 'paid_at' => $paidAt]];
     }
 
     /**
@@ -120,9 +170,9 @@ final class Receipts
     }
 
     /**
-     * Deletes the receipts of requests reviewed more than the configured
-     * number of days ago, and any file no request points to any more (a
-     * failed submit, a deleted club). Returns what it removed.
+     * Deletes the receipts of requests and claims reviewed more than the
+     * configured number of days ago, and any file nothing points to any more
+     * (a failed submit, a deleted club). Returns what it removed.
      *
      * @return array{deleted: int, freed_bytes: int}
      */
@@ -130,25 +180,32 @@ final class Receipts
     {
         $deleted = 0;
         $freed = 0;
+        $sources = array_values(array_filter(self::SOURCES, static fn (string $t): bool => Database::hasColumn($t, 'receipt_path')));
 
         $days = Settings::get('billing')['receipt_retention_days'];
         if ($days > 0) {
-            $stmt = $pdo->prepare(
-                "SELECT id, receipt_path FROM payment_requests
-                 WHERE receipt_path IS NOT NULL AND status <> 'pending'
-                   AND reviewed_at IS NOT NULL AND reviewed_at < :cutoff"
-            );
-            $stmt->execute(['cutoff' => date('Y-m-d H:i:s', time() - $days * 86400)]);
-            foreach ($stmt->fetchAll() as $row) {
-                $freed += self::remove($row['receipt_path']);
-                $deleted++;
-                $pdo->prepare('UPDATE payment_requests SET receipt_path = NULL, receipt_purged_at = NOW() WHERE id = :id')
-                    ->execute(['id' => $row['id']]);
+            foreach ($sources as $table) {
+                $stmt = $pdo->prepare(
+                    "SELECT id, receipt_path FROM {$table}
+                     WHERE receipt_path IS NOT NULL AND status <> 'pending'
+                       AND reviewed_at IS NOT NULL AND reviewed_at < :cutoff"
+                );
+                $stmt->execute(['cutoff' => date('Y-m-d H:i:s', time() - $days * 86400)]);
+                foreach ($stmt->fetchAll() as $row) {
+                    $freed += self::remove($row['receipt_path']);
+                    $deleted++;
+                    $pdo->prepare("UPDATE {$table} SET receipt_path = NULL, receipt_purged_at = NOW() WHERE id = :id")
+                        ->execute(['id' => $row['id']]);
+                }
             }
         }
 
-        $referenced = array_flip($pdo->query('SELECT receipt_path FROM payment_requests WHERE receipt_path IS NOT NULL')
-            ->fetchAll(PDO::FETCH_COLUMN));
+        $referenced = [];
+        foreach ($sources as $table) {
+            foreach ($pdo->query("SELECT receipt_path FROM {$table} WHERE receipt_path IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN) as $file) {
+                $referenced[$file] = true;
+            }
+        }
         foreach (self::files() as $file => $path) {
             // A day's grace: a file may have been written a moment before its row.
             if (!isset($referenced[$file]) && filemtime($path) < time() - 86400) {

@@ -80,7 +80,7 @@ final class AdminController
         $receiptFile = null;
         if (Receipts::ready()) {
             $billing = Settings::get('billing');
-            $fields = self::receiptFields($data);
+            $fields = Receipts::parseFields($data);
             if (isset($fields['error'])) {
                 Response::error(400, $fields['error'][0], $fields['error'][1]);
                 return;
@@ -138,43 +138,6 @@ final class AdminController
         }
 
         Response::ok(['id' => $id], 201);
-    }
-
-    /**
-     * The tracking code, last four card digits and optional payment time from
-     * the request, cleaned up (Persian digits become Latin).
-     *
-     * @return array{row: array<string, mixed>}|array{error: array{0: string, 1: string}}
-     */
-    private static function receiptFields(array $data): array
-    {
-        $digits = static fn (mixed $v): string => strtr(trim((string) $v), [
-            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
-            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
-            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
-            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
-        ]);
-
-        $tracking = preg_replace('/\s+/', '', $digits($data['tracking_code'] ?? '')) ?? '';
-        if (preg_match('/^[A-Za-z0-9_\/-]{4,40}$/', $tracking) !== 1) {
-            return ['error' => ['invalid_tracking_code', 'کد پیگیری باید بین ۴ تا ۴۰ حرف یا رقم باشد.']];
-        }
-        $last4 = $digits($data['card_last4'] ?? '');
-        if (preg_match('/^[0-9]{4}$/', $last4) !== 1) {
-            return ['error' => ['invalid_card_last4', 'چهار رقم آخر کارت پرداخت‌کننده را وارد کنید.']];
-        }
-
-        $paidAt = null;
-        $rawPaidAt = trim($digits($data['paid_at'] ?? ''));
-        if ($rawPaidAt !== '') {
-            $time = strtotime($rawPaidAt);
-            if ($time === false || $time > time() + 86400) {
-                return ['error' => ['invalid_paid_at', 'زمان واریز معتبر نیست.']];
-            }
-            $paidAt = date('Y-m-d H:i:s', $time);
-        }
-
-        return ['row' => ['tracking_code' => $tracking, 'card_last4' => $last4, 'paid_at' => $paidAt]];
     }
 
     /** Tells the admins who review payments that a request is waiting. Never throws. */

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ClaimReview } from "@/features/invoices/components/claim-review";
 import { PAYMENT_METHOD_LABEL } from "@/features/invoices/constants";
 import { useCancelInvoice } from "@/features/invoices/hooks/use-cancel-invoice";
 import { useInvoices } from "@/features/invoices/hooks/use-invoices";
@@ -46,6 +47,7 @@ export function PendingQuestionnaireInvoices() {
               <Lock className="size-4 text-muted-foreground" />
               {invoice.athleteName} · {invoice.itemTitle ?? "پرسشنامه"} · {formatNumber(invoice.amountToman)} تومان
             </p>
+            <ClaimReview invoice={invoice} />
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setPaying({ invoice, method: "cash" })}>
                 ثبت پرداخت نقدی
