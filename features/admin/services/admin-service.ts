@@ -214,6 +214,18 @@ export interface AdminPaymentRequestRow {
   list_price_toman?: number | null;
   discount_toman?: number;
   discount_code?: string | null;
+  /** Present once the payment receipts database update has run. */
+  tracking_code?: string | null;
+  card_last4?: string | null;
+  paid_at?: string | null;
+  has_receipt?: boolean;
+  receipt_is_pdf?: boolean;
+  /** The file was deleted (after the retention period, or by an admin). */
+  receipt_purged_at?: string | null;
+  /** When the file will be deleted, once the request has been reviewed. */
+  receipt_expires_at?: string | null;
+  /** Another request used the same tracking code (admins only). */
+  duplicate_tracking?: boolean;
 }
 
 export async function listPaymentRequests(): Promise<AdminPaymentRequestRow[]> {

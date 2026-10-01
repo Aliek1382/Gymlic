@@ -20,6 +20,7 @@ import { listPaymentRequests, type AdminPaymentRequestRow } from "../services/ad
 import { ExportButton } from "./export-button";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { PaymentRequestActions } from "@/features/admin/components/payment-request-actions";
+import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import type { PaymentRequestStatus } from "@/types/database.types";
 
 const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
@@ -48,6 +49,14 @@ type RequestRow = Pick<
   | "list_price_toman"
   | "discount_toman"
   | "discount_code"
+  | "tracking_code"
+  | "card_last4"
+  | "paid_at"
+  | "has_receipt"
+  | "receipt_is_pdf"
+  | "receipt_purged_at"
+  | "receipt_expires_at"
+  | "duplicate_tracking"
 >;
 
 function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions: boolean }) {
@@ -70,6 +79,8 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
           <TableHead>باشگاه</TableHead>
           <TableHead>پلن</TableHead>
           <TableHead>مبلغ</TableHead>
+          <TableHead>کد پیگیری</TableHead>
+          <TableHead>رسید</TableHead>
           <TableHead>توضیح باشگاه</TableHead>
           <TableHead>تاریخ</TableHead>
           <TableHead>وضعیت</TableHead>
@@ -96,6 +107,41 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
                   {" · "}
                   {formatToman(request.discount_toman)} تخفیف
                 </p>
+              )}
+            </TableCell>
+            <TableCell className="text-muted-foreground">
+              {request.tracking_code ? (
+                <div className="space-y-1">
+                  <p dir="ltr" className="text-end font-mono text-xs text-foreground">
+                    {request.tracking_code}
+                  </p>
+                  <p className="text-xs">
+                    کارت ••••{" "}
+                    <span dir="ltr" className="font-mono">{request.card_last4}</span>
+                  </p>
+                  {request.paid_at && (
+                    <p className="text-xs">واریز: {formatPersianDate(new Date(request.paid_at))}</p>
+                  )}
+                  {request.duplicate_tracking && (
+                    <Badge variant="warning">کد پیگیری تکراری</Badge>
+                  )}
+                </div>
+              ) : (
+                "—"
+              )}
+            </TableCell>
+            <TableCell className="text-muted-foreground">
+              {request.has_receipt ? (
+                <ReceiptViewer
+                  requestId={request.id}
+                  isPdf={request.receipt_is_pdf}
+                  expiresAt={request.receipt_expires_at}
+                  canDelete
+                />
+              ) : request.receipt_purged_at ? (
+                <span className="text-xs">حذف شده</span>
+              ) : (
+                "—"
               )}
             </TableCell>
             <TableCell className="max-w-48 truncate text-muted-foreground">

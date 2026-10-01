@@ -176,6 +176,14 @@ final class Settings
                 'bank_name'      => self::text($v['bank_name'] ?? null, 60),
                 'instructions'   => self::text($v['instructions'] ?? null, 1000),
                 'expiring_days'  => self::int($v['expiring_days'] ?? null, 7, 1, 60),
+                // Payment receipts (see Receipts): whether the image/PDF is
+                // mandatory, the size ceiling after the browser has shrunk
+                // it, and how many days after review the file is deleted
+                // (0 = keep). The tracking code and last four card digits
+                // are always required.
+                'receipt_required'       => self::bool($v['receipt_required'] ?? null, true),
+                'receipt_max_mb'         => self::int($v['receipt_max_mb'] ?? null, 3, 1, 10),
+                'receipt_retention_days' => self::int($v['receipt_retention_days'] ?? null, 7, 0, 365),
             ],
             // Notification texts; see Templates.
             'templates' => Templates::normalize($v),

@@ -55,6 +55,7 @@ use Gymlic\Controllers\NutritionPlanBuilderController;
 use Gymlic\Controllers\PagesController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\PointsController;
+use Gymlic\Controllers\ReceiptController;
 use Gymlic\Controllers\SessionPackageController;
 use Gymlic\Controllers\SupplementController;
 use Gymlic\Controllers\SupportController;
@@ -268,6 +269,7 @@ $router->delete('/earnings/{id}', fn (array $p) => EarningsController::remove($p
 $router->get('/plans-catalog', fn () => AdminController::listPlans());
 $router->get('/payment-requests', fn () => AdminController::listPaymentRequests());
 $router->post('/payment-requests', fn () => AdminController::submitPaymentRequest());
+$router->get('/payment-requests/{id}/receipt', fn (array $p) => ReceiptController::show($p));
 $router->get('/billing/info', fn () => BillingController::info());
 $router->post('/billing/discount-check', fn () => BillingController::checkDiscount());
 
@@ -283,6 +285,9 @@ $router->post('/admin/profiles/{id}/suspend', fn (array $p) => AdminController::
 $router->patch('/admin/profiles/{id}', fn (array $p) => AdminController::updateProfile($p));
 $router->post('/admin/payment-requests/{id}/approve', fn (array $p) => AdminController::approvePaymentRequest($p));
 $router->post('/admin/payment-requests/{id}/reject', fn (array $p) => AdminController::rejectPaymentRequest($p));
+$router->delete('/admin/payment-requests/{id}/receipt', fn (array $p) => ReceiptController::remove($p));
+$router->get('/admin/receipts/stats', fn () => ReceiptController::stats());
+$router->post('/admin/receipts/purge', fn () => ReceiptController::purge());
 $router->post('/admin/plans', fn () => AdminController::createPlan());
 $router->patch('/admin/plans/{id}', fn (array $p) => AdminController::updatePlan($p));
 $router->get('/admin/subscriptions', fn () => AdminBillingController::subscriptions());

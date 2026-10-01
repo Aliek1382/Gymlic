@@ -252,6 +252,10 @@ export interface Database {
           submitted_by: string;
           amount_toman: number;
           reference_note: string | null;
+          tracking_code?: string | null;
+          card_last4?: string | null;
+          paid_at?: string | null;
+          receipt_purged_at?: string | null;
           status: PaymentRequestStatus;
           admin_note: string | null;
           reviewed_by: string | null;

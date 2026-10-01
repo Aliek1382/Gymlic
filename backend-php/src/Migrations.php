@@ -133,6 +133,16 @@ final class Migrations
             ],
         ],
         [
+            'id'    => 'payment-receipts',
+            'file'  => 'payment-receipts-update.sql',
+            'title' => 'رسید پرداخت: کد پیگیری، چهار رقم کارت و تصویر رسید',
+            'check' => [
+                ['column', 'payment_requests', 'tracking_code'],
+                ['column', 'payment_requests', 'card_last4'],
+                ['column', 'payment_requests', 'receipt_path'],
+            ],
+        ],
+        [
             'id'    => 'communication',
             'file'  => 'communication-update.sql',
             'title' => 'اعلان همگانی، تیکت پشتیبانی و صفحه‌های متنی (فاز ۷)',

@@ -6,6 +6,11 @@ export const paymentRequestFormSchema = z.object({
   // dialog checks that, since the schema can't see the code.
   amountToman: z.coerce.number().int().min(0, "مبلغ را وارد کنید."),
   referenceNote: z.string().trim().optional(),
+  // Required only once the receipts database update is on (the dialog checks
+  // that, since the schema can't see the server's rules).
+  trackingCode: z.string().trim().optional(),
+  cardLast4: z.string().trim().optional(),
+  paidAt: z.string().optional(),
 });
 
 // Two shapes: the raw pre-coercion form input (amountToman typed unknown,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,15 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { toAsciiDigits } from "@/lib/persian";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { PaymentInfoCard, formatCardNumber } from "@/features/finance/components/payment-info-card";
 import {
   getBillingSettings,
+  getReceiptStats,
+  purgeReceipts,
   saveBillingSettings,
   type BillingSettings,
 } from "../services/admin-billing-service";
@@ -69,6 +72,8 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
     card_number: digitsOnly(draft.card_number),
     sheba: digitsOnly(draft.sheba) ? `IR${digitsOnly(draft.sheba)}` : "",
     expiring_days: Number(digitsOnly(String(draft.expiring_days))) || 7,
+    receipt_max_mb: Number(digitsOnly(String(draft.receipt_max_mb))) || 0,
+    receipt_retention_days: Number(digitsOnly(String(draft.receipt_retention_days))) || 0,
   };
 
   async function save() {
@@ -82,6 +87,14 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
     }
     if (value.expiring_days < 1 || value.expiring_days > 60) {
       toast.error("تعداد روز «رو به اتمام» باید بین ۱ و ۶۰ باشد.");
+      return;
+    }
+    if (value.receipt_max_mb < 1 || value.receipt_max_mb > 10) {
+      toast.error("حداکثر حجم رسید باید بین ۱ و ۱۰ مگابایت باشد.");
+      return;
+    }
+    if (value.receipt_retention_days > 365) {
+      toast.error("مدت نگهداری رسید حداکثر ۳۶۵ روز است.");
       return;
     }
     setSaving(true);
@@ -197,6 +210,63 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
           </div>
         </div>
 
+        <div className="space-y-4 border-t border-border px-6 pt-5">
+          <div className="space-y-1">
+            <CardTitle className="text-base">رسید پرداخت</CardTitle>
+            <CardDescription>
+              باشگاه هنگام ثبت درخواست، کد پیگیری و چهار رقم آخر کارتش را همیشه وارد می‌کند. تصویر
+              رسید در مرورگر کوچک و در سرور دوباره فشرده می‌شود و پس از بررسی درخواست، خودکار حذف
+              می‌شود. درخواست‌های در انتظار، رسیدشان را تا زمان بررسی نگه می‌دارند.
+            </CardDescription>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+            <div>
+              <Label htmlFor="billing-receipt-required">پیوست رسید الزامی باشد</Label>
+              <p className="text-xs text-muted-foreground">
+                اگر خاموش باشد، باشگاه می‌تواند بدون تصویر رسید هم درخواست ثبت کند.
+              </p>
+            </div>
+            <Switch
+              id="billing-receipt-required"
+              checked={draft.receipt_required}
+              disabled={locked}
+              onCheckedChange={(receipt_required) => patch({ receipt_required })}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="billing-receipt-mb">حداکثر حجم رسید (مگابایت)</Label>
+              <Input
+                id="billing-receipt-mb"
+                dir="ltr"
+                inputMode="numeric"
+                disabled={locked}
+                className="w-24"
+                value={String(draft.receipt_max_mb)}
+                onChange={(e) => patch({ receipt_max_mb: Number(digitsOnly(e.target.value).slice(0, 2)) || 0 })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="billing-receipt-days">حذف رسید، چند روز پس از بررسی</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="billing-receipt-days"
+                  dir="ltr"
+                  inputMode="numeric"
+                  disabled={locked}
+                  className="w-24"
+                  value={String(draft.receipt_retention_days)}
+                  onChange={(e) =>
+                    patch({ receipt_retention_days: Number(digitsOnly(e.target.value).slice(0, 3)) || 0 })
+                  }
+                />
+                <span className="text-sm text-muted-foreground">روز (۰ = حذف نشود)</span>
+              </div>
+            </div>
+          </div>
+          <ReceiptStorage />
+        </div>
+
         <div className="px-6">
           <Button onClick={save} disabled={saving || locked}>
             {saving && <Loader2 className="animate-spin" />}
@@ -215,6 +285,53 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+const formatMegabytes = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} مگابایت`;
+
+/** What the receipts folder holds now, and a button to run the cleanup immediately. */
+function ReceiptStorage() {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({ queryKey: ["admin", "receipt-stats"], queryFn: getReceiptStats });
+  const [purging, setPurging] = useState(false);
+
+  if (!data) return null;
+  if (!data.ready) {
+    return (
+      <p className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
+        ذخیرهٔ رسید هنوز فعال نیست: به‌روزرسانی «رسید پرداخت» را از صفحهٔ پایگاه‌داده اجرا کنید.
+      </p>
+    );
+  }
+
+  async function purge() {
+    setPurging(true);
+    try {
+      const result = await purgeReceipts();
+      toast.success(
+        result.deleted > 0
+          ? `${result.deleted} رسید حذف شد (${formatMegabytes(result.freed_bytes)}).`
+          : "رسیدی برای حذف نبود."
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin"] });
+    } catch (error) {
+      toast.error(getErrorMessage(error, "پاکسازی ناموفق بود."));
+    } finally {
+      setPurging(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">
+        الان {data.count} فایل رسید ذخیره است ({formatMegabytes(data.bytes)}).
+      </p>
+      <Button type="button" size="sm" variant="outline" onClick={purge} disabled={purging}>
+        {purging ? <Loader2 className="animate-spin" /> : <Trash2 />}
+        پاکسازی رسیدهای منقضی
+      </Button>
     </div>
   );
 }

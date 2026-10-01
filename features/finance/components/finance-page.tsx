@@ -22,6 +22,7 @@ import {
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { SubscriptionCard } from "@/features/dashboard/components/shared/subscription-card";
+import { ReceiptViewer } from "./receipt-viewer";
 import { SubmitPaymentRequestDialog } from "./submit-payment-request-dialog";
 import { ClubRevenueSection } from "@/features/revenue";
 import type { PaymentRequestStatus, SubscriptionStatus } from "@/types/database.types";
@@ -133,6 +134,7 @@ export function FinancePage() {
                       <TableHead>پلن</TableHead>
                       <TableHead>مبلغ</TableHead>
                       <TableHead>وضعیت</TableHead>
+                      <TableHead>کد پیگیری</TableHead>
                       <TableHead>یادداشت مدیریت</TableHead>
                       <TableHead>تاریخ ثبت</TableHead>
                     </TableRow>
@@ -159,6 +161,24 @@ export function FinancePage() {
                           <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>
                             {REQUEST_STATUS_LABEL[request.status]}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {request.tracking_code ? (
+                            <div className="space-y-1">
+                              <p dir="ltr" className="text-end font-mono text-xs text-foreground">
+                                {request.tracking_code}
+                              </p>
+                              {request.has_receipt && (
+                                <ReceiptViewer
+                                  requestId={request.id}
+                                  isPdf={request.receipt_is_pdf}
+                                  expiresAt={request.receipt_expires_at}
+                                />
+                              )}
+                            </div>
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {request.admin_note ?? "—"}

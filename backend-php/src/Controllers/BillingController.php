@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Discounts;
+use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Validate;
@@ -28,6 +29,13 @@ final class BillingController
                 'instructions'   => $billing['instructions'],
             ],
             'discounts_enabled' => Discounts::ready(),
+            // What the payment dialog asks for besides the amount; absent
+            // until the receipts database update has run.
+            'receipts' => Receipts::ready() ? [
+                'required'       => $billing['receipt_required'],
+                'max_mb'         => $billing['receipt_max_mb'],
+                'retention_days' => $billing['receipt_retention_days'],
+            ] : null,
         ]);
     }
 

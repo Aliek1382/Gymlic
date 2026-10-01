@@ -15,6 +15,12 @@ export interface BillingSettings {
   instructions: string;
   /** Days before expiry a subscription counts as running out. */
   expiring_days: number;
+  /** Whether a payment request must carry a receipt image/PDF. */
+  receipt_required: boolean;
+  /** Size ceiling for a receipt file, in MB. */
+  receipt_max_mb: number;
+  /** Days after review that receipt files are deleted; 0 keeps them. */
+  receipt_retention_days: number;
 }
 
 export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
@@ -24,6 +30,9 @@ export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
   bank_name: "",
   instructions: "",
   expiring_days: 7,
+  receipt_required: true,
+  receipt_max_mb: 3,
+  receipt_retention_days: 7,
 };
 
 export async function getBillingSettings(): Promise<{ settings: BillingSettings; storageReady: boolean }> {
@@ -39,6 +48,27 @@ export async function getBillingSettings(): Promise<{ settings: BillingSettings;
 export async function saveBillingSettings(value: BillingSettings): Promise<BillingSettings> {
   const data = await api.put<{ value: BillingSettings }>("/admin/settings/billing", { value });
   return data.value;
+}
+
+export interface ReceiptStats {
+  /** False until the receipts database update has run. */
+  ready: boolean;
+  count: number;
+  bytes: number;
+}
+
+export async function getReceiptStats(): Promise<ReceiptStats> {
+  return api.get<ReceiptStats>("/admin/receipts/stats");
+}
+
+/** Runs the receipt cleanup now. */
+export async function purgeReceipts(): Promise<{ deleted: number; freed_bytes: number }> {
+  return api.post("/admin/receipts/purge");
+}
+
+/** Deletes one request's receipt file right away. */
+export async function deleteReceipt(requestId: string): Promise<void> {
+  await api.delete(`/admin/payment-requests/${requestId}/receipt`);
 }
 
 // ---------------------------------------------------------------------------

@@ -75,6 +75,11 @@ final class Templates
         ],
 
         // ---- billing
+        'payment_submitted' => [
+            'group' => 'billing', 'label' => 'ثبت درخواست پرداخت اشتراک', 'to' => 'مدیرانِ بررسی‌کنندهٔ پرداخت',
+            'title' => 'درخواست پرداخت جدید', 'body' => 'باشگاه «{club}» پرداخت {amount} تومان را برای بررسی ثبت کرد.',
+            'vars' => ['club' => 'نام باشگاه', 'amount' => 'مبلغ به تومان'],
+        ],
         'payment_approved' => [
             'group' => 'billing', 'label' => 'تأیید پرداخت اشتراک', 'to' => 'مالک باشگاه',
             'title' => 'پرداخت تأیید شد', 'body' => 'اشتراک باشگاه شما تا {date} فعال شد.', 'vars' => ['date' => 'تاریخ انقضا'],
