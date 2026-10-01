@@ -149,6 +149,12 @@ final class Migrations
             'check' => [['table', 'trainer_payment_info'], ['table', 'invoice_payment_claims']],
         ],
         [
+            'id'    => 'trainer-billing',
+            'file'  => 'trainer-billing-update.sql',
+            'title' => 'اشتراک و پرداخت کارت‌به‌کارت مربی به پلتفرم',
+            'check' => [['table', 'trainer_plans'], ['table', 'trainer_subscriptions'], ['table', 'trainer_payment_requests']],
+        ],
+        [
             'id'    => 'communication',
             'file'  => 'communication-update.sql',
             'title' => 'اعلان همگانی، تیکت پشتیبانی و صفحه‌های متنی (فاز ۷)',

@@ -191,6 +191,12 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
             "بیوگرافی، افتخارات، مدارک، جدول تعرفه و شبکه‌های اجتماعی‌تان را برای شاگردانتان بنویسید.",
         },
         {
+          label: "اشتراک من",
+          href: "/subscription",
+          icon: CalendarCheck,
+          description: "وضعیت اشتراک شما، پلن‌ها و پرداخت کارت‌به‌کارت به جیم‌لیک.",
+        },
+        {
           label: "امتیاز من",
           href: "/points",
           icon: Trophy,

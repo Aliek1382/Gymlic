@@ -64,7 +64,7 @@ export function ReceiptViewer({
   }, [blob]);
 
   async function remove() {
-    await deleteReceipt(requestId);
+    await deleteReceipt(requestId, kind === "trainer-payment" ? "trainer-payment" : "payment-request");
     toast.success("رسید حذف شد.");
     setOpen(false);
     void queryClient.invalidateQueries({ queryKey: ["admin"] });

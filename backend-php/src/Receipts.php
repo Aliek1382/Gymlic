@@ -21,7 +21,9 @@ use Throwable;
  *   from the admin panel. Waiting requests keep theirs.
  *
  * The same files, rules and cleanup serve the claims an athlete files against a
- * trainer's invoice (invoice_payment_claims); see InvoiceClaimController.
+ * trainer's invoice (invoice_payment_claims, see InvoiceClaimController) and a
+ * trainer's own subscription payments (trainer_payment_requests, see
+ * TrainerBillingController).
  *
  * Like Discounts, it only runs once its columns exist: the backend can reach
  * the host before payment-receipts-update.sql has been run.
@@ -33,7 +35,7 @@ final class Receipts
     private const NAME_PATTERN = '/^[0-9a-f]{32}\.(jpg|pdf)$/';
 
     /** Tables whose rows point at a receipt file (receipt_path, status, reviewed_at / receipt_purged_at). */
-    private const SOURCES = ['payment_requests', 'invoice_payment_claims'];
+    private const SOURCES = ['payment_requests', 'invoice_payment_claims', 'trainer_payment_requests'];
 
     private function __construct()
     {

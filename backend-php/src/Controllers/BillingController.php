@@ -9,6 +9,7 @@ use Gymlic\Discounts;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
+use Gymlic\TrainerBilling;
 use Gymlic\Validate;
 
 /** What a club owner sees while paying for their subscription. */
@@ -31,7 +32,7 @@ final class BillingController
             'discounts_enabled' => Discounts::ready(),
             // What the payment dialog asks for besides the amount; absent
             // until the receipts database update has run.
-            'receipts' => (Receipts::ready() || Receipts::claimsReady()) ? [
+            'receipts' => (Receipts::ready() || Receipts::claimsReady() || TrainerBilling::ready()) ? [
                 'required'       => $billing['receipt_required'],
                 'max_mb'         => $billing['receipt_max_mb'],
                 'retention_days' => $billing['receipt_retention_days'],

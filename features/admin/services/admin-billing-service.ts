@@ -21,6 +21,8 @@ export interface BillingSettings {
   receipt_max_mb: number;
   /** Days after review that receipt files are deleted; 0 keeps them. */
   receipt_retention_days: number;
+  /** Whether a trainer outside a club needs an active plan to invite athletes. */
+  trainer_enforce: boolean;
 }
 
 export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
@@ -33,6 +35,7 @@ export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
   receipt_required: true,
   receipt_max_mb: 3,
   receipt_retention_days: 7,
+  trainer_enforce: false,
 };
 
 export async function getBillingSettings(): Promise<{ settings: BillingSettings; storageReady: boolean }> {
@@ -66,9 +69,16 @@ export async function purgeReceipts(): Promise<{ deleted: number; freed_bytes: n
   return api.post("/admin/receipts/purge");
 }
 
-/** Deletes one request's receipt file right away. */
-export async function deleteReceipt(requestId: string): Promise<void> {
-  await api.delete(`/admin/payment-requests/${requestId}/receipt`);
+/** Deletes one request's receipt file right away (a club's payment request, or a trainer's). */
+export async function deleteReceipt(
+  requestId: string,
+  kind: "payment-request" | "trainer-payment" = "payment-request"
+): Promise<void> {
+  const path =
+    kind === "trainer-payment"
+      ? `/admin/trainer-billing/requests/${requestId}/receipt`
+      : `/admin/payment-requests/${requestId}/receipt`;
+  await api.delete(path);
 }
 
 // ---------------------------------------------------------------------------

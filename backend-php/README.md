@@ -193,3 +193,30 @@ as they did (`Receipts::claimsReady()` is false, endpoints answer 409).
 5. Receipt files (`GET /invoice-claims/{id}/receipt`, athlete or trainer only)
    are deleted by the same cleanup as the club ones, N days after the claim is
    reviewed.
+
+## Trainer subscriptions (trainer → platform)
+
+A trainer pays the platform card-to-card, like a club, from "اشتراک من"
+(`/subscription`). The database step is `schema/trainer-billing-update.sql`
+(admin panel's database page, or phpMyAdmin); until it has run the endpoints
+answer `ready: false` / 409 and the pages hide the feature.
+
+- Own tables, so nothing a club sees changes: `trainer_plans` (price,
+  duration, `max_athletes`), `trainer_subscriptions` (one row per trainer) and
+  `trainer_payment_requests`. The receiving card is the same one clubs pay to
+  (billing settings). A request carries the tracking code, last four card
+  digits and a receipt, with the same size ceiling, shrinking and auto-delete
+  as the club payments (`Receipts::SOURCES`). One waiting request per trainer.
+- Admins with the finance permission manage it at `/admin/trainer-billing`:
+  approve/reject requests (approving starts or extends the subscription,
+  counting from the current expiry while it runs), plans, and a per-trainer
+  "add days" (free days keep the trainer's plan, or pick one).
+- **Nothing is enforced by default.** Switch on "الزام اشتراک مربی" in
+  `/admin/billing` (`billing.trainer_enforce`) and a trainer outside a club
+  needs an active subscription, within its athlete cap, to create an athlete
+  invite (`TrainerBilling::inviteBlock`, HTTP 402 from `POST /athlete-invites`).
+  Existing athletes are never removed, and a trainer who is an active member of
+  a club is never asked to pay. Set the plans up and let trainers subscribe
+  before switching it on.
+- Not covered yet: discount codes for trainer plans, and trainer payments in
+  the admin revenue report / CSV export.

@@ -184,6 +184,11 @@ final class Settings
                 'receipt_required'       => self::bool($v['receipt_required'] ?? null, true),
                 'receipt_max_mb'         => self::int($v['receipt_max_mb'] ?? null, 3, 1, 10),
                 'receipt_retention_days' => self::int($v['receipt_retention_days'] ?? null, 7, 0, 365),
+                // Trainer subscriptions (TrainerBilling): when on, a trainer
+                // working outside a club needs an active plan, within its
+                // athlete cap, to invite new athletes. Off until the admin
+                // has set the plans up.
+                'trainer_enforce'        => self::bool($v['trainer_enforce'] ?? null, false),
             ],
             // Notification texts; see Templates.
             'templates' => Templates::normalize($v),
