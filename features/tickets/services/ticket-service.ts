@@ -64,20 +64,20 @@ export async function listTicketTrainers(): Promise<TicketTrainerOption[]> {
   }));
 }
 
-export async function getTicket(id: string): Promise<TicketDetail> {
-  const data = await api.get<{
-    ticket: TicketRow;
-    messages: {
-      id: string;
-      sender_id: string;
-      body: string;
-      created_at: string;
-      first_name: string | null;
-      last_name: string | null;
-      avatar_url: string | null;
-    }[];
-  }>(`/tickets/${id}`);
+interface TicketDetailResponse {
+  ticket: TicketRow;
+  messages: {
+    id: string;
+    sender_id: string;
+    body: string;
+    created_at: string;
+    first_name: string | null;
+    last_name: string | null;
+    avatar_url: string | null;
+  }[];
+}
 
+function mapDetail(data: TicketDetailResponse): TicketDetail {
   return {
     ticket: mapTicket(data.ticket),
     messages: data.messages.map((row) => ({
@@ -89,6 +89,29 @@ export async function getTicket(id: string): Promise<TicketDetail> {
       createdAt: row.created_at,
     })),
   };
+}
+
+export async function getTicket(id: string): Promise<TicketDetail> {
+  return mapDetail(await api.get<TicketDetailResponse>(`/tickets/${id}`));
+}
+
+/** Admin oversight (support permission): every athlete ↔ trainer ticket, read-only. */
+export async function listAdminTickets(
+  status?: TicketStatus
+): Promise<{ items: (Ticket & { messageCount: number })[]; counts: Record<TicketStatus, number> }> {
+  const query = status ? `?status=${status}` : "";
+  const data = await api.get<{
+    items: (TicketRow & { message_count: number | string })[];
+    counts: Record<TicketStatus, number>;
+  }>(`/admin/tickets${query}`);
+  return {
+    items: data.items.map((row) => ({ ...mapTicket(row), messageCount: Number(row.message_count) })),
+    counts: data.counts,
+  };
+}
+
+export async function getAdminTicket(id: string): Promise<TicketDetail> {
+  return mapDetail(await api.get<TicketDetailResponse>(`/admin/tickets/${id}`));
 }
 
 export async function createTicket(input: {

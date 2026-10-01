@@ -21,6 +21,7 @@ import {
   ReceiptText,
   Settings,
   Tags,
+  Ticket,
   TicketPercent,
   ToggleRight,
   Trophy,
@@ -75,6 +76,7 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
       { label: "اعلان همگانی", href: "/admin/notifications", icon: Megaphone, permission: "notifications" },
       { label: "قالب متن اعلان‌ها", href: "/admin/templates", icon: MessageSquareText, permission: "notifications" },
       { label: "تیکت‌های پشتیبانی", href: "/admin/support", icon: Headset, permission: "support" },
+      { label: "تیکت‌های مربی و ورزشکار", href: "/admin/tickets", icon: Ticket, permission: "support" },
     ],
   },
   {
