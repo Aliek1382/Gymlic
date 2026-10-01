@@ -253,3 +253,59 @@ simply off.
   (`AdminBillingController::revenueSummary`: totals, by month, by plan, with
   the club/trainer split), its CSV, the overview's total revenue and pending
   count, and a new CSV `GET /admin/export/trainer-payments`.
+
+## Athlete → club card-to-card membership payments
+
+An athlete pays their club for a membership plan from "عضویت من"
+(`/membership`); a club owner or reception approves it in "پرداخت‌های اعضا"
+(`/member-payments`). The database step is `schema/member-payments-update.sql`
+(admin panel's database page, or phpMyAdmin); until it has run the endpoints
+answer `ready: false` / 409 and the pages hide the feature.
+
+- The club saves its receiving card in Settings → "دریافت پرداخت"
+  (`club_payment_info`, `GET/PUT /clubs/{id}/payment-info`, owner or reception,
+  card number Luhn-checked via `CardInfo`). Athletes see it only for a club they
+  are an active athlete member of.
+- The athlete picks one of the club's active, non-free plans and files the
+  payment: `POST /member-payments` with tracking code, last four card digits
+  and a receipt (same rules, size ceiling, shrinking and retention as the other
+  receipts, from the admin's billing settings). The plan's name, duration and
+  price are copied onto the request. One waiting request per athlete per club.
+- The owner and reception are notified (`member_payment_submitted`). Approving
+  (`POST /member-payments/{id}/approve`, one transaction) extends the
+  membership from the current expiry while it still runs, else from today, sets
+  its plan, writes the amount into `revenue_entries` (category `membership`,
+  recorded by the approver) and tells the athlete. Rejecting lets the athlete
+  file again, with the reason in the notification.
+- Receipt files (`GET /member-payments/{id}/receipt`: the athlete, or a manager
+  of that club) are deleted by the same cleanup as the others, N days after the
+  review; a manager can also delete one by hand.
+- Discount codes on membership plans are below; a reminder when a membership
+  is about to end is not covered.
+
+### Discount codes made by clubs and trainers
+
+The database step is `schema/member-discounts-update.sql` (after
+`member-payments-update.sql` and `invoice-claims-update.sql`); until it has run
+the code boxes and tabs are simply off.
+
+- **A club's codes for its membership plans** (`club_discount_codes`, unique
+  per club): owner or reception manage them in "پرداخت‌های اعضا" → "کدهای
+  تخفیف" (`/clubs/{id}/discount-codes`). The athlete enters a code in the pay
+  dialog (`POST /member-payments/discount-check`, then `discount_code` on
+  `POST /member-payments`); the request stores the plan price, the discount and
+  the discounted `amount_toman`, so approving puts the discounted amount in the
+  club's revenue.
+- **A trainer's codes for their athletes' invoices** (`athlete_discount_codes`,
+  unique per trainer): managed in "فاکتورهای من" → "کدهای تخفیف"
+  (`/athlete-discount-codes`). The athlete enters it with "پرداخت کردم"
+  (`POST /invoices/{id}/discount-check`, then `discount_code` on the claim); the
+  claim keeps the discount, the trainer sees the amount that should have been
+  paid, and approving settles the invoice for that amount
+  (`InvoiceController::settle`'s `$paidAmount`).
+- The rules are the platform codes' (`DiscountCodes`): percent or amount, one
+  plan or all (club codes only), a cap on total uses, once per person, an
+  expiry date, active/inactive. A use is a pending or approved payment, so a
+  rejected one gives its use back. A code can never make a payment free (percent
+  is capped at 99, and a code that would take the whole price is refused when
+  used), and a used code can be switched off but not deleted.

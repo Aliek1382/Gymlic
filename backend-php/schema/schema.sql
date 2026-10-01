@@ -661,10 +661,31 @@ CREATE TABLE trainer_payment_info (
   CONSTRAINT fk_tpi_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE athlete_discount_codes (
+  id                CHAR(36) NOT NULL PRIMARY KEY,
+  trainer_id        CHAR(36) NOT NULL,
+  code              VARCHAR(40) NOT NULL,
+  kind              ENUM('percent','amount') NOT NULL,
+  value             BIGINT NOT NULL,
+  max_uses          INT NULL,                       -- pending and approved claims count
+  once_per_athlete  TINYINT(1) NOT NULL DEFAULT 0,
+  expires_at        DATETIME NULL,
+  is_active         TINYINT(1) NOT NULL DEFAULT 1,
+  note              VARCHAR(255) NULL,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_adc_trainer_code (trainer_id, code),
+  CONSTRAINT fk_adc_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT chk_adc_value CHECK (value > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE invoice_payment_claims (
   id                CHAR(36) NOT NULL PRIMARY KEY,
   invoice_id        CHAR(36) NOT NULL,
   athlete_id        CHAR(36) NOT NULL,
+  discount_code_id  CHAR(36) NULL,
+  list_price_toman  BIGINT NULL,                -- the invoice amount when a code was used
+  discount_toman    BIGINT NOT NULL DEFAULT 0,
   tracking_code     VARCHAR(40) NOT NULL,
   card_last4        CHAR(4) NOT NULL,
   paid_at           DATETIME NULL,
@@ -679,7 +700,8 @@ CREATE TABLE invoice_payment_claims (
   KEY idx_claims_status (status),
   KEY idx_claims_tracking (tracking_code),
   CONSTRAINT fk_claims_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
-  CONSTRAINT fk_claims_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE
+  CONSTRAINT fk_claims_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_claims_discount FOREIGN KEY (discount_code_id) REFERENCES athlete_discount_codes(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
@@ -762,6 +784,77 @@ CREATE TABLE trainer_payment_requests (
   CONSTRAINT fk_tpay_discount FOREIGN KEY (discount_code_id) REFERENCES trainer_discount_codes(id) ON DELETE SET NULL,
   CONSTRAINT fk_tpay_reviewer FOREIGN KEY (reviewed_by) REFERENCES profiles(id) ON DELETE SET NULL,
   CONSTRAINT chk_tpay_amount CHECK (amount_toman >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- club_payment_info / membership_payment_requests: an athlete paying a club
+-- for a membership plan card-to-card. Approving one extends the membership and
+-- adds the amount to revenue_entries.
+-- =========================================================================
+CREATE TABLE club_payment_info (
+  club_id     CHAR(36) NOT NULL PRIMARY KEY,
+  card_number VARCHAR(19) NULL,
+  sheba       VARCHAR(26) NULL,
+  holder_name VARCHAR(100) NULL,
+  bank_name   VARCHAR(60) NULL,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cpi_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE club_discount_codes (
+  id              CHAR(36) NOT NULL PRIMARY KEY,
+  club_id         CHAR(36) NOT NULL,
+  code            VARCHAR(40) NOT NULL,             -- stored upper-case, matched case-insensitively
+  kind            ENUM('percent','amount') NOT NULL,
+  value           BIGINT NOT NULL,                  -- 1..100 for percent, toman for amount
+  plan_id         CHAR(36) NULL,                    -- NULL = any membership plan of the club
+  max_uses        INT NULL,                         -- NULL = unlimited, pending and approved payments count
+  once_per_member TINYINT(1) NOT NULL DEFAULT 0,
+  expires_at      DATETIME NULL,
+  is_active       TINYINT(1) NOT NULL DEFAULT 1,
+  note            VARCHAR(255) NULL,
+  created_by      CHAR(36) NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_cdc_club_code (club_id, code),
+  CONSTRAINT fk_cdc_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cdc_plan FOREIGN KEY (plan_id) REFERENCES club_membership_plans(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cdc_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT chk_cdc_value CHECK (value > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE membership_payment_requests (
+  id                CHAR(36) NOT NULL PRIMARY KEY,
+  club_id           CHAR(36) NOT NULL,
+  athlete_id        CHAR(36) NOT NULL,
+  plan_id           CHAR(36) NULL,
+  plan_name         VARCHAR(255) NOT NULL,
+  duration_days     INT NOT NULL,
+  amount_toman      BIGINT NOT NULL,
+  discount_code_id  CHAR(36) NULL,
+  list_price_toman  BIGINT NULL,                -- the plan's price when a code was used
+  discount_toman    BIGINT NOT NULL DEFAULT 0,
+  tracking_code     VARCHAR(40) NOT NULL,
+  card_last4        CHAR(4) NOT NULL,
+  paid_at           DATETIME NULL,
+  note              VARCHAR(500) NULL,
+  receipt_path      VARCHAR(120) NULL,
+  receipt_purged_at DATETIME NULL,
+  status            ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  review_note       VARCHAR(500) NULL,
+  reviewed_by       CHAR(36) NULL,
+  reviewed_at       DATETIME NULL,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_mpr_club (club_id, status, created_at DESC),
+  KEY idx_mpr_athlete (athlete_id, created_at DESC),
+  KEY idx_mpr_tracking (tracking_code),
+  CONSTRAINT fk_mpr_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_mpr_athlete FOREIGN KEY (athlete_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_mpr_discount FOREIGN KEY (discount_code_id) REFERENCES club_discount_codes(id) ON DELETE SET NULL,
+  CONSTRAINT fk_mpr_plan FOREIGN KEY (plan_id) REFERENCES club_membership_plans(id) ON DELETE SET NULL,
+  CONSTRAINT fk_mpr_reviewer FOREIGN KEY (reviewed_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT chk_mpr_amount CHECK (amount_toman > 0),
+  CONSTRAINT chk_mpr_duration CHECK (duration_days > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================

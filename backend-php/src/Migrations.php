@@ -165,6 +165,23 @@ final class Migrations
             ],
         ],
         [
+            'id'    => 'member-payments',
+            'file'  => 'member-payments-update.sql',
+            'title' => 'پرداخت کارت‌به‌کارت ورزشکار به باشگاه (شهریهٔ عضویت)',
+            'check' => [['table', 'club_payment_info'], ['table', 'membership_payment_requests']],
+        ],
+        [
+            'id'    => 'member-discounts',
+            'file'  => 'member-discounts-update.sql',
+            'title' => 'کد تخفیف برای طرح‌های عضویت باشگاه و فاکتورهای مربی',
+            'check' => [
+                ['table', 'club_discount_codes'],
+                ['table', 'athlete_discount_codes'],
+                ['column', 'membership_payment_requests', 'discount_code_id'],
+                ['column', 'invoice_payment_claims', 'discount_code_id'],
+            ],
+        ],
+        [
             'id'    => 'communication',
             'file'  => 'communication-update.sql',
             'title' => 'اعلان همگانی، تیکت پشتیبانی و صفحه‌های متنی (فاز ۷)',

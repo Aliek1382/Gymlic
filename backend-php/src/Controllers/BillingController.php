@@ -32,7 +32,7 @@ final class BillingController
             'discounts_enabled' => Discounts::ready(),
             // What the payment dialog asks for besides the amount; absent
             // until the receipts database update has run.
-            'receipts' => (Receipts::ready() || Receipts::claimsReady() || TrainerBilling::ready()) ? [
+            'receipts' => (Receipts::ready() || Receipts::claimsReady() || TrainerBilling::ready() || Database::hasTable('membership_payment_requests')) ? [
                 'required'       => $billing['receipt_required'],
                 'max_mb'         => $billing['receipt_max_mb'],
                 'retention_days' => $billing['receipt_retention_days'],

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Paperclip, Wallet } from "lucide-react";
+import { Loader2, Paperclip, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,11 +19,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PaymentInfoCard } from "@/features/finance/components/payment-info-card";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
-import { getBillingInfo, prepareReceipt } from "@/features/finance/services/finance-service";
+import { getBillingInfo, prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { formatPersianDate, toAsciiDigits } from "@/lib/persian";
+import { formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
 import { useSubmitInvoiceClaim } from "../hooks/use-invoice-claims";
 import { useMyInvoices } from "../hooks/use-my-invoices";
+import { checkInvoiceDiscount } from "../services/invoice-service";
 
 /**
  * Athlete side of a pending invoice: where to send the card-to-card payment
@@ -70,6 +71,12 @@ export function PayInvoiceCard({ invoiceId }: { invoiceId: string }) {
             {formatPersianDate(new Date(claim.createdAt.replace(" ", "T")))} ثبت شد. بعد از تأیید مربی،
             محتوا برای شما باز می‌شود.
           </p>
+          {claim.discountToman > 0 && claim.listPriceToman != null && (
+            <p className="text-xs text-muted-foreground">
+              با کد تخفیف <span dir="ltr" className="font-mono">{claim.discountCode}</span>:{" "}
+              {formatToman(claim.listPriceToman - claim.discountToman)} تومان
+            </p>
+          )}
           {claim.hasReceipt && (
             <ReceiptViewer requestId={claim.id} kind="invoice-claim" isPdf={claim.receiptIsPdf} />
           )}
@@ -92,17 +99,30 @@ export function PayInvoiceCard({ invoiceId }: { invoiceId: string }) {
         </Button>
       )}
 
-      {claimsEnabled && <ClaimDialog invoiceId={invoiceId} open={open} onOpenChange={setOpen} />}
+      {claimsEnabled && (
+        <ClaimDialog
+          invoiceId={invoiceId}
+          amount={invoice.amountToman}
+          discountsEnabled={mine.data?.discountsEnabled === true}
+          open={open}
+          onOpenChange={setOpen}
+        />
+      )}
     </div>
   );
 }
 
 function ClaimDialog({
   invoiceId,
+  amount,
+  discountsEnabled,
   open,
   onOpenChange,
 }: {
   invoiceId: string;
+  /** The invoice amount, before any discount code. */
+  amount: number;
+  discountsEnabled: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -113,6 +133,24 @@ function ClaimDialog({
   const [note, setNote] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [discountText, setDiscountText] = useState("");
+  const [quote, setQuote] = useState<DiscountQuote | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  async function applyCode() {
+    if (!discountText.trim()) return;
+    setChecking(true);
+    try {
+      setQuote(await checkInvoiceDiscount(invoiceId, discountText.trim()));
+      setError(null);
+      toast.success("کد تخفیف اعمال شد.");
+    } catch (e) {
+      setQuote(null);
+      toast.error(getErrorMessage(e, "بررسی کد تخفیف ناموفق بود."));
+    } finally {
+      setChecking(false);
+    }
+  }
 
   const { data: billing } = useQuery({
     queryKey: ["finance", "billing-info"],
@@ -150,6 +188,7 @@ function ClaimDialog({
         cardLast4: last4,
         paidAt: paidAt || undefined,
         note: note.trim() || undefined,
+        discountCode: quote?.code,
         receipt: prepared,
       });
       toast.success("پرداخت شما ثبت شد و در انتظار تأیید مربی است.");
@@ -158,6 +197,8 @@ function ClaimDialog({
       setPaidAt("");
       setNote("");
       setReceipt(null);
+      setDiscountText("");
+      setQuote(null);
       onOpenChange(false);
     } catch (e) {
       setError(getErrorMessage(e, "ثبت پرداخت با خطا مواجه شد."));
@@ -170,11 +211,71 @@ function ClaimDialog({
         <DialogHeader>
           <DialogTitle>ثبت پرداخت کارت‌به‌کارت</DialogTitle>
           <DialogDescription>
-            بعد از واریز به کارت مربی، اطلاعات پرداخت را اینجا ثبت کنید. محتوا بعد از تأیید مربی باز می‌شود.
+            {quote
+              ? `مبلغ ${formatToman(quote.final_toman)} تومان را به کارت مربی واریز کنید`
+              : "بعد از واریز به کارت مربی"}
+            ، اطلاعات پرداخت را اینجا ثبت کنید. محتوا بعد از تأیید مربی باز می‌شود.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {discountsEnabled && (
+            <div className="space-y-2">
+              <Label htmlFor="claim-discount">
+                کد تخفیف مربی <span className="text-muted-foreground">(اگر دارید)</span>
+              </Label>
+              {quote ? (
+                <div className="space-y-1 rounded-xl border border-success/30 bg-success-muted px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      کد <span dir="ltr" className="font-mono font-medium">{quote.code}</span> اعمال شد
+                    </span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setQuote(null)}
+                      aria-label="حذف کد تخفیف"
+                    >
+                      <X />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="line-through">{formatToman(amount)}</span> ←{" "}
+                    <span className="font-medium text-foreground">{formatToman(quote.final_toman)} تومان</span>{" "}
+                    ({formatToman(quote.discount_toman)} تومان تخفیف)
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    id="claim-discount"
+                    dir="ltr"
+                    value={discountText}
+                    maxLength={40}
+                    className="font-mono uppercase"
+                    onChange={(e) => setDiscountText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void applyCode();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={applyCode}
+                    disabled={checking || !discountText.trim()}
+                  >
+                    {checking && <Loader2 className="animate-spin" />}
+                    اعمال
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="claim-tracking">کد پیگیری واریز</Label>

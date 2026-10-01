@@ -23,6 +23,10 @@ export interface InvoiceClaim {
   receiptPurged: boolean;
   /** Another claim to the same trainer used this tracking code (trainer's view). */
   duplicateTracking: boolean;
+  /** The trainer's discount code the athlete paid with, and what it took off. */
+  discountCode: string | null;
+  listPriceToman: number | null;
+  discountToman: number;
 }
 
 /** The trainer's receiving account, as the athlete sees it on a pending invoice. */
