@@ -22,6 +22,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { cn } from "@/lib/utils";
+import { SupplementPlansPanel } from "@/features/supplements";
+import { useFeatureEnabled } from "@/features/site-settings";
 import { NutritionFormatHint } from "./nutrition-format-hint";
 import { PlanFormatHint } from "./plan-format-hint";
 import { PLAN_DESCRIPTION_PLACEHOLDER } from "../constants/athletes";
@@ -80,6 +82,7 @@ export function PlanDialog({
   const applyTemplate = useApplyTemplate(kind, target);
   const deleteTemplate = useDeleteTemplate(kind);
   const { title: kindTitle, icon: Icon } = KIND_LABEL[kind];
+  const supplementsEnabled = useFeatureEnabled("supplements");
 
   // The most recently assigned active plan — highlighted as what the
   // athlete should currently be following. Shifts automatically once a
@@ -428,6 +431,14 @@ export function PlanDialog({
             ذخیره به‌عنوان قالب
           </Button>
         </form>
+
+        {/* Outside the form: its buttons would otherwise submit the plan. */}
+        {kind === "nutrition" && athleteId && supplementsEnabled && (
+          <div className="space-y-2 border-t border-border pt-4">
+            <p className="text-sm font-medium text-foreground">مکمل‌ها</p>
+            <SupplementPlansPanel athleteId={athleteId} embedded />
+          </div>
+        )}
 
         <div className="space-y-2 border-t border-border pt-4">
           <p className="text-sm font-medium text-foreground">

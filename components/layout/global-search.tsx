@@ -8,7 +8,7 @@ import { Search } from "lucide-react";
 import type { AccountType } from "@/types/database.types";
 import { featureForPath, useFeatureCheck } from "@/features/site-settings";
 import { SearchResultGroup, type SearchResultItem } from "./search-result-group";
-import { SIDEBAR_NAV } from "./sidebar-nav";
+import { SIDEBAR_NAV, flattenNav } from "./sidebar-nav";
 
 const TrainerSearchResults = dynamic(() => import("./trainer-search-results"), {
   ssr: false,
@@ -45,7 +45,7 @@ export function GlobalSearch({ accountType }: { accountType: AccountType }) {
   const isEnabled = useFeatureCheck();
 
   const pageResults: SearchResultItem[] = useMemo(() => {
-    const items = SIDEBAR_NAV[accountType].filter((item) =>
+    const items = flattenNav(SIDEBAR_NAV[accountType]).filter((item) =>
       isEnabled(featureForPath(item.href))
     );
     const matches = trimmedQuery

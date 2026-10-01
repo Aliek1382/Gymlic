@@ -9,7 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatAge, formatPersianDate } from "@/lib/persian";
 import { NoteList } from "@/features/notes";
 import { SessionPackagesPanel } from "@/features/session-packages";
-import { SupplementPlansPanel } from "@/features/supplements";
 import { ProgressPageContent } from "@/features/progress/components/progress-page-content";
 import { useFeatureCheck } from "@/features/site-settings";
 import { useAthleteProfile } from "../hooks/use-athlete-profile";
@@ -103,8 +102,6 @@ export function AthleteProfileContent({ athleteId }: { athleteId: string }) {
       {isEnabled("nutrition") && (
         <AthleteNutritionGoal athleteId={athleteId} athlete={athlete} />
       )}
-
-      {isEnabled("supplements") && <SupplementPlansPanel athleteId={athleteId} />}
 
       {isEnabled("session_packages") && <SessionPackagesPanel athleteId={athleteId} />}
 

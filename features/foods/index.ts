@@ -13,3 +13,4 @@ export * from "./services/food-service";
 export * from "./types/food-types";
 export * from "./utils/food-macros";
 export * from "./constants/foods";
+export * from "./components/nutrition-library-page";
