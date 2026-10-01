@@ -8,6 +8,7 @@ use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Subscriptions;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use Throwable;
@@ -87,6 +88,7 @@ final class ClubController
             return;
         }
 
+        $club['subscription_status'] = Subscriptions::status($club['subscription_expires_at']);
         Response::ok(Cast::row($club, [], ['member_capacity']));
     }
 

@@ -67,9 +67,12 @@ export function FinancePage() {
           planName: club.subscription_plan_name ?? "",
           status: club.subscription_status as SubscriptionStatus,
           expiresAt: club.subscription_expires_at,
-          remainingDays: Math.ceil(
-            (new Date(club.subscription_expires_at).getTime() - Date.now()) /
-              (1000 * 60 * 60 * 24)
+          remainingDays: Math.max(
+            0,
+            Math.ceil(
+              (new Date(club.subscription_expires_at).getTime() - Date.now()) /
+                (1000 * 60 * 60 * 24)
+            )
           ),
         }
       : null;
@@ -139,9 +142,18 @@ export function FinancePage() {
                       <TableRow key={request.id}>
                         <TableCell className="text-foreground">
                           {request.plan_name}
+                          {request.recorded_by_admin && (
+                            <p className="text-xs text-muted-foreground">ثبت توسط مدیریت</p>
+                          )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatToman(request.amount_toman)} تومان
+                          {!!request.discount_toman && request.discount_toman > 0 && (
+                            <p className="text-xs">
+                              با کد <span dir="ltr" className="font-mono">{request.discount_code}</span>،{" "}
+                              {formatToman(request.discount_toman)} تومان تخفیف
+                            </p>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>

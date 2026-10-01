@@ -16,7 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
-import { listPaymentRequests } from "../services/admin-service";
+import { listPaymentRequests, type AdminPaymentRequestRow } from "../services/admin-service";
+import { ExportButton } from "./export-button";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { PaymentRequestActions } from "@/features/admin/components/payment-request-actions";
 import type { PaymentRequestStatus } from "@/types/database.types";
@@ -33,16 +34,21 @@ const STATUS_VARIANT: Record<PaymentRequestStatus, "warning" | "success" | "dest
   rejected: "destructive",
 };
 
-interface RequestRow {
-  id: string;
-  amount_toman: number;
-  reference_note: string | null;
-  status: PaymentRequestStatus;
-  admin_note: string | null;
-  created_at: string;
-  club_name: string;
-  plan_name: string;
-}
+type RequestRow = Pick<
+  AdminPaymentRequestRow,
+  | "id"
+  | "amount_toman"
+  | "reference_note"
+  | "status"
+  | "admin_note"
+  | "created_at"
+  | "club_name"
+  | "plan_name"
+  | "recorded_by_admin"
+  | "list_price_toman"
+  | "discount_toman"
+  | "discount_code"
+>;
 
 function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions: boolean }) {
   if (rows.length === 0) {
@@ -81,9 +87,23 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
             </TableCell>
             <TableCell className="text-muted-foreground">
               {formatToman(request.amount_toman)} تومان
+              {!!request.discount_toman && request.discount_toman > 0 && (
+                <p className="text-xs">
+                  {request.list_price_toman != null && (
+                    <span className="line-through">{formatToman(request.list_price_toman)}</span>
+                  )}{" "}
+                  کد <span dir="ltr" className="font-mono">{request.discount_code ?? "—"}</span>
+                  {" · "}
+                  {formatToman(request.discount_toman)} تخفیف
+                </p>
+              )}
             </TableCell>
             <TableCell className="max-w-48 truncate text-muted-foreground">
-              {request.reference_note ?? "—"}
+              {request.recorded_by_admin ? (
+                <Badge variant="secondary">ثبت دستی مدیر</Badge>
+              ) : (
+                (request.reference_note ?? "—")
+              )}
             </TableCell>
             <TableCell className="text-muted-foreground">
               {formatPersianDate(new Date(request.created_at))}
@@ -125,11 +145,14 @@ export function AdminPaymentsPage() {
   return (
 
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">درخواست‌های پرداخت</h1>
-        <p className="text-sm text-muted-foreground">
-          بررسی و تایید واریزی‌هایی که باشگاه‌ها برای فعال‌سازی اشتراک ثبت کرده‌اند.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">درخواست‌های پرداخت</h1>
+          <p className="text-sm text-muted-foreground">
+            بررسی و تایید واریزی‌هایی که باشگاه‌ها برای فعال‌سازی اشتراک ثبت کرده‌اند.
+          </p>
+        </div>
+        <ExportButton kind="payments" />
       </div>
 
       <Card className="gap-4 py-5">

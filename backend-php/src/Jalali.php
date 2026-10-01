@@ -39,6 +39,22 @@ final class Jalali
         return [$jy, 7 + intdiv($k, 30), $k % 30 + 1];
     }
 
+    /**
+     * "1405/07/09" (or with Persian digits) for a stored DATETIME/DATE,
+     * '' for null. Only the calendar day is converted; the time is dropped.
+     */
+    public static function format(?string $datetime, bool $persianDigits = false): string
+    {
+        if ($datetime === null || $datetime === '' || !preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $datetime, $m)) {
+            return '';
+        }
+        [$jy, $jm, $jd] = self::fromGregorian((int) $m[1], (int) $m[2], (int) $m[3]);
+        $text = sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
+        return $persianDigits
+            ? strtr($text, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹'])
+            : $text;
+    }
+
     public static function isLeapYear(int $jy): bool
     {
         return self::cal($jy)['leap'] === 0;

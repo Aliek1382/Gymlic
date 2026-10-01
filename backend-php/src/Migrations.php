@@ -119,6 +119,17 @@ final class Migrations
                 ['table', 'login_challenges'],
             ],
         ],
+        [
+            'id'    => 'finance',
+            'file'  => 'finance-update.sql',
+            'title' => 'کد تخفیف اشتراک (فاز ۶)',
+            'check' => [
+                ['table', 'discount_codes'],
+                ['column', 'payment_requests', 'discount_code_id'],
+                ['column', 'payment_requests', 'list_price_toman'],
+                ['column', 'payment_requests', 'discount_toman'],
+            ],
+        ],
     ];
 
     /**

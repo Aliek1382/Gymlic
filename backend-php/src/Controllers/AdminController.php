@@ -8,9 +8,12 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Discounts;
+use Gymlic\Jalali;
 use Gymlic\Response;
 use Gymlic\Security;
 use Gymlic\SmsGateway;
+use Gymlic\Subscriptions;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use PDO;
@@ -37,25 +40,63 @@ final class AdminController
             return;
         }
 
-        $plan = $pdo->prepare('SELECT id FROM plans WHERE id = :id AND is_active = 1');
+        $plan = $pdo->prepare('SELECT id, name, price_toman FROM plans WHERE id = :id AND is_active = 1');
         $plan->execute(['id' => $data['plan_id']]);
-        if ($plan->fetch() === false) {
+        $planRow = $plan->fetch();
+        if ($planRow === false) {
             Response::error(404, 'plan_not_found', 'That plan is not available.');
             return;
         }
 
+        $amount = (int) $data['amount_toman'];
+        if ($amount < 0) {
+            Response::error(400, 'invalid_amount', 'مبلغ نمی‌تواند منفی باشد.');
+            return;
+        }
+
+        $code = Discounts::normalizeCode($data['discount_code'] ?? '');
+        if ($code !== '' && !Discounts::ready()) {
+            Response::error(409, 'discounts_unavailable', 'کد تخفیف فعلاً پذیرفته نمی‌شود.');
+            return;
+        }
+
         $id = Uuid::v4();
-        $pdo->prepare(
-            'INSERT INTO payment_requests (id, club_id, plan_id, submitted_by, amount_toman, reference_note)
-             VALUES (:id, :club_id, :plan_id, :submitted_by, :amount_toman, :reference_note)'
-        )->execute([
+        $row = [
             'id'             => $id,
             'club_id'        => $clubRow['id'],
             'plan_id'        => (string) $data['plan_id'],
             'submitted_by'   => $user['id'],
-            'amount_toman'   => (int) $data['amount_toman'],
+            'amount_toman'   => $amount,
             'reference_note' => Validate::nullableString($data['reference_note'] ?? null),
-        ]);
+        ];
+
+        $pdo->beginTransaction();
+        try {
+            if ($code !== '') {
+                // Checked again here, with the code locked, whatever the
+                // dialog showed: it may have run out since.
+                $result = Discounts::evaluate($pdo, $code, $planRow, $clubRow['id'], true);
+                if (!$result['ok']) {
+                    $pdo->rollBack();
+                    Response::error(409, $result['error'], $result['message']);
+                    return;
+                }
+                $row += [
+                    'discount_code_id' => $result['code']['id'],
+                    'list_price_toman' => $result['list_price'],
+                    'discount_toman'   => $result['discount'],
+                ];
+            }
+
+            $pdo->prepare(
+                'INSERT INTO payment_requests (' . implode(', ', array_keys($row)) . ')
+                 VALUES (:' . implode(', :', array_keys($row)) . ')'
+            )->execute($row);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
 
         Response::ok(['id' => $id], 201);
     }
@@ -82,13 +123,17 @@ final class AdminController
         // A finance role reviews every club's requests, like a super admin.
         $isAdmin = AdminAccess::can($user, 'finance');
 
+        $discounts = Discounts::ready();
         $sql =
             'SELECT pr.id, pr.club_id, pr.plan_id, pr.amount_toman, pr.reference_note, pr.status,
                     pr.admin_note, pr.reviewed_at, pr.created_at,
-                    c.name AS club_name, p.name AS plan_name
+                    c.name AS club_name, p.name AS plan_name,
+                    (pr.submitted_by <> c.owner_id) AS recorded_by_admin'
+            . ($discounts ? ', pr.list_price_toman, pr.discount_toman, d.code AS discount_code' : '') . '
              FROM payment_requests pr
              JOIN clubs c ON c.id = pr.club_id
-             JOIN plans p ON p.id = pr.plan_id';
+             JOIN plans p ON p.id = pr.plan_id'
+            . ($discounts ? ' LEFT JOIN discount_codes d ON d.id = pr.discount_code_id' : '');
         $bind = [];
 
         if (!$isAdmin) {
@@ -100,7 +145,14 @@ final class AdminController
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($bind);
 
-        Response::ok(['items' => Cast::rows($stmt->fetchAll(), [], ['amount_toman'])]);
+        Response::ok([
+            'items' => Cast::rows(
+                $stmt->fetchAll(),
+                [],
+                ['amount_toman', 'list_price_toman', 'discount_toman'],
+                ['recorded_by_admin']
+            ),
+        ]);
     }
 
     // ---- Platform admin --------------------------------------------------
@@ -133,39 +185,9 @@ final class AdminController
                 throw new \RuntimeException('request_not_pending');
             }
 
-            $existing = $pdo->prepare(
-                'SELECT id, expires_at FROM subscriptions WHERE club_id = :club_id ORDER BY expires_at DESC LIMIT 1'
-            );
-            $existing->execute(['club_id' => $request['club_id']]);
-            $subscription = $existing->fetch();
-
-            // Extend from the current expiry when it is still in the future,
-            // so approving early doesn't cost the club the remaining days.
-            $base = ($subscription !== false && $subscription['expires_at'] > date('Y-m-d H:i:s'))
-                ? strtotime($subscription['expires_at'])
-                : time();
-            $expiresAt = date('Y-m-d H:i:s', strtotime('+' . (int) $request['duration_days'] . ' days', $base));
-
-            if ($subscription !== false) {
-                $pdo->prepare(
-                    "UPDATE subscriptions SET plan_name = :plan_name, status = 'active', expires_at = :expires_at
-                     WHERE id = :id"
-                )->execute([
-                    'plan_name'  => $request['plan_name'],
-                    'expires_at' => $expiresAt,
-                    'id'         => $subscription['id'],
-                ]);
-            } else {
-                $pdo->prepare(
-                    "INSERT INTO subscriptions (id, club_id, plan_name, status, expires_at)
-                     VALUES (:id, :club_id, :plan_name, 'active', :expires_at)"
-                )->execute([
-                    'id'         => Uuid::v4(),
-                    'club_id'    => $request['club_id'],
-                    'plan_name'  => $request['plan_name'],
-                    'expires_at' => $expiresAt,
-                ]);
-            }
+            // Counted from the current expiry while it is still running, so
+            // approving early doesn't cost the club its remaining days.
+            $expiresAt = Subscriptions::extend($pdo, $request['club_id'], (int) $request['duration_days'], $request['plan_name']);
 
             $pdo->prepare("UPDATE clubs SET member_capacity = :cap, status = 'active' WHERE id = :id")
                 ->execute(['cap' => $request['max_members'], 'id' => $request['club_id']]);
@@ -191,7 +213,7 @@ final class AdminController
                 $admin['id'],
                 'broadcast',
                 'پرداخت تأیید شد',
-                'اشتراک باشگاه شما تا ' . substr($expiresAt, 0, 10) . ' فعال شد.',
+                'اشتراک باشگاه شما تا ' . Jalali::format($expiresAt, true) . ' فعال شد.',
                 '/finance'
             );
 
@@ -466,12 +488,16 @@ final class AdminController
                (SELECT COUNT(*) FROM profiles WHERE account_type = 'trainer') AS trainers_count,
                (SELECT COUNT(*) FROM profiles WHERE account_type = 'athlete') AS athletes_count,
                (SELECT COUNT(*) FROM payment_requests WHERE status = 'pending') AS pending_requests_count,
-               (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') AS active_subs,
-               (SELECT COUNT(*) FROM subscriptions WHERE status = 'expiring') AS expiring_subs,
-               (SELECT COUNT(*) FROM subscriptions WHERE status = 'expired') AS expired_subs,
                (SELECT COALESCE(SUM(amount_toman), 0) FROM payment_requests
                  WHERE status = 'approved') AS total_revenue"
         )->fetch();
+
+        // Counted from the expiry dates: the stored status column is never
+        // moved on as time passes (see Subscriptions).
+        $counts += ['active_subs' => 0, 'expiring_subs' => 0, 'expired_subs' => 0];
+        foreach ($pdo->query('SELECT expires_at FROM subscriptions')->fetchAll(PDO::FETCH_COLUMN) as $expiresAt) {
+            $counts[Subscriptions::status((string) $expiresAt) . '_subs']++;
+        }
 
         // Money is the finance permission's: a role without it gets the counts only.
         if (!AdminAccess::can($admin, 'finance')) {
@@ -484,7 +510,17 @@ final class AdminController
     public static function listClubs(): void
     {
         Auth::requireAdmin('users.view');
+        Response::ok(['items' => self::clubRows()]);
+    }
 
+    /**
+     * Every club with its owner, member count and subscription — the clubs
+     * page, the subscriptions page and their CSV exports.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function clubRows(): array
+    {
         $stmt = Database::connection()->query(
             "SELECT c.id, c.name, c.status, c.member_capacity, c.created_at,
                     c.owner_id, p.first_name AS owner_first_name, p.last_name AS owner_last_name,
@@ -499,7 +535,7 @@ final class AdminController
              ORDER BY c.created_at DESC"
         );
 
-        Response::ok(['items' => Cast::rows($stmt->fetchAll(), [], ['member_capacity', 'member_count'])]);
+        return self::withSubscription(Cast::rows($stmt->fetchAll(), [], ['member_capacity', 'member_count']));
     }
 
     /** One club's whole file: the club, its active members, and its payment history. */
@@ -538,18 +574,22 @@ final class AdminController
 
         $requests = $pdo->prepare(
             'SELECT pr.id, pr.amount_toman, pr.reference_note, pr.status, pr.admin_note,
-                    pr.created_at, pr.reviewed_at, p.name AS plan_name
+                    pr.created_at, pr.reviewed_at, p.name AS plan_name,
+                    (pr.submitted_by <> c.owner_id) AS recorded_by_admin'
+            . (Discounts::ready() ? ', pr.discount_toman, d.code AS discount_code' : '') . '
              FROM payment_requests pr
              JOIN plans p ON p.id = pr.plan_id
+             JOIN clubs c ON c.id = pr.club_id'
+            . (Discounts::ready() ? ' LEFT JOIN discount_codes d ON d.id = pr.discount_code_id' : '') . '
              WHERE pr.club_id = :club_id
              ORDER BY pr.created_at DESC'
         );
         $requests->execute(['club_id' => $params['id']]);
 
         Response::ok([
-            'club'             => Cast::row($club, [], ['member_capacity']),
+            'club'             => self::withSubscription([Cast::row($club, [], ['member_capacity'])])[0],
             'members'          => $members->fetchAll(),
-            'payment_requests' => Cast::rows($requests->fetchAll(), [], ['amount_toman']),
+            'payment_requests' => Cast::rows($requests->fetchAll(), [], ['amount_toman', 'discount_toman'], ['recorded_by_admin']),
         ]);
     }
 
@@ -667,6 +707,23 @@ final class AdminController
         );
 
         Response::ok(['items' => Cast::json($stmt->fetchAll())]);
+    }
+
+    /**
+     * subscription_status from the expiry date (see Subscriptions), plus the
+     * days left, on club rows that carry subscription_expires_at.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withSubscription(array $rows): array
+    {
+        foreach ($rows as &$row) {
+            $row['subscription_status'] = Subscriptions::status($row['subscription_expires_at'] ?? null);
+            $row['subscription_remaining_days'] = Subscriptions::remainingDays($row['subscription_expires_at'] ?? null);
+        }
+        unset($row);
+        return $rows;
     }
 
     public static function logActivity(

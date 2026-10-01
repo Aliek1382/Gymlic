@@ -10,21 +10,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useState } from "react";
+import { Settings2 } from "lucide-react";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getAdminClubDetail } from "../services/admin-service";
+import { Button } from "@/components/ui/button";
+import { getAdminClubDetail, listCatalogPlans } from "../services/admin-service";
+import { useAdminCan } from "../hooks/use-admin-access";
 import { useSearchParams } from "next/navigation";
-
+import { SubscriptionDialog } from "./subscription-dialog";
+import { SubscriptionStatusBadge } from "./subscription-status-badge";
 
 import { NotFoundNotice } from "@/components/not-found-notice";
 import { RouteLoading } from "@/components/layout/route-loading";
 import { ClubStatusToggle } from "./club-status-toggle";
-import type {
-  ClubStatus,
-  PaymentRequestStatus,
-  SubscriptionStatus,
-} from "@/types/database.types";
+import type { ClubStatus, PaymentRequestStatus } from "@/types/database.types";
 
 const CLUB_STATUS_LABEL: Record<ClubStatus, string> = {
   active: "فعال",
@@ -43,18 +44,6 @@ const ROLE_LABEL: Record<string, string> = {
   trainer: "مربی",
   reception: "پذیرش",
   athlete: "ورزشکار",
-};
-
-const SUB_STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  active: "فعال",
-  expiring: "در حال انقضا",
-  expired: "منقضی",
-};
-
-const SUB_STATUS_VARIANT: Record<SubscriptionStatus, "success" | "warning" | "destructive"> = {
-  active: "success",
-  expiring: "warning",
-  expired: "destructive",
 };
 
 const REQUEST_STATUS_LABEL: Record<PaymentRequestStatus, string> = {
@@ -78,6 +67,15 @@ export function AdminClubDetailPage() {
     queryKey: ["admin", "club", id],
     enabled: id.length > 0,
     queryFn: () => getAdminClubDetail(id),
+  });
+  const can = useAdminCan();
+  const canManageSubscription = can("finance");
+  const queryClient = useQueryClient();
+  const [managing, setManaging] = useState(false);
+  const { data: plans } = useQuery({
+    queryKey: ["admin", "plans"],
+    queryFn: listCatalogPlans,
+    enabled: canManageSubscription,
   });
 
   if (isPending) return <RouteLoading />;
@@ -127,25 +125,28 @@ export function AdminClubDetailPage() {
         </Card>
         <Card className="gap-2 py-5">
           <div className="px-6">
-            <p className="text-sm text-muted-foreground">اشتراک فعلی</p>
-            {club.subscription_status ? (
-              <div className="mt-2 space-y-1">
-                <Badge
-                  variant={SUB_STATUS_VARIANT[club.subscription_status as SubscriptionStatus]}
-                >
-                  {SUB_STATUS_LABEL[club.subscription_status as SubscriptionStatus]}
-                </Badge>
-                <p className="text-sm text-foreground">{club.plan_name}</p>
-                <p className="text-xs text-muted-foreground">
-                  انقضا:{" "}
-                  {formatPersianDate(new Date(club.subscription_expires_at as string))}
-                </p>
-              </div>
-            ) : (
-              <Badge className="mt-2" variant="secondary">
-                بدون اشتراک
-              </Badge>
-            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground">اشتراک فعلی</p>
+              {canManageSubscription && (
+                <Button size="sm" variant="outline" onClick={() => setManaging(true)}>
+                  <Settings2 />
+                  مدیریت
+                </Button>
+              )}
+            </div>
+            <div className="mt-2 space-y-1">
+              <SubscriptionStatusBadge status={club.subscription_status} />
+              {club.subscription_expires_at && (
+                <>
+                  <p className="text-sm text-foreground">{club.plan_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    انقضا: {formatPersianDate(new Date(club.subscription_expires_at))}
+                    {club.subscription_remaining_days != null && club.subscription_remaining_days > 0 &&
+                      ` (${formatNumber(club.subscription_remaining_days)} روز مانده)`}
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         </Card>
         <Card className="gap-2 py-5">
@@ -242,9 +243,18 @@ export function AdminClubDetailPage() {
                 <TableRow key={request.id}>
                   <TableCell className="text-foreground">
                     {request.plan_name}
+                    {request.recorded_by_admin && (
+                      <p className="text-xs text-muted-foreground">ثبت دستی مدیر</p>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatToman(request.amount_toman)} تومان
+                    {!!request.discount_toman && request.discount_toman > 0 && (
+                      <p className="text-xs">
+                        کد <span dir="ltr" className="font-mono">{request.discount_code ?? "—"}</span> ·{" "}
+                        {formatToman(request.discount_toman)} تخفیف
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={REQUEST_STATUS_VARIANT[request.status as PaymentRequestStatus]}>
@@ -260,6 +270,15 @@ export function AdminClubDetailPage() {
           </Table>
         )}
       </Card>
+
+      {canManageSubscription && (
+        <SubscriptionDialog
+          club={managing ? club : null}
+          plans={plans ?? []}
+          onClose={() => setManaging(false)}
+          onSaved={() => void queryClient.invalidateQueries({ queryKey: ["admin"] })}
+        />
+      )}
     </div>
   );
 }

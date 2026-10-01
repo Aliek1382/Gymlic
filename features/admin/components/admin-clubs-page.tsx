@@ -19,7 +19,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listAdminClubs } from "../services/admin-service";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
-import type { ClubStatus, SubscriptionStatus } from "@/types/database.types";
+import type { ClubStatus } from "@/types/database.types";
+import { SubscriptionStatusBadge } from "./subscription-status-badge";
 
 const CLUB_STATUS_LABEL: Record<ClubStatus, string> = {
   active: "فعال",
@@ -31,18 +32,6 @@ const CLUB_STATUS_VARIANT: Record<ClubStatus, "success" | "destructive" | "warni
   active: "success",
   suspended: "destructive",
   pending: "warning",
-};
-
-const SUB_STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  active: "فعال",
-  expiring: "در حال انقضا",
-  expired: "منقضی",
-};
-
-const SUB_STATUS_VARIANT: Record<SubscriptionStatus, "success" | "warning" | "destructive"> = {
-  active: "success",
-  expiring: "warning",
-  expired: "destructive",
 };
 
 export function AdminClubsPage() {
@@ -142,17 +131,7 @@ export function AdminClubsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {club.subscription_status ? (
-                        <Badge
-                          variant={
-                            SUB_STATUS_VARIANT[club.subscription_status as SubscriptionStatus]
-                          }
-                        >
-                          {SUB_STATUS_LABEL[club.subscription_status as SubscriptionStatus]}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">بدون اشتراک</Badge>
-                      )}
+                      <SubscriptionStatusBadge status={club.subscription_status} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatPersianDate(new Date(club.created_at))}

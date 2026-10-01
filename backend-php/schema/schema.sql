@@ -191,6 +191,9 @@ CREATE TABLE payment_requests (
   submitted_by   CHAR(36) NOT NULL,
   amount_toman   BIGINT NOT NULL,
   reference_note TEXT NULL,
+  discount_code_id CHAR(36) NULL,  -- discount_codes; FK added at the end of this file
+  list_price_toman BIGINT NULL,    -- the plan's price when a discount code was used
+  discount_toman   BIGINT NOT NULL DEFAULT 0,
   status         ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
   admin_note     TEXT NULL,
   reviewed_by    CHAR(36) NULL,
@@ -1018,3 +1021,29 @@ CREATE TABLE login_challenges (
   KEY idx_login_challenges_user (user_id),
   CONSTRAINT fk_login_challenges_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- discount_codes (phase 6): codes a club enters when paying for a plan
+-- =========================================================================
+CREATE TABLE discount_codes (
+  id            CHAR(36) NOT NULL PRIMARY KEY,
+  code          VARCHAR(40) NOT NULL,             -- stored upper-case; matched case-insensitively
+  kind          ENUM('percent','amount') NOT NULL,
+  value         BIGINT NOT NULL,                  -- 1..100 for percent, toman for amount
+  plan_id       CHAR(36) NULL,                    -- NULL = any plan
+  max_uses      INT NULL,                         -- NULL = unlimited; pending + approved requests count
+  once_per_club TINYINT(1) NOT NULL DEFAULT 0,
+  expires_at    DATETIME NULL,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  note          VARCHAR(255) NULL,
+  created_by    CHAR(36) NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_discount_codes_code (code),
+  CONSTRAINT fk_discount_codes_plan FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+  CONSTRAINT fk_discount_codes_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT chk_discount_codes_value CHECK (value > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE payment_requests
+  ADD CONSTRAINT fk_payreq_discount FOREIGN KEY (discount_code_id) REFERENCES discount_codes(id) ON DELETE SET NULL;

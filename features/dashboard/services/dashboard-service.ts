@@ -43,7 +43,8 @@ interface ClubDashboardResponse {
   };
   revenue_series: { month: string; total: number }[];
   plan_distribution: { plan_name: string; member_count: number }[];
-  subscription: { plan_name: string; status: string; expires_at: string } | null;
+  /** status is worked out from expires_at by the API, with the admin's "running out" window. */
+  subscription: { plan_name: string; status: SubscriptionInfo["status"] | null; expires_at: string } | null;
   recent_members: {
     id: string;
     user_id: string;
@@ -178,12 +179,15 @@ function toSubscription(data: ClubDashboardResponse): SubscriptionInfo | null {
       (1000 * 60 * 60 * 24)
   );
 
+  // The API's status follows the window the admin set; the local fallback
+  // only covers a backend from before it did.
   const status =
-    remainingDays < 0
+    data.subscription.status ??
+    (remainingDays < 0
       ? "expired"
       : remainingDays <= SUBSCRIPTION_WARNING_DAYS
         ? "expiring"
-        : "active";
+        : "active");
 
   return {
     planName: data.subscription.plan_name,

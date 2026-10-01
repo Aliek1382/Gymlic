@@ -1,5 +1,5 @@
 import { api, query, type ListResponse } from "@/lib/api/client";
-import type { ClubStatus } from "@/types/database.types";
+import type { ClubStatus, SubscriptionStatus } from "@/types/database.types";
 
 export async function setClubStatus(clubId: string, status: ClubStatus) {
   await api.post(`/admin/clubs/${clubId}/status`, { status });
@@ -101,9 +101,11 @@ export interface AdminClubRow {
   owner_phone: string | null;
   owner_email: string | null;
   plan_name: string | null;
-  subscription_status: string | null;
+  /** Worked out from the expiry date by the API; null = no subscription. */
+  subscription_status: SubscriptionStatus | null;
   subscription_started_at: string | null;
   subscription_expires_at: string | null;
+  subscription_remaining_days: number | null;
   member_count: number;
 }
 
@@ -130,6 +132,9 @@ export interface AdminClubDetail {
     created_at: string;
     reviewed_at: string | null;
     plan_name: string;
+    recorded_by_admin: boolean;
+    discount_toman?: number;
+    discount_code?: string | null;
   }[];
 }
 
@@ -201,6 +206,12 @@ export interface AdminPaymentRequestRow {
   created_at: string;
   club_name: string;
   plan_name: string;
+  /** Recorded by an admin from the subscriptions page, not filed by the club. */
+  recorded_by_admin: boolean;
+  /** Present once the phase 6 database update has run. */
+  list_price_toman?: number | null;
+  discount_toman?: number;
+  discount_code?: string | null;
 }
 
 export async function listPaymentRequests(): Promise<AdminPaymentRequestRow[]> {
