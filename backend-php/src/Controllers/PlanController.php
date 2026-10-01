@@ -11,6 +11,7 @@ use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use Gymlic\Templates;
+use Gymlic\ContentLibrary;
 
 /**
  * Workout and nutrition assignments share a shape, so one controller serves
@@ -262,7 +263,7 @@ final class PlanController
 
         $stmt = Database::connection()->prepare(
             "SELECT id, title, description, assigned_at, " . self::builderModeColumn($params['kind']) . " FROM {$table}
-             WHERE trainer_id = :trainer_id AND is_template = 1
+             WHERE trainer_id = :trainer_id AND is_template = 1" . ContentLibrary::ownOnly() . "
              ORDER BY assigned_at DESC"
         );
         $stmt->execute(['trainer_id' => $user['id']]);
@@ -323,7 +324,8 @@ final class PlanController
         $data = Validate::body();
 
         $template = self::planOr404($kind, $params['id']);
-        if ((int) $template['is_template'] !== 1 || $template['trainer_id'] !== $user['id']) {
+        // Public templates are copied from the content library first, never applied directly.
+        if ((int) $template['is_template'] !== 1 || $template['trainer_id'] !== $user['id'] || !empty($template['is_public'])) {
             Response::error(404, 'not_found', 'Template not found.');
             return;
         }
@@ -386,7 +388,7 @@ final class PlanController
      * Shared by saveTemplate (plan -> template) and applyTemplate
      * (template -> plan). Callers wrap it in a transaction.
      */
-    private static function copyStructure(string $fromAssignmentId, string $toAssignmentId, string $kind): void
+    public static function copyStructure(string $fromAssignmentId, string $toAssignmentId, string $kind): void
     {
         $pdo = Database::connection();
 
@@ -469,7 +471,7 @@ final class PlanController
         $table = self::table($params['kind']);
 
         $stmt = Database::connection()->prepare(
-            "DELETE FROM {$table} WHERE id = :id AND trainer_id = :trainer_id AND is_template = 1"
+            "DELETE FROM {$table} WHERE id = :id AND trainer_id = :trainer_id AND is_template = 1" . ContentLibrary::ownOnly()
         );
         $stmt->execute(['id' => $params['id'], 'trainer_id' => $user['id']]);
 

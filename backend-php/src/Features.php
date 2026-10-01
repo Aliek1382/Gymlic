@@ -89,6 +89,12 @@ final class Features
             'roles'       => ['trainer'],
             'routes'      => ['#^/plans/[^/]+/templates(/|$)#'],
         ],
+        'content_library' => [
+            'label'       => 'محتوای آماده',
+            'description' => 'قالب‌های برنامه، تکنیک‌ها و پرسشنامه‌های آماده‌ای که مدیر منتشر می‌کند و مربی به مال خودش اضافه می‌کند.',
+            'roles'       => ['trainer'],
+            'routes'      => ['#^/content-library(/|$)#'],
+        ],
         'notes' => [
             'label'       => 'یادداشت‌های مربی',
             'description' => 'یادداشت‌های خصوصی مربی دربارهٔ هر ورزشکار.',

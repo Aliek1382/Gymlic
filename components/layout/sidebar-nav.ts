@@ -12,6 +12,7 @@ import {
   Dumbbell,
   Headset,
   LayoutGrid,
+  Library,
   LineChart,
   MessageCircle,
   MessagesSquare,
@@ -83,6 +84,13 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
           icon: Bookmark,
           description:
             "قالب‌های آماده برای برنامه تمرینی و غذایی بسازید تا هنگام نوشتن برنامه برای ورزشکاران سریع‌تر شروع کنید.",
+        },
+        {
+          label: "محتوای آماده",
+          href: "/content-library",
+          icon: Library,
+          description:
+            "قالب برنامه، تکنیک و پرسشنامه‌های آمادهٔ تیم جیم‌لیک را ببینید و به مال خودتان اضافه کنید.",
         },
       ],
     },

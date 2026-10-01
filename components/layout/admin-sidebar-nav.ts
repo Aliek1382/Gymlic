@@ -15,6 +15,7 @@ import {
   Landmark,
   ShieldCheck,
   LayoutGrid,
+  Library,
   Megaphone,
   MessageSquareText,
   ReceiptText,
@@ -68,6 +69,7 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
     title: "محتوا و ارتباط",
     items: [
       { label: "کتابخانه‌ها", href: "/admin/library", icon: BookOpen, permission: "content" },
+      { label: "محتوای آماده", href: "/admin/content", icon: Library, permission: "content" },
       { label: "امتیاز مربیان", href: "/admin/points", icon: Trophy, permission: "content" },
       { label: "صفحه‌های متنی", href: "/admin/pages", icon: FileText, permission: "content" },
       { label: "اعلان همگانی", href: "/admin/notifications", icon: Megaphone, permission: "notifications" },

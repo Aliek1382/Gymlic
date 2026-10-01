@@ -9,6 +9,8 @@ interface ExerciseRow {
   muscle_group: string;
   created_by: string | null;
   created_at: string;
+  image_url?: string | null;
+  video_url?: string | null;
 }
 
 export async function listExercises(): Promise<ExerciseSummary[]> {
@@ -22,6 +24,8 @@ export async function listExercises(): Promise<ExerciseSummary[]> {
     muscleGroup: row.muscle_group,
     isCustom: row.created_by !== null,
     createdAt: row.created_at,
+    imageUrl: row.image_url ?? null,
+    videoUrl: row.video_url ?? null,
   }));
 }
 

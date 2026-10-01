@@ -62,6 +62,10 @@ const ADMIN_ACTIONS = [
   "support_status_changed",
   "page_saved",
   "page_deleted",
+  "content_published",
+  "content_saved",
+  "content_deleted",
+  "exercise_media_changed",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -106,6 +110,10 @@ const ACTION_LABEL: Record<string, string> = {
   support_status_changed: "تغییر وضعیت تیکت پشتیبانی",
   page_saved: "ذخیرهٔ صفحهٔ متنی",
   page_deleted: "حذف صفحهٔ متنی",
+  content_published: "انتشار محتوای آماده",
+  content_saved: "ذخیرهٔ محتوای آماده",
+  content_deleted: "حذف محتوای آماده",
+  exercise_media_changed: "عکس یا ویدیوی حرکت",
 };
 
 const EXPORT_LABEL: Record<string, string> = {
@@ -142,6 +150,12 @@ function billingDetail(log: { action: string; metadata: Record<string, unknown> 
     case "page_saved":
     case "page_deleted":
       return String(m.title ?? m.slug ?? "");
+    case "content_published":
+    case "content_saved":
+    case "content_deleted":
+      return String(m.title ?? "");
+    case "exercise_media_changed":
+      return `${String(m.name ?? "")} · ${m.slot === "video" ? "ویدیو" : "عکس"}${m.removed ? " (حذف)" : ""}`;
     default:
       return "";
   }

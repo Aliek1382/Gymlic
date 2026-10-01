@@ -18,6 +18,9 @@ export interface AdminLibraryEntry {
   plan_usage: number;
   // exercises
   muscle_group?: string;
+  /** How-to media; present once phase 8's database update has run. */
+  image_url?: string | null;
+  video_url?: string | null;
   // foods
   category?: string;
   default_unit?: string;
@@ -71,4 +74,15 @@ export async function deleteLibraryEntry(kind: LibraryKind, id: string) {
 
 export async function publishLibraryEntry(kind: LibraryKind, id: string) {
   await api.post(`/admin/library/${kind}/${id}/publish`);
+}
+
+export type ExerciseMediaSlot = "image" | "video";
+
+export async function uploadExerciseMedia(id: string, slot: ExerciseMediaSlot, file: File) {
+  return api.upload<Record<string, string | null>>(`/admin/library/exercises/${id}/media`, file, { slot });
+}
+
+/** A link (https) instead of a file, or null to remove. */
+export async function setExerciseMediaLink(id: string, slot: ExerciseMediaSlot, url: string | null) {
+  return api.put<Record<string, string | null>>(`/admin/library/exercises/${id}/media`, { slot, url });
 }

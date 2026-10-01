@@ -8,6 +8,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\ContentLibrary;
 
 /**
  * A trainer's own technique bank (drop-set, super-set…), attached to the
@@ -24,7 +25,7 @@ final class TechniqueController
 
         $stmt = Database::connection()->prepare(
             'SELECT id, name, description, created_at
-             FROM techniques WHERE coach_id = :coach_id ORDER BY name ASC'
+             FROM techniques WHERE coach_id = :coach_id' . ContentLibrary::ownOnly() . ' ORDER BY name ASC'
         );
         $stmt->execute(['coach_id' => $user['id']]);
 
@@ -117,7 +118,7 @@ final class TechniqueController
     private static function ownedOr404(string $id, string $coachId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT * FROM techniques WHERE id = :id AND coach_id = :coach_id'
+            'SELECT * FROM techniques WHERE id = :id AND coach_id = :coach_id' . ContentLibrary::ownOnly()
         );
         $stmt->execute(['id' => $id, 'coach_id' => $coachId]);
         $technique = $stmt->fetch();
