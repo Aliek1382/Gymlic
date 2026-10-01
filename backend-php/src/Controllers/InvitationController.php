@@ -9,6 +9,7 @@ use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 use PDO;
 use Throwable;
 
@@ -107,13 +108,13 @@ final class InvitationController
                     'expires_at' => $expiresAt,
                 ]);
 
-                AuthController::notify(
+                Templates::notify(
                     $pdo,
+                    'member_joined',
                     $invite['created_by'],
                     $user['id'],
                     'member_joined',
-                    'عضو جدید',
-                    trim(($invite['first_name'] ?? '') . ' ' . ($invite['last_name'] ?? '')) . ' به باشگاه پیوست.',
+                    ['name' => trim(($invite['first_name'] ?? '') . ' ' . ($invite['last_name'] ?? ''))],
                     '/members'
                 );
             }
@@ -143,13 +144,13 @@ final class InvitationController
             )->execute(['uid' => $user['id'], 'id' => $invite['id']]);
 
             if ($invite['created_by'] !== $user['id']) {
-                AuthController::notify(
+                Templates::notify(
                     $pdo,
+                    'invitation_accepted',
                     $invite['created_by'],
                     $user['id'],
                     'invitation_accepted',
-                    'دعوت پذیرفته شد',
-                    trim(($invite['first_name'] ?? '') . ' ' . ($invite['last_name'] ?? '')) . ' دعوت شما را پذیرفت.',
+                    ['name' => trim(($invite['first_name'] ?? '') . ' ' . ($invite['last_name'] ?? ''))],
                     null
                 );
             }
@@ -249,13 +250,13 @@ final class InvitationController
             )->execute(['uid' => $user['id'], 'id' => $invite['id']]);
 
             if ($invite['created_by'] !== $user['id']) {
-                AuthController::notify(
+                Templates::notify(
                     $pdo,
+                    'invitation_accepted',
                     $invite['created_by'],
                     $user['id'],
                     'invitation_accepted',
-                    'دعوت پذیرفته شد',
-                    trim(($invite['first_name'] ?? '') . ' ' . ($invite['last_name'] ?? '')) . ' دعوت شما را پذیرفت.',
+                    ['name' => trim(($invite['first_name'] ?? '') . ' ' . ($invite['last_name'] ?? ''))],
                     null
                 );
             }

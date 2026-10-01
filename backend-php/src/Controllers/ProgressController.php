@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 final class ProgressController
 {
@@ -202,13 +203,13 @@ final class ProgressController
             }
             $notified[$row['athlete_id']] = true;
 
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                'assessment_reminder',
                 $row['athlete_id'],
                 $row['trainer_id'],
                 'assessment_reminder',
-                'یادآوری ثبت اندازه‌گیری',
-                'وقتشه دوباره اندازه‌هاتو ثبت کنی.',
+                [],
                 '/progress'
             );
             $sent++;
@@ -232,26 +233,26 @@ final class ProgressController
             );
             $stmt->execute(['id' => $athleteId]);
             foreach ($stmt->fetchAll() as $row) {
-                AuthController::notify(
+                Templates::notify(
                     $pdo,
+                    'measurement_by_athlete',
                     $row['trainer_id'],
                     $user['id'],
                     'measurement_recorded',
-                    'اندازه‌گیری جدید',
-                    $name . ' اندازه‌گیری جدیدی ثبت کرد.',
+                    ['name' => $name],
                     '/athletes/' . $athleteId
                 );
             }
             return;
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'measurement_by_trainer',
             $athleteId,
             $user['id'],
             'measurement_recorded',
-            'اندازه‌گیری جدید',
-            $name . ' برای شما اندازه‌گیری جدیدی ثبت کرد.',
+            ['name' => $name],
             '/progress'
         );
     }

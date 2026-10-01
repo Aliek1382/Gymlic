@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /**
  * A trainer's bill to one athlete for one plan (workout_assignments /
@@ -100,13 +101,13 @@ final class InvoiceController
             }
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'invoice_created',
             $plan['athlete_id'],
             $user['id'],
             'invoice_created',
-            'فاکتور جدید',
-            'برای برنامه «' . $plan['title'] . '» فاکتوری به مبلغ ' . number_format($amount) . ' تومان صادر شد.',
+            ['title' => $plan['title'], 'amount' => number_format($amount)],
             self::linkFor($itemType),
             ['invoice_id' => $id]
         );
@@ -191,17 +192,17 @@ final class InvoiceController
             throw $e;
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            match ($invoice['item_type']) {
+                'session_package' => 'package_invoice_paid',
+                'questionnaire'   => 'questionnaire_invoice_paid',
+                default           => 'invoice_paid',
+            },
             $invoice['athlete_id'],
             $user['id'],
             'invoice_paid',
-            'پرداخت شما تایید شد',
-            match ($invoice['item_type']) {
-                'session_package' => 'پرداخت شما ثبت شد و پکیج جلسات خصوصی شما فعال است.',
-                'questionnaire'   => 'پرداخت شما ثبت شد و اکنون می‌توانید به پرسشنامه پاسخ دهید.',
-                default           => 'پرداخت شما ثبت شد و برنامه اکنون برای شما باز است.',
-            },
+            [],
             self::linkFor($invoice['item_type']),
             ['invoice_id' => $invoice['id']]
         );
@@ -240,13 +241,13 @@ final class InvoiceController
             throw $e;
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'invoice_cancelled',
             $invoice['athlete_id'],
             $user['id'],
             'invoice_cancelled',
-            'فاکتور لغو شد',
-            'فاکتور صادرشده برای شما لغو شد و نیازی به پرداخت آن نیست.',
+            [],
             self::linkFor($invoice['item_type']),
             ['invoice_id' => $invoice['id']]
         );

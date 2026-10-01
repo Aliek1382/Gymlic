@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatNumber, formatPersianDate, formatRelativeTime, formatToman } from "@/lib/persian";
+import { formatNumber, formatPersianDate, formatRelativeTime, formatToman, toPersianDigits } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
 import { listAdminActivity } from "../services/admin-service";
@@ -55,6 +55,13 @@ const ADMIN_ACTIONS = [
   "discount_code_saved",
   "discount_code_deleted",
   "data_exported",
+  "broadcast_sent",
+  "broadcast_scheduled",
+  "broadcast_cancelled",
+  "support_replied",
+  "support_status_changed",
+  "page_saved",
+  "page_deleted",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -92,6 +99,13 @@ const ACTION_LABEL: Record<string, string> = {
   discount_code_saved: "ذخیرهٔ کد تخفیف",
   discount_code_deleted: "حذف کد تخفیف",
   data_exported: "دانلود خروجی Excel",
+  broadcast_sent: "ارسال اعلان همگانی",
+  broadcast_scheduled: "زمان‌بندی اعلان همگانی",
+  broadcast_cancelled: "لغو اعلان زمان‌بندی‌شده",
+  support_replied: "پاسخ به تیکت پشتیبانی",
+  support_status_changed: "تغییر وضعیت تیکت پشتیبانی",
+  page_saved: "ذخیرهٔ صفحهٔ متنی",
+  page_deleted: "حذف صفحهٔ متنی",
 };
 
 const EXPORT_LABEL: Record<string, string> = {
@@ -118,6 +132,16 @@ function billingDetail(log: { action: string; metadata: Record<string, unknown> 
       return String(m.code ?? "");
     case "data_exported":
       return EXPORT_LABEL[String(m.kind)] ?? String(m.kind ?? "");
+    case "broadcast_sent":
+      return `${String(m.title ?? "")} · ${formatNumber(Number(m.recipients ?? 0))} نفر`;
+    case "broadcast_scheduled":
+      return `${String(m.title ?? "")} · برای ${formatNumber(Number(m.recipients ?? 0))} نفر`;
+    case "support_replied":
+    case "support_status_changed":
+      return `تیکت #${toPersianDigits(Number(m.number ?? 0))}`;
+    case "page_saved":
+    case "page_deleted":
+      return String(m.title ?? m.slug ?? "");
     default:
       return "";
   }
@@ -135,6 +159,7 @@ const SETTINGS_GROUP_LABEL: Record<string, string> = {
   mail: "تنظیمات ایمیل",
   security: "امنیت ورود",
   billing: "اطلاعات پرداخت",
+  templates: "قالب متن اعلان‌ها",
 };
 
 export function AdminActivityPage() {

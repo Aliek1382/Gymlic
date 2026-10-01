@@ -10,6 +10,7 @@ use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /**
  * Workout and nutrition assignments share a shape, so one controller serves
@@ -222,13 +223,13 @@ final class PlanController
 
         // notify_plan_completed (0020): tell the trainer, unless they did it.
         if ($stmt->rowCount() > 0 && $plan['trainer_id'] !== $user['id']) {
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                'plan_completed',
                 $plan['trainer_id'],
                 $user['id'],
                 $kind === 'nutrition' ? 'nutrition_completed' : 'workout_completed',
-                'برنامه تکمیل شد',
-                trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) . ' برنامه «' . $plan['title'] . '» را تکمیل کرد.',
+                ['name' => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')), 'title' => $plan['title']],
                 '/athletes/' . $user['id']
             );
         }
@@ -546,13 +547,13 @@ final class PlanController
             return;
         }
 
-        AuthController::notify(
+        Templates::notify(
             Database::connection(),
+            $kind === 'nutrition' ? 'nutrition_assigned' : 'workout_assigned',
             $athleteId,
             $user['id'],
             $kind === 'nutrition' ? 'nutrition_assigned' : 'workout_assigned',
-            $kind === 'nutrition' ? 'برنامه غذایی جدید' : 'برنامه تمرینی جدید',
-            'برنامه «' . $title . '» برای شما ثبت شد.',
+            ['title' => $title],
             $kind === 'nutrition' ? '/nutrition' : '/workouts'
         );
     }

@@ -80,8 +80,23 @@ final class Auth
         );
         $stmt->execute(['token' => $token]);
         $user = $stmt->fetch();
+        if ($user === false) {
+            return null;
+        }
 
-        return $user ?: null;
+        // "Last seen" for the admin's inactive-users audience: at most one
+        // write an hour. The column only exists once phase 7's SQL has run.
+        if (array_key_exists('last_seen_at', $user)
+            && ($user['last_seen_at'] === null || strtotime((string) $user['last_seen_at']) < time() - 3600)) {
+            try {
+                $pdo->prepare('UPDATE profiles SET last_seen_at = :now WHERE id = :id')
+                    ->execute(['now' => date('Y-m-d H:i:s'), 'id' => $user['id']]);
+            } catch (\Throwable $e) {
+                error_log('last_seen: ' . $e->getMessage());
+            }
+        }
+
+        return $user;
     }
 
     /** Ends the request with 401 if there's no valid session; otherwise returns the user. */

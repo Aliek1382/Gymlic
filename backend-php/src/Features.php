@@ -119,6 +119,12 @@ final class Features
             'roles'       => ['trainer'],
             'routes'      => ['#^/reports/trainer/#'],
         ],
+        'support' => [
+            'label'       => 'تیکت پشتیبانی',
+            'description' => 'تیکت به پشتیبانی جیم‌لیک برای گزارش مشکل، سؤال مالی یا پیشنهاد.',
+            'roles'       => ['club', 'trainer'],
+            'routes'      => ['#^/support(/|$)#'],
+        ],
         'club_finance' => [
             'label'       => 'امور مالی باشگاه',
             'description' => 'دفتر درآمد و هزینهٔ باشگاه.',

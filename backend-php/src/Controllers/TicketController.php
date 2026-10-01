@@ -10,6 +10,7 @@ use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /**
  * Formal athlete → trainer requests. Deliberately separate from `messages`
@@ -91,13 +92,13 @@ final class TicketController
         $stmt->execute(['id' => $ticketId]);
         $number = (int) $stmt->fetchColumn();
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'ticket_new',
             $trainerId,
             $user['id'],
             'ticket',
-            'تیکت جدید',
-            self::actorName($user) . ': ' . $subject,
+            ['name' => self::actorName($user), 'subject' => $subject],
             '/tickets?id=' . $ticketId
         );
 
@@ -223,13 +224,13 @@ final class TicketController
         )->execute(['id' => $ticket['id']]);
 
         $recipientId = $ticket['trainer_id'] === $user['id'] ? $ticket['athlete_id'] : $ticket['trainer_id'];
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'ticket_reply',
             $recipientId,
             $user['id'],
             'ticket',
-            'پاسخ جدید در تیکت #' . $ticket['ticket_number'],
-            self::actorName($user) . ': ' . mb_substr($body, 0, 80),
+            ['number' => $ticket['ticket_number'], 'name' => self::actorName($user), 'text' => mb_substr($body, 0, 80)],
             '/tickets?id=' . $ticket['id']
         );
 
@@ -264,13 +265,13 @@ final class TicketController
         )->execute(['s1' => $status, 's2' => $status, 'id' => $ticket['id']]);
 
         if ($status !== $ticket['status']) {
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                'ticket_status',
                 $ticket['athlete_id'],
                 $user['id'],
                 'ticket',
-                'وضعیت تیکت #' . $ticket['ticket_number'] . ' تغییر کرد',
-                $ticket['subject'],
+                ['number' => $ticket['ticket_number'], 'subject' => $ticket['subject']],
                 '/tickets?id=' . $ticket['id']
             );
         }

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Gymlic;
 
+use PDO;
 use Throwable;
 
 /**
@@ -25,8 +26,9 @@ final class AdminAccess
         'users.view'    => ['مشاهدهٔ کاربران', 'دیدن باشگاه‌ها، مربی‌ها، ورزشکاران و فهرست همهٔ کاربران.'],
         'users.manage'  => ['مدیریت کاربران', 'مسدودسازی، ویرایش پروفایل، تغییر نقش، تعیین رمز، خارج‌کردن از دستگاه‌ها، و تأیید/تعلیق باشگاه. حساب مدیران را نمی‌تواند تغییر دهد.'],
         'finance'       => ['مالی', 'درخواست‌های پرداخت، پلن‌ها و گزارش مالی.'],
-        'content'       => ['محتوا', 'کتابخانه‌های حرکات، غذاها و مکمل‌ها، و امتیاز مربیان.'],
-        'notifications' => ['اعلان همگانی', 'ارسال اعلان به همهٔ کاربران یا اعضای باشگاه‌ها.'],
+        'content'       => ['محتوا', 'کتابخانه‌های حرکات، غذاها و مکمل‌ها، امتیاز مربیان، و صفحه‌های متنی (قوانین، راهنما و…).'],
+        'notifications' => ['اعلان همگانی', 'ارسال اعلان به گروه‌های کاربران (با پیامک و ایمیل و زمان‌بندی) و ویرایش متن اعلان‌های خودکار.'],
+        'support'       => ['پشتیبانی', 'دیدن و پاسخ‌دادن به تیکت‌های پشتیبانی کاربران.'],
         'settings'      => ['تنظیمات سایت', 'مدیریت بخش‌ها، حالت تعمیر، ثبت‌نام، اطلاعیه، پشتیبانی و محدودیت‌ها (بدون کلیدهای پیامک و ایمیل).'],
         'system'        => ['سیستم', 'سلامت سایت و صف پیامک و ایمیل.'],
         'activity'      => ['لاگ فعالیت', 'دیدن کارهایی که مدیران در پنل انجام داده‌اند.'],
@@ -131,6 +133,33 @@ final class AdminAccess
             $out['users.view'] = true;
         }
         return array_values(array_filter(array_keys(self::PERMISSIONS), static fn (string $k): bool => isset($out[$k])));
+    }
+
+    /**
+     * The ids of every active admin who has $permission: super admins, and
+     * staff whose role grants it. For telling the right people about
+     * something that waits on them (a new support ticket).
+     *
+     * @return list<string>
+     */
+    public static function holders(PDO $pdo, string $permission): array
+    {
+        $ids = $pdo->query('SELECT id FROM profiles WHERE is_platform_admin = 1 AND is_suspended = 0')->fetchAll(PDO::FETCH_COLUMN);
+
+        if (self::rolesReady()) {
+            $rows = $pdo->query(
+                'SELECT p.id, r.permissions FROM profiles p
+                 JOIN admin_roles r ON r.id = p.admin_role_id
+                 WHERE p.is_platform_admin = 0 AND p.is_suspended = 0'
+            )->fetchAll();
+            foreach ($rows as $row) {
+                if (in_array($permission, self::normalize(json_decode((string) $row['permissions'], true)), true)) {
+                    $ids[] = $row['id'];
+                }
+            }
+        }
+
+        return array_values(array_unique(array_map('strval', $ids)));
     }
 
     /** @return list<array{key: string, label: string, description: string}> */

@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /** The trainer's own athlete roster and the invites they hand out. */
 final class AthleteController
@@ -127,13 +128,13 @@ final class AthleteController
         $stmt->execute(['trainer_id' => $user['id'], 'athlete_id' => $params['id']]);
 
         if ($stmt->rowCount() > 0) {
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                'trainer_removed',
                 $params['id'],
                 $user['id'],
                 'trainer_removed',
-                'پایان همکاری با مربی',
-                'همکاری مربی شما با شما در جیم‌لیک پایان یافت.',
+                [],
                 '/dashboard'
             );
         }

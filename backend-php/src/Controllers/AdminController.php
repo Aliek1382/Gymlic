@@ -16,6 +16,7 @@ use Gymlic\SmsGateway;
 use Gymlic\Subscriptions;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 use PDO;
 use Throwable;
 
@@ -207,13 +208,13 @@ final class AdminController
                 'plan'       => $request['plan_name'],
             ]);
 
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                'payment_approved',
                 $request['submitted_by'],
                 $admin['id'],
                 'broadcast',
-                'پرداخت تأیید شد',
-                'اشتراک باشگاه شما تا ' . Jalali::format($expiresAt, true) . ' فعال شد.',
+                ['date' => Jalali::format($expiresAt, true)],
                 '/finance'
             );
 
@@ -259,13 +260,13 @@ final class AdminController
         $request = $request->fetch();
         if ($request !== false && $request['submitted_by'] !== null) {
             $note = trim((string) ($request['admin_note'] ?? ''));
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                'payment_rejected',
                 $request['submitted_by'],
                 $admin['id'],
                 'broadcast',
-                'پرداخت رد شد',
-                $note !== '' ? 'درخواست پرداخت اشتراک شما رد شد: ' . $note : 'درخواست پرداخت اشتراک شما رد شد. برای پیگیری با پشتیبانی تماس بگیرید.',
+                ['reason' => $note !== '' ? $note : 'برای پیگیری با پشتیبانی تماس بگیرید.'],
                 '/finance'
             );
         }
@@ -305,15 +306,13 @@ final class AdminController
         self::logActivity($pdo, $params['id'], $admin['id'], null, 'club_status_changed', ['status' => $status]);
 
         if ($club !== false && $status !== 'pending') {
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                $status === 'suspended' ? 'club_suspended' : 'club_activated',
                 $club['owner_id'],
                 $admin['id'],
                 'broadcast',
-                $status === 'suspended' ? 'باشگاه شما تعلیق شد' : 'باشگاه شما فعال شد',
-                $status === 'suspended'
-                    ? 'باشگاه «' . $club['name'] . '» تعلیق شد. برای پیگیری با پشتیبانی تماس بگیرید.'
-                    : 'باشگاه «' . $club['name'] . '» دوباره فعال شد.',
+                ['club' => $club['name']],
                 '/dashboard'
             );
         }
@@ -352,15 +351,13 @@ final class AdminController
 
         // Only a real change: the push reaches their devices even though the session is gone.
         if ($before !== false && (bool) $before['is_suspended'] !== $suspended) {
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                $suspended ? 'account_suspended' : 'account_activated',
                 $params['id'],
                 $admin['id'],
                 'broadcast',
-                $suspended ? 'حساب شما تعلیق شد' : 'حساب شما فعال شد',
-                $suspended
-                    ? 'حساب کاربری شما تعلیق شد. برای پیگیری با پشتیبانی تماس بگیرید.'
-                    : 'حساب کاربری شما دوباره فعال شد و می‌توانید وارد شوید.',
+                [],
                 '/login'
             );
         }
@@ -497,6 +494,14 @@ final class AdminController
         $counts += ['active_subs' => 0, 'expiring_subs' => 0, 'expired_subs' => 0];
         foreach ($pdo->query('SELECT expires_at FROM subscriptions')->fetchAll(PDO::FETCH_COLUMN) as $expiresAt) {
             $counts[Subscriptions::status((string) $expiresAt) . '_subs']++;
+        }
+
+        // Tickets waiting on support, for whoever answers them.
+        if (AdminAccess::can($admin, 'support')) {
+            $open = SupportController::openCount($pdo);
+            if ($open !== null) {
+                $counts['open_support_tickets'] = $open;
+            }
         }
 
         // Money is the finance permission's: a role without it gets the counts only.

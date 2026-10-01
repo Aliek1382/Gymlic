@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /**
  * A block of N private sessions a trainer sells one athlete. Selling it issues
@@ -89,13 +90,13 @@ final class SessionPackageController
             throw $e;
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'package_invoice_created',
             $athleteId,
             $user['id'],
             'invoice_created',
-            'فاکتور جدید',
-            'برای پکیج «' . $title . '» فاکتوری به مبلغ ' . number_format($amount) . ' تومان صادر شد.',
+            ['title' => $title, 'amount' => number_format($amount)],
             '/session-packages',
             ['invoice_id' => $invoiceId, 'package_id' => $id]
         );

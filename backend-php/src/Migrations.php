@@ -130,6 +130,18 @@ final class Migrations
                 ['column', 'payment_requests', 'discount_toman'],
             ],
         ],
+        [
+            'id'    => 'communication',
+            'file'  => 'communication-update.sql',
+            'title' => 'اعلان همگانی، تیکت پشتیبانی و صفحه‌های متنی (فاز ۷)',
+            'check' => [
+                ['table', 'broadcasts'],
+                ['table', 'support_tickets'],
+                ['column', 'support_messages', 'seq'],
+                ['table', 'site_pages'],
+                ['column', 'profiles', 'last_seen_at'],
+            ],
+        ],
     ];
 
     /**

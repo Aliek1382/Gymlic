@@ -7,6 +7,8 @@ import {
   CalendarClock,
   DatabaseZap,
   Dumbbell,
+  FileText,
+  Headset,
   History,
   Inbox,
   KeyRound,
@@ -14,6 +16,7 @@ import {
   ShieldCheck,
   LayoutGrid,
   Megaphone,
+  MessageSquareText,
   ReceiptText,
   Settings,
   Tags,
@@ -66,7 +69,10 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
     items: [
       { label: "کتابخانه‌ها", href: "/admin/library", icon: BookOpen, permission: "content" },
       { label: "امتیاز مربیان", href: "/admin/points", icon: Trophy, permission: "content" },
+      { label: "صفحه‌های متنی", href: "/admin/pages", icon: FileText, permission: "content" },
       { label: "اعلان همگانی", href: "/admin/notifications", icon: Megaphone, permission: "notifications" },
+      { label: "قالب متن اعلان‌ها", href: "/admin/templates", icon: MessageSquareText, permission: "notifications" },
+      { label: "تیکت‌های پشتیبانی", href: "/admin/support", icon: Headset, permission: "support" },
     ],
   },
   {

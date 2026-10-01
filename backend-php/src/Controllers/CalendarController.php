@@ -10,6 +10,7 @@ use Gymlic\Recurrence;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /**
  * The trainer's month calendar. Two kinds of rows share calendar_events:
@@ -291,13 +292,13 @@ final class CalendarController
                 }
 
                 $message = strtr($body, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
-                AuthController::notify(
+                Templates::notify(
                     $pdo,
+                    'calendar_reminder',
                     $row['trainer_id'],
                     null,
                     'calendar_reminder',
-                    'یادآوری: ' . $row['title'],
-                    $message,
+                    ['title' => $row['title'], 'details' => $message],
                     '/calendar',
                     ['event_id' => $row['id'], 'date' => $date]
                 );

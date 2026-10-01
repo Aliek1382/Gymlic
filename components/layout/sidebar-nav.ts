@@ -10,6 +10,7 @@ import {
   CalendarDays,
   ClipboardList,
   Dumbbell,
+  Headset,
   LayoutGrid,
   LineChart,
   MessageCircle,
@@ -64,6 +65,7 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
     { label: "کلاس‌ها", href: "/classes", icon: Calendar },
     { label: "امور مالی", href: "/finance", icon: Wallet },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
+    { label: "پشتیبانی", href: "/support", icon: Headset },
     { label: "تنظیمات", href: "/settings", icon: Settings },
   ],
   trainer: [
@@ -160,6 +162,12 @@ export const SIDEBAR_NAV: Record<AccountType, SidebarNavEntry[]> = {
     },
     { label: "گزارش‌ها", href: "/reports", icon: BarChart3 },
     { label: "اعلان‌ها", href: "/notifications", icon: Bell },
+    {
+      label: "پشتیبانی",
+      href: "/support",
+      icon: Headset,
+      description: "سؤال، مشکل یا پیشنهادتان را برای تیم جیم‌لیک بفرستید.",
+    },
     {
       label: "حساب من",
       icon: UserCog,

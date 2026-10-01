@@ -24,6 +24,7 @@ import {
   type SidebarNavItem,
 } from "./sidebar-nav";
 import type { AccountType } from "@/types/database.types";
+import { SitePageLinks } from "@/features/site-pages/components/site-page-links";
 
 function isItemActive(pathname: string, item: SidebarNavItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -190,6 +191,8 @@ export function SidebarContent({
             </Link>
           </Button>
         )}
+
+        <SitePageLinks className="justify-start px-3.5" onNavigate={onNavigate} />
 
         <button
           type="button"

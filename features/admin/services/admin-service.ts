@@ -84,6 +84,8 @@ export interface AdminOverview {
   expiring_subs: number;
   expired_subs: number;
   total_revenue?: number;
+  /** Only for an admin with the support permission. */
+  open_support_tickets?: number;
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {

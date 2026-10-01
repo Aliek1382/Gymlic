@@ -12,6 +12,7 @@ use Gymlic\Response;
 use Gymlic\Subscriptions;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 use PDO;
 use Throwable;
 
@@ -94,7 +95,7 @@ final class AdminBillingController
             ]);
 
             if ($notify) {
-                AuthController::notify($pdo, $club['owner_id'], $admin['id'], 'broadcast', $outcome['title'], $outcome['body'], '/finance');
+                Templates::notify($pdo, $outcome['template'], $club['owner_id'], $admin['id'], 'broadcast', $outcome['vars'], '/finance');
             }
 
             $pdo->commit();
@@ -158,8 +159,8 @@ final class AdminBillingController
         return [
             'action' => 'subscription_renewed',
             'log'    => ['plan' => $plan['name'], 'days' => (int) $plan['duration_days'], 'amount' => $amount, 'expires_at' => $expiresAt, 'request_id' => $requestId],
-            'title'  => 'اشتراک باشگاه تمدید شد',
-            'body'   => 'اشتراک «' . $plan['name'] . '» باشگاه شما تا ' . Jalali::format($expiresAt, true) . ' تمدید شد.',
+            'template' => 'subscription_renewed',
+            'vars'     => ['plan' => $plan['name'], 'date' => Jalali::format($expiresAt, true)],
         ];
     }
 
@@ -177,9 +178,8 @@ final class AdminBillingController
         return [
             'action' => 'subscription_gifted',
             'log'    => ['days' => $days, 'expires_at' => $expiresAt],
-            'title'  => 'روز هدیه به اشتراک شما اضافه شد',
-            'body'   => self::persianNumber($days) . ' روز هدیه به اشتراک باشگاه شما اضافه شد؛ اشتراک تا '
-                . Jalali::format($expiresAt, true) . ' فعال است.' . ($note !== null ? ' ' . $note : ''),
+            'template' => 'subscription_gifted',
+            'vars'     => ['days' => self::persianNumber($days), 'date' => Jalali::format($expiresAt, true), 'note' => $note ?? ''],
         ];
     }
 
@@ -215,10 +215,8 @@ final class AdminBillingController
         return [
             'action' => 'subscription_set',
             'log'    => ['plan' => $planName, 'expires_at' => $expiresAt, 'member_capacity' => $capacity],
-            'title'  => $ended ? 'اشتراک باشگاه پایان یافت' : 'اشتراک باشگاه به‌روزرسانی شد',
-            'body'   => $ended
-                ? 'اشتراک باشگاه شما پایان یافت. برای تمدید از بخش «امور مالی» اقدام کنید.'
-                : 'اشتراک «' . $planName . '» باشگاه شما تا ' . Jalali::format($expiresAt, true) . ' فعال است.',
+            'template' => $ended ? 'subscription_ended' : 'subscription_set',
+            'vars'     => ['plan' => $planName, 'date' => Jalali::format($expiresAt, true)],
         ];
     }
 
@@ -258,14 +256,13 @@ final class AdminBillingController
                 $count++;
 
                 if ($notify) {
-                    AuthController::notify(
+                    Templates::notify(
                         $pdo,
+                        'subscription_gifted',
                         $club['owner_id'],
                         $admin['id'],
                         'broadcast',
-                        'روز هدیه به اشتراک شما اضافه شد',
-                        self::persianNumber($days) . ' روز هدیه به اشتراک باشگاه شما اضافه شد؛ اشتراک تا '
-                            . Jalali::format($expiresAt, true) . ' فعال است.' . ($note !== null ? ' ' . $note : ''),
+                        ['days' => self::persianNumber($days), 'date' => Jalali::format($expiresAt, true), 'note' => $note ?? ''],
                         '/finance'
                     );
                 }

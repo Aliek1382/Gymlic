@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 use Throwable;
 
 final class MemberController
@@ -207,13 +208,13 @@ final class MemberController
 
         $club = $pdo->prepare('SELECT name FROM clubs WHERE id = :id');
         $club->execute(['id' => $membership['club_id']]);
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'membership_removed',
             $membership['user_id'],
             $user['id'],
             'membership_removed',
-            'پایان عضویت',
-            'عضویت شما در باشگاه «' . ($club->fetchColumn() ?: 'باشگاه') . '» پایان یافت.',
+            ['club' => $club->fetchColumn() ?: 'باشگاه'],
             '/dashboard'
         );
 
