@@ -1,7 +1,8 @@
 "use client";
 
-import { Banknote, Receipt, TicketPercent, TrendingUp } from "lucide-react";
+import { Banknote, Dumbbell, Receipt, TicketPercent, TrendingUp, Users } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -36,6 +37,8 @@ export function AdminReportsPage() {
   const monthRows = (data?.months ?? []).slice(0, 12);
   const planRows = data?.plans ?? [];
   const discountTotal = data?.discount_total ?? 0;
+  const clubs = data?.sources.clubs ?? { count: 0, total: 0 };
+  const trainers = data?.sources.trainers ?? { count: 0, total: 0 };
 
   return (
 
@@ -44,13 +47,14 @@ export function AdminReportsPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">گزارش مالی پلتفرم</h1>
           <p className="text-sm text-muted-foreground">
-            درآمد حاصل از پرداخت‌های تأییدشدهٔ باشگاه‌ها (و مبالغی که هنگام تمدید دستی ثبت شده)، به
-            تفکیک ماهِ تأیید.
+            درآمد حاصل از پرداخت‌های تأییدشدهٔ باشگاه‌ها و مربیان (و مبالغی که هنگام تمدید دستی ثبت
+            شده)، به تفکیک ماهِ تأیید.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <ExportButton kind="revenue" label="خروجی ماهانه" />
-          <ExportButton kind="payments" label="خروجی همهٔ پرداخت‌ها" />
+          <ExportButton kind="payments" label="پرداخت‌های باشگاه‌ها" />
+          <ExportButton kind="trainer-payments" label="پرداخت‌های مربیان" />
         </div>
       </div>
 
@@ -69,6 +73,16 @@ export function AdminReportsPage() {
           icon={TrendingUp}
           title="میانگین هر پرداخت"
           value={`${formatToman(avgAmount)} تومان`}
+        />
+        <StatisticCard
+          icon={Users}
+          title="از باشگاه‌ها"
+          value={`${formatToman(clubs.total)} تومان`}
+        />
+        <StatisticCard
+          icon={Dumbbell}
+          title="از مربیان"
+          value={`${formatToman(trainers.total)} تومان`}
         />
         {discountTotal > 0 && (
           <StatisticCard
@@ -92,7 +106,9 @@ export function AdminReportsPage() {
                 <TableRow>
                   <TableHead>ماه</TableHead>
                   <TableHead>تعداد</TableHead>
-                  <TableHead>مبلغ</TableHead>
+                  <TableHead>باشگاه‌ها</TableHead>
+                  <TableHead>مربیان</TableHead>
+                  <TableHead>جمع</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -100,6 +116,8 @@ export function AdminReportsPage() {
                   <TableRow key={m.month}>
                     <TableCell className="text-foreground">{monthLabel(m.month)}</TableCell>
                     <TableCell className="text-muted-foreground">{formatNumber(m.count)}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatToman(m.clubs_total)}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatToman(m.trainers_total)}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatToman(m.total)} تومان
                     </TableCell>
@@ -127,8 +145,13 @@ export function AdminReportsPage() {
               </TableHeader>
               <TableBody>
                 {planRows.map((plan) => (
-                  <TableRow key={plan.plan_name}>
-                    <TableCell className="text-foreground">{plan.plan_name}</TableCell>
+                  <TableRow key={`${plan.kind}|${plan.plan_name}`}>
+                    <TableCell className="text-foreground">
+                      {plan.plan_name}
+                      <Badge variant="secondary" className="ms-2">
+                        {plan.kind === "trainer" ? "مربی" : "باشگاه"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{formatNumber(plan.count)}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatToman(plan.total)} تومان

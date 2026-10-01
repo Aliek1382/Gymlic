@@ -22,6 +22,7 @@ final class CronHeartbeat
         'calendar-reminders'    => ['یادآور تقویم، مکمل‌ها و اعلان مرورگر', 5],
         'assessment-reminders'  => ['یادآور ارزیابی دوره‌ای', 1440],
         'receipt-cleanup'       => ['حذف رسیدهای پرداختِ قدیمی', 1440],
+        'trainer-subscription-reminders' => ['یادآور پایان اشتراک مربیان', 1440],
     ];
 
     private function __construct()

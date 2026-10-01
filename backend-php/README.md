@@ -218,5 +218,38 @@ answer `ready: false` / 409 and the pages hide the feature.
   Existing athletes are never removed, and a trainer who is an active member of
   a club is never asked to pay. Set the plans up and let trainers subscribe
   before switching it on.
-- Not covered yet: discount codes for trainer plans, and trainer payments in
-  the admin revenue report / CSV export.
+- Discount codes, reminders and the revenue report are part 2, below.
+
+### Trainer subscriptions, part 2: discount codes, reminders, revenue
+
+The database step is `schema/trainer-billing-extras-update.sql` (after
+`trainer-billing-update.sql`); until it has run the codes and reminders are
+simply off.
+
+- **Discount codes for trainer plans** (`trainer_discount_codes`, admin tab
+  "کدهای تخفیف" in `/admin/trainer-billing`, `TrainerDiscounts` /
+  `TrainerDiscountController`). Same rules as the club codes: percent or fixed
+  amount, one plan or all, a cap on total uses, once per trainer, an expiry
+  date, active/inactive. A use is a pending or approved request, so a rejected
+  request gives its use back. The trainer enters the code in the purchase
+  dialog and sees the price (`POST /trainer-billing/discount-check`); the code
+  is checked again with its row locked when the request is filed. A code that
+  covers the whole price needs no card, tracking code or receipt (stored as
+  tracking code `DISCOUNT`, and the admin still approves it). A code that has
+  been used cannot be deleted, only switched off.
+- **Reminders** (`cron/trainer-subscription-reminders.php`, once a day):
+  `trainer_subscription_expiring` once the subscription is inside the
+  "running out" window of the billing settings, and
+  `trainer_subscription_expired` once it has ended. Each is sent once per
+  expiry (`trainer_subscriptions.reminder_stage`, reset when the subscription
+  is extended); club members are skipped. They go out like any notification,
+  by SMS/email too for those who opted in. Without a cron entry the same job
+  runs at most every six hours when a trainer opens their subscription page or
+  an admin opens the trainer payments.
+  ```
+  15 8 * * * php /home/USER/path/to/backend-php/cron/trainer-subscription-reminders.php
+  ```
+- **Revenue**: approved trainer payments are in the admin revenue report
+  (`AdminBillingController::revenueSummary`: totals, by month, by plan, with
+  the club/trainer split), its CSV, the overview's total revenue and pending
+  count, and a new CSV `GET /admin/export/trainer-payments`.

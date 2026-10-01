@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, Loader2, Paperclip, Wallet } from "lucide-react";
+import { CalendarClock, Loader2, Paperclip, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -33,10 +33,11 @@ import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { PaymentInfoCard } from "@/features/finance/components/payment-info-card";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
-import { prepareReceipt } from "@/features/finance/services/finance-service";
+import { prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
 import {
+  checkTrainerDiscount,
   getTrainerBilling,
   submitTrainerPayment,
   type TrainerBillingOverview,
@@ -135,6 +136,13 @@ function Content({ data }: { data: TrainerBillingOverview }) {
           ) : (
             <p>هنوز اشتراکی ندارید.</p>
           )}
+          {!data.in_club && subscription && subscription.status !== "active" && (
+            <p className="font-medium text-warning">
+              {subscription.status === "expiring"
+                ? "اشتراک شما رو به پایان است. برای تمدید، یکی از پلن‌های زیر را انتخاب کنید."
+                : "اشتراک شما تمام شده است. برای تمدید، یکی از پلن‌های زیر را انتخاب کنید."}
+            </p>
+          )}
           {!data.in_club &&
             (data.enforcing ? (
               <p>برای دعوت ورزشکار تازه، اشتراک فعال و ظرفیت آزاد لازم است. ورزشکاران فعلی‌تان همیشه می‌مانند.</p>
@@ -198,14 +206,22 @@ function Content({ data }: { data: TrainerBillingOverview }) {
               {requests.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell className="text-foreground">{request.plan_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatToman(request.amount_toman)} تومان</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatToman(request.amount_toman)} تومان
+                    {!!request.discount_toman && request.discount_toman > 0 && (
+                      <p className="text-xs">
+                        با کد <span dir="ltr" className="font-mono">{request.discount_code}</span>،{" "}
+                        {formatToman(request.discount_toman)} تومان تخفیف
+                      </p>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[request.status]}>{STATUS_LABEL[request.status]}</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     <div className="space-y-1">
                       <p dir="ltr" className="text-end font-mono text-xs text-foreground">
-                        {request.tracking_code}
+                        {request.tracking_code === "DISCOUNT" ? "—" : request.tracking_code}
                       </p>
                       {request.has_receipt && (
                         <ReceiptViewer
@@ -280,36 +296,61 @@ function PaymentDialog({
   const [receipt, setReceipt] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [discountText, setDiscountText] = useState("");
+  const [quote, setQuote] = useState<DiscountQuote | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  // A code that covers the whole price leaves nothing to pay: no card, code or receipt.
+  const free = quote !== null && quote.final_toman === 0;
+  const price = quote ? quote.final_toman : plan.price_toman;
+
+  async function applyCode() {
+    if (!discountText.trim()) return;
+    setChecking(true);
+    try {
+      setQuote(await checkTrainerDiscount(plan.id, discountText.trim()));
+      setError(null);
+      toast.success("کد تخفیف اعمال شد.");
+    } catch (e) {
+      setQuote(null);
+      toast.error(getErrorMessage(e, "بررسی کد تخفیف ناموفق بود."));
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function submit() {
     const code = toAsciiDigits(trackingCode).replace(/\s+/g, "");
     const last4 = toAsciiDigits(cardLast4).trim();
-    if (!/^[A-Za-z0-9_/-]{4,40}$/.test(code)) {
-      setError("کد پیگیری باید بین ۴ تا ۴۰ حرف یا رقم باشد.");
-      return;
-    }
-    if (!/^\d{4}$/.test(last4)) {
-      setError("چهار رقم آخر کارت خود را وارد کنید.");
-      return;
-    }
-    if (rules?.required !== false && !receipt) {
-      setError("تصویر یا فایل رسید پرداخت را پیوست کنید.");
-      return;
+    if (!free) {
+      if (!/^[A-Za-z0-9_/-]{4,40}$/.test(code)) {
+        setError("کد پیگیری باید بین ۴ تا ۴۰ حرف یا رقم باشد.");
+        return;
+      }
+      if (!/^\d{4}$/.test(last4)) {
+        setError("چهار رقم آخر کارت خود را وارد کنید.");
+        return;
+      }
+      if (rules?.required !== false && !receipt) {
+        setError("تصویر یا فایل رسید پرداخت را پیوست کنید.");
+        return;
+      }
     }
     setError(null);
     setSaving(true);
     try {
-      const prepared = receipt ? await prepareReceipt(receipt) : null;
+      const prepared = !free && receipt ? await prepareReceipt(receipt) : null;
       if (prepared && rules && prepared.size > rules.max_mb * 1024 * 1024) {
         setError(`حجم رسید باید حداکثر ${rules.max_mb} مگابایت باشد.`);
         return;
       }
       await submitTrainerPayment({
         planId: plan.id,
-        trackingCode: code,
-        cardLast4: last4,
-        paidAt: paidAt || undefined,
+        trackingCode: free ? undefined : code,
+        cardLast4: free ? undefined : last4,
+        paidAt: free ? undefined : paidAt || undefined,
         note: note.trim() || undefined,
+        discountCode: quote?.code,
         receipt: prepared,
       });
       toast.success("پرداخت شما ثبت شد و در انتظار تأیید مدیریت است.");
@@ -318,6 +359,8 @@ function PaymentDialog({
       setPaidAt("");
       setNote("");
       setReceipt(null);
+      setDiscountText("");
+      setQuote(null);
       onOpenChange(false);
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     } catch (e) {
@@ -333,13 +376,74 @@ function PaymentDialog({
         <DialogHeader>
           <DialogTitle>ثبت پرداخت پلن «{plan.name}»</DialogTitle>
           <DialogDescription>
-            مبلغ {formatToman(plan.price_toman)} تومان را به کارت زیر واریز کنید و بعد اطلاعات پرداخت را ثبت کنید.
+            {free
+              ? "با این کد تخفیف چیزی برای پرداخت نمی‌ماند؛ درخواست را ثبت کنید تا مدیریت تأیید کند."
+              : `مبلغ ${formatToman(price)} تومان را به کارت زیر واریز کنید و بعد اطلاعات پرداخت را ثبت کنید.`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <PaymentInfoCard info={data.payment} />
+          {data.discounts_enabled && (
+            <div className="space-y-2">
+              <Label htmlFor="tb-discount">
+                کد تخفیف <span className="text-muted-foreground">(اگر دارید)</span>
+              </Label>
+              {quote ? (
+                <div className="space-y-1 rounded-xl border border-success/30 bg-success-muted px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      کد <span dir="ltr" className="font-mono font-medium">{quote.code}</span> اعمال شد
+                    </span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setQuote(null)}
+                      aria-label="حذف کد تخفیف"
+                    >
+                      <X />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="line-through">{formatToman(quote.list_price_toman)}</span> ←{" "}
+                    <span className="font-medium text-foreground">{formatToman(quote.final_toman)} تومان</span>{" "}
+                    ({formatToman(quote.discount_toman)} تومان تخفیف)
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    id="tb-discount"
+                    dir="ltr"
+                    value={discountText}
+                    maxLength={40}
+                    className="font-mono uppercase"
+                    onChange={(e) => setDiscountText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void applyCode();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={applyCode}
+                    disabled={checking || !discountText.trim()}
+                  >
+                    {checking && <Loader2 className="animate-spin" />}
+                    اعمال
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
+          {!free && <PaymentInfoCard info={data.payment} />}
+
+          {!free && (
+          <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="tb-tracking">کد پیگیری واریز</Label>
@@ -405,6 +509,8 @@ function PaymentDialog({
               onChange={(e) => setPaidAt(e.target.value)}
             />
           </div>
+          </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tb-note">
@@ -419,7 +525,7 @@ function PaymentDialog({
         <DialogFooter>
           <Button onClick={submit} disabled={saving}>
             {saving && <Loader2 className="animate-spin" />}
-            ثبت پرداخت
+            {free ? "ثبت درخواست" : "ثبت پرداخت"}
           </Button>
         </DialogFooter>
       </DialogContent>

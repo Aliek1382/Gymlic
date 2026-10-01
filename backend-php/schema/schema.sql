@@ -705,9 +705,30 @@ CREATE TABLE trainer_subscriptions (
   max_athletes INT NULL,
   started_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at   DATETIME NOT NULL,
+  reminder_stage TINYINT NOT NULL DEFAULT 0,   -- 1 = "ending soon" sent, 2 = "expired" sent, for this expiry
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_tsub_expires (expires_at),
   CONSTRAINT fk_tsub_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE trainer_discount_codes (
+  id               CHAR(36) NOT NULL PRIMARY KEY,
+  code             VARCHAR(40) NOT NULL,             -- stored upper-case, matched case-insensitively
+  kind             ENUM('percent','amount') NOT NULL,
+  value            BIGINT NOT NULL,                  -- 1..100 for percent, toman for amount
+  plan_id          CHAR(36) NULL,                    -- NULL = any trainer plan
+  max_uses         INT NULL,                         -- NULL = unlimited, pending and approved requests count
+  once_per_trainer TINYINT(1) NOT NULL DEFAULT 0,
+  expires_at       DATETIME NULL,
+  is_active        TINYINT(1) NOT NULL DEFAULT 1,
+  note             VARCHAR(255) NULL,
+  created_by       CHAR(36) NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_tdiscount_code (code),
+  CONSTRAINT fk_tdiscount_plan FOREIGN KEY (plan_id) REFERENCES trainer_plans(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tdiscount_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT chk_tdiscount_value CHECK (value > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE trainer_payment_requests (
@@ -715,6 +736,9 @@ CREATE TABLE trainer_payment_requests (
   trainer_id        CHAR(36) NOT NULL,
   plan_id           CHAR(36) NOT NULL,
   amount_toman      BIGINT NOT NULL,
+  discount_code_id  CHAR(36) NULL,
+  list_price_toman  BIGINT NULL,                -- the plan's price when a code was used
+  discount_toman    BIGINT NOT NULL DEFAULT 0,
   reference_note    VARCHAR(500) NULL,
   tracking_code     VARCHAR(40) NOT NULL,
   card_last4        CHAR(4) NOT NULL,
@@ -731,6 +755,7 @@ CREATE TABLE trainer_payment_requests (
   KEY idx_tpay_tracking (tracking_code),
   CONSTRAINT fk_tpay_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT fk_tpay_plan FOREIGN KEY (plan_id) REFERENCES trainer_plans(id),
+  CONSTRAINT fk_tpay_discount FOREIGN KEY (discount_code_id) REFERENCES trainer_discount_codes(id) ON DELETE SET NULL,
   CONSTRAINT fk_tpay_reviewer FOREIGN KEY (reviewed_by) REFERENCES profiles(id) ON DELETE SET NULL,
   CONSTRAINT chk_tpay_amount CHECK (amount_toman >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

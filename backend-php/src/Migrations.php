@@ -155,6 +155,16 @@ final class Migrations
             'check' => [['table', 'trainer_plans'], ['table', 'trainer_subscriptions'], ['table', 'trainer_payment_requests']],
         ],
         [
+            'id'    => 'trainer-billing-extras',
+            'file'  => 'trainer-billing-extras-update.sql',
+            'title' => 'کد تخفیف و یادآور پایان اشتراک مربی',
+            'check' => [
+                ['table', 'trainer_discount_codes'],
+                ['column', 'trainer_payment_requests', 'discount_code_id'],
+                ['column', 'trainer_subscriptions', 'reminder_stage'],
+            ],
+        ],
+        [
             'id'    => 'communication',
             'file'  => 'communication-update.sql',
             'title' => 'اعلان همگانی، تیکت پشتیبانی و صفحه‌های متنی (فاز ۷)',

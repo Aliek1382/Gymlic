@@ -1,5 +1,13 @@
 import { api } from "@/lib/api/client";
-import type { PaymentInfo, ReceiptRules } from "@/features/finance/services/finance-service";
+import type {
+  DiscountCodeInput,
+  DiscountCodeRow,
+} from "@/features/admin/services/admin-billing-service";
+import type {
+  DiscountQuote,
+  PaymentInfo,
+  ReceiptRules,
+} from "@/features/finance/services/finance-service";
 
 export type TrainerRequestStatus = "pending" | "approved" | "rejected";
 export type TrainerSubscriptionStatus = "active" | "expiring" | "expired";
@@ -39,6 +47,10 @@ export interface TrainerPaymentRequest {
   has_receipt: boolean;
   receipt_is_pdf: boolean;
   receipt_purged_at: string | null;
+  /** Present once the discount-code database update has run. */
+  list_price_toman?: number | null;
+  discount_toman?: number;
+  discount_code?: string | null;
 }
 
 export interface TrainerBillingOverview {
@@ -51,6 +63,8 @@ export interface TrainerBillingOverview {
   athletes?: { active: number; pending_invites: number };
   plans?: TrainerPlan[];
   requests?: TrainerPaymentRequest[];
+  /** False until the discount-code tables exist. */
+  discounts_enabled?: boolean;
   receipts?: ReceiptRules;
   payment?: PaymentInfo;
 }
@@ -59,21 +73,27 @@ export async function getTrainerBilling(): Promise<TrainerBillingOverview> {
   return api.get<TrainerBillingOverview>("/trainer-billing");
 }
 
+/** The price a discount code gives for a plan, before the trainer files the payment. */
+export async function checkTrainerDiscount(planId: string, code: string): Promise<DiscountQuote> {
+  return api.post<DiscountQuote>("/trainer-billing/discount-check", { plan_id: planId, code });
+}
+
 export async function submitTrainerPayment(input: {
   planId: string;
-  trackingCode: string;
-  cardLast4: string;
+  /** Not needed when a discount code covers the whole price. */
+  trackingCode?: string;
+  cardLast4?: string;
   paidAt?: string;
   note?: string;
+  discountCode?: string;
   receipt?: File | null;
 }): Promise<void> {
-  const fields: Record<string, string> = {
-    plan_id: input.planId,
-    tracking_code: input.trackingCode,
-    card_last4: input.cardLast4,
-  };
+  const fields: Record<string, string> = { plan_id: input.planId };
+  if (input.trackingCode) fields.tracking_code = input.trackingCode;
+  if (input.cardLast4) fields.card_last4 = input.cardLast4;
   if (input.paidAt) fields.paid_at = input.paidAt;
   if (input.note) fields.reference_note = input.note;
+  if (input.discountCode) fields.discount_code = input.discountCode;
 
   if (input.receipt) {
     await api.upload("/trainer-billing/requests", input.receipt, fields, "receipt");
@@ -169,4 +189,45 @@ export async function grantTrainerDays(input: {
     days: input.days,
     plan_id: input.planId || null,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Discount codes (admin)
+// ---------------------------------------------------------------------------
+
+// The server calls the once-per-person rule once_per_trainer; the discount
+// dialog shared with the club codes calls it once_per_club, so it is renamed
+// here in both directions.
+type TrainerDiscountRow = Omit<DiscountCodeRow, "once_per_club"> & { once_per_trainer: boolean };
+
+export async function listTrainerDiscounts(): Promise<{
+  ready: boolean;
+  items: DiscountCodeRow[];
+  plans: { id: string; name: string; price_toman: number; is_active: boolean }[];
+}> {
+  const data = await api.get<{
+    ready: boolean;
+    items: TrainerDiscountRow[];
+    plans: { id: string; name: string; price_toman: number; is_active: boolean }[];
+  }>("/admin/trainer-discounts");
+  return {
+    ...data,
+    items: data.items.map(({ once_per_trainer, ...row }) => ({ ...row, once_per_club: once_per_trainer })),
+  };
+}
+
+function toTrainerDiscountPayload({ once_per_club, ...input }: DiscountCodeInput) {
+  return { ...input, once_per_trainer: once_per_club };
+}
+
+export async function createTrainerDiscount(input: DiscountCodeInput): Promise<void> {
+  await api.post("/admin/trainer-discounts", toTrainerDiscountPayload(input));
+}
+
+export async function updateTrainerDiscount(id: string, input: DiscountCodeInput): Promise<void> {
+  await api.patch(`/admin/trainer-discounts/${id}`, toTrainerDiscountPayload(input));
+}
+
+export async function deleteTrainerDiscount(id: string): Promise<void> {
+  await api.delete(`/admin/trainer-discounts/${id}`);
 }

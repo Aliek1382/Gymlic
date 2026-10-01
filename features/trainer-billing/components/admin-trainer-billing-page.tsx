@@ -37,7 +37,11 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
 import {
   approveTrainerRequest,
+  createTrainerDiscount,
+  deleteTrainerDiscount,
   grantTrainerDays,
+  listTrainerDiscounts,
+  updateTrainerDiscount,
   listAdminTrainerPlans,
   listTrainerRequests,
   listTrainerSubscriptions,
@@ -48,8 +52,21 @@ import {
   type TrainerPlan,
   type TrainerRequestStatus,
 } from "../services/trainer-billing-service";
+import { DiscountCodesManager } from "@/features/admin/components/discount-codes-manager";
 import { SubscriptionStatusBadge } from "@/features/admin/components/subscription-status-badge";
 import { TrainerPlanDialog } from "./trainer-plan-dialog";
+
+const DISCOUNT_CONFIG = {
+  queryKey: ["admin", "trainer-discounts"],
+  load: listTrainerDiscounts,
+  create: createTrainerDiscount,
+  update: updateTrainerDiscount,
+  remove: deleteTrainerDiscount,
+  onceLabel: "هر مربی فقط یک بار",
+  onceBadge: "یک بار برای هر مربی",
+  notReady: "به‌روزرسانی «کد تخفیف و یادآور پایان اشتراک مربی» را از صفحهٔ «به‌روزرسانی دیتابیس» اجرا کنید.",
+  emptyText: "با «کد جدید» اولین کد را بسازید.",
+};
 
 const STATUS_LABEL: Record<TrainerRequestStatus, string> = {
   pending: "در انتظار",
@@ -97,6 +114,7 @@ export function AdminTrainerBillingPage() {
           <TabsList>
             <TabsTrigger value="requests">پرداخت‌ها ({formatNumber(pendingCount)} در انتظار)</TabsTrigger>
             <TabsTrigger value="plans">پلن‌ها</TabsTrigger>
+            <TabsTrigger value="discounts">کدهای تخفیف</TabsTrigger>
             <TabsTrigger value="subscriptions">اشتراک‌ها</TabsTrigger>
           </TabsList>
           <TabsContent value="requests">
@@ -104,6 +122,14 @@ export function AdminTrainerBillingPage() {
           </TabsContent>
           <TabsContent value="plans">
             <PlansTab />
+          </TabsContent>
+          <TabsContent value="discounts" className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              مربیان هنگام خرید پلن کد را وارد می‌کنند و مبلغ با تخفیف حساب می‌شود. هر پرداختِ در انتظار
+              یا تأییدشده یک بار استفاده حساب می‌شود؛ پرداختی که رد شود، استفاده‌اش برمی‌گردد. کدی که
+              کل مبلغ را بپوشاند، بدون رسید ثبت می‌شود و شما آن را تأیید می‌کنید.
+            </p>
+            <DiscountCodesManager config={DISCOUNT_CONFIG} />
           </TabsContent>
           <TabsContent value="subscriptions">
             <SubscriptionsTab />
@@ -175,8 +201,21 @@ function RequestsTab({ rows }: { rows: AdminTrainerRequest[] }) {
                 <TableCell className="text-muted-foreground">
                   {request.plan_name}
                   <p className="text-xs">{formatToman(request.amount_toman)} تومان</p>
+                  {!!request.discount_toman && request.discount_toman > 0 && (
+                    <p className="text-xs">
+                      {request.list_price_toman != null && (
+                        <span className="line-through">{formatToman(request.list_price_toman)}</span>
+                      )}{" "}
+                      کد <span dir="ltr" className="font-mono">{request.discount_code ?? "—"}</span>
+                      {" · "}
+                      {formatToman(request.discount_toman)} تخفیف
+                    </p>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
+                  {request.tracking_code === "DISCOUNT" ? (
+                    <Badge variant="secondary">تخفیف کامل، بدون پرداخت</Badge>
+                  ) : (
                   <div className="space-y-1">
                     <p dir="ltr" className="text-end font-mono text-xs text-foreground">
                       {request.tracking_code}
@@ -192,6 +231,7 @@ function RequestsTab({ rows }: { rows: AdminTrainerRequest[] }) {
                     )}
                     {request.duplicate_tracking && <Badge variant="warning">کد پیگیری تکراری</Badge>}
                   </div>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {request.has_receipt ? (

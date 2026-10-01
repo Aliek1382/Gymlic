@@ -127,12 +127,25 @@ export async function giftAllSubscriptions(input: {
 // ---------------------------------------------------------------------------
 
 export interface RevenueReport {
+  /** Clubs and trainers together. */
   total: number;
   count: number;
   discount_total: number;
+  /** The same total split by who paid. */
+  sources: {
+    clubs: { count: number; total: number };
+    trainers: { count: number; total: number };
+  };
   /** Newest first; month is the Jalali "1405/07". */
-  months: { month: string; count: number; total: number; discount: number }[];
-  plans: { plan_name: string; count: number; total: number }[];
+  months: {
+    month: string;
+    count: number;
+    total: number;
+    discount: number;
+    clubs_total: number;
+    trainers_total: number;
+  }[];
+  plans: { plan_name: string; kind: "club" | "trainer"; count: number; total: number }[];
 }
 
 export async function getRevenueReport(): Promise<RevenueReport> {
@@ -201,7 +214,7 @@ export async function deleteDiscountCode(id: string) {
 // CSV exports
 // ---------------------------------------------------------------------------
 
-export type ExportKind = "users" | "payments" | "subscriptions" | "revenue";
+export type ExportKind = "users" | "payments" | "trainer-payments" | "subscriptions" | "revenue";
 
 /**
  * Like the database backup, a CSV is a file rather than JSON: fetched with

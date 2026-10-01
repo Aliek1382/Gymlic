@@ -62,6 +62,7 @@ use Gymlic\Controllers\SupplementController;
 use Gymlic\Controllers\SupportController;
 use Gymlic\Controllers\TechniqueController;
 use Gymlic\Controllers\TrainerBillingController;
+use Gymlic\Controllers\TrainerDiscountController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
@@ -280,6 +281,7 @@ $router->post('/payment-requests', fn () => AdminController::submitPaymentReques
 $router->get('/payment-requests/{id}/receipt', fn (array $p) => ReceiptController::show($p));
 $router->get('/trainer-billing', fn () => TrainerBillingController::overview());
 $router->post('/trainer-billing/requests', fn () => TrainerBillingController::submit());
+$router->post('/trainer-billing/discount-check', fn () => TrainerBillingController::checkDiscount());
 $router->get('/trainer-billing/requests/{id}/receipt', fn (array $p) => TrainerBillingController::receipt($p));
 $router->get('/billing/info', fn () => BillingController::info());
 $router->post('/billing/discount-check', fn () => BillingController::checkDiscount());
@@ -302,6 +304,10 @@ $router->post('/admin/trainer-billing/requests/{id}/reject', fn (array $p) => Tr
 $router->delete('/admin/trainer-billing/requests/{id}/receipt', fn (array $p) => TrainerBillingController::deleteReceipt($p));
 $router->get('/admin/trainer-billing/subscriptions', fn () => TrainerBillingController::adminSubscriptions());
 $router->post('/admin/trainer-billing/subscriptions/{trainerId}/grant', fn (array $p) => TrainerBillingController::grant($p));
+$router->get('/admin/trainer-discounts', fn () => TrainerDiscountController::list());
+$router->post('/admin/trainer-discounts', fn () => TrainerDiscountController::create());
+$router->patch('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::update($p));
+$router->delete('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::delete($p));
 $router->get('/admin/trainer-plans', fn () => TrainerBillingController::adminPlans());
 $router->post('/admin/trainer-plans', fn () => TrainerBillingController::createPlan());
 $router->patch('/admin/trainer-plans/{id}', fn (array $p) => TrainerBillingController::updatePlan($p));
