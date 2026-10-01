@@ -7,6 +7,7 @@ use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Receipts;
 use Gymlic\Response;
@@ -14,6 +15,7 @@ use Gymlic\Settings;
 use Gymlic\Subscriptions;
 use Gymlic\Templates;
 use Gymlic\TrainerBilling;
+use Gymlic\TrainerDiscounts;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use PDO;
@@ -45,18 +47,22 @@ final class TrainerBillingController
 
         $pdo = Database::connection();
         $billing = Settings::get('billing');
+        TrainerBilling::remindIfDue($pdo);
 
         $plans = $pdo->query(
             'SELECT id, name, price_toman, duration_days, max_athletes FROM trainer_plans
              WHERE is_active = 1 ORDER BY price_toman ASC'
         )->fetchAll();
 
+        $discounts = TrainerDiscounts::ready();
         $stmt = $pdo->prepare(
             'SELECT r.id, r.plan_id, r.amount_toman, r.reference_note, r.tracking_code, r.card_last4, r.paid_at,
                     r.status, r.admin_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE \'%.pdf\') AS receipt_is_pdf,
-                    p.name AS plan_name
-             FROM trainer_payment_requests r JOIN trainer_plans p ON p.id = r.plan_id
+                    p.name AS plan_name'
+            . ($discounts ? ', r.list_price_toman, r.discount_toman, dc.code AS discount_code' : '') . '
+             FROM trainer_payment_requests r JOIN trainer_plans p ON p.id = r.plan_id'
+            . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '') . '
              WHERE r.trainer_id = :id ORDER BY r.created_at DESC LIMIT 50'
         );
         $stmt->execute(['id' => $user['id']]);
@@ -68,7 +74,8 @@ final class TrainerBillingController
             'subscription' => TrainerBilling::subscription($pdo, $user['id']),
             'athletes'     => TrainerBilling::athleteCounts($pdo, $user['id']),
             'plans'        => Cast::rows($plans, [], ['price_toman', 'duration_days', 'max_athletes']),
-            'requests'     => Cast::rows($stmt->fetchAll(), [], ['amount_toman'], ['has_receipt', 'receipt_is_pdf']),
+            'discounts_enabled' => $discounts,
+            'requests'     => Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf']),
             'receipts'     => [
                 'required'       => $billing['receipt_required'],
                 'max_mb'         => $billing['receipt_max_mb'],
@@ -111,46 +118,91 @@ final class TrainerBillingController
             return;
         }
 
-        $fields = Receipts::parseFields($data);
-        if (isset($fields['error'])) {
-            Response::error(400, $fields['error'][0], $fields['error'][1]);
+        // A discount code, checked now so we know whether anything is left to
+        // pay, and again inside the transaction with the code row locked.
+        $code = Discounts::normalizeCode($data['discount_code'] ?? '');
+        if ($code !== '' && !TrainerDiscounts::ready()) {
+            Response::error(409, 'discounts_unavailable', 'کد تخفیف فعلاً پذیرفته نمی‌شود.');
             return;
         }
-
-        $billing = Settings::get('billing');
-        $file = null;
-        $upload = $_FILES['receipt'] ?? null;
-        if ($upload !== null && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            $stored = Receipts::store($upload, $billing['receipt_max_mb']);
-            if (!$stored['ok']) {
-                Response::error($stored['status'], $stored['code'], $stored['message']);
+        $quote = null;
+        if ($code !== '') {
+            $quote = TrainerDiscounts::evaluate($pdo, $code, $plan, $user['id']);
+            if (!$quote['ok']) {
+                Response::error(409, $quote['error'], $quote['message']);
                 return;
             }
-            $file = $stored['file'];
-        } elseif ($billing['receipt_required']) {
-            Response::error(400, 'receipt_required', 'تصویر یا فایل رسید پرداخت را پیوست کنید.');
-            return;
+        }
+
+        // A code that covers the whole price leaves nothing to pay: no tracking
+        // code or receipt, just a request for the admin to approve.
+        $free = $quote !== null && $quote['final'] === 0;
+        $billing = Settings::get('billing');
+        $file = null;
+        if ($free) {
+            $fields = ['row' => ['tracking_code' => 'DISCOUNT', 'card_last4' => '0000', 'paid_at' => null]];
+        } else {
+            $fields = Receipts::parseFields($data);
+            if (isset($fields['error'])) {
+                Response::error(400, $fields['error'][0], $fields['error'][1]);
+                return;
+            }
+
+            $upload = $_FILES['receipt'] ?? null;
+            if ($upload !== null && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $stored = Receipts::store($upload, $billing['receipt_max_mb']);
+                if (!$stored['ok']) {
+                    Response::error($stored['status'], $stored['code'], $stored['message']);
+                    return;
+                }
+                $file = $stored['file'];
+            } elseif ($billing['receipt_required']) {
+                Response::error(400, 'receipt_required', 'تصویر یا فایل رسید پرداخت را پیوست کنید.');
+                return;
+            }
         }
 
         $id = Uuid::v4();
+        $row = [
+            'id'            => $id,
+            'trainer_id'    => $user['id'],
+            'plan_id'       => $plan['id'],
+            // The plan's price at this moment: the admin may edit it later.
+            'amount_toman'  => (int) $plan['price_toman'],
+            'reference_note' => self::text($data['reference_note'] ?? '', 500),
+            'tracking_code' => $fields['row']['tracking_code'],
+            'card_last4'    => $fields['row']['card_last4'],
+            'paid_at'       => $fields['row']['paid_at'],
+            'receipt_path'  => $file,
+        ];
+
+        $pdo->beginTransaction();
         try {
+            if ($quote !== null) {
+                // Again, with the code locked: it may have run out since.
+                $locked = TrainerDiscounts::evaluate($pdo, $code, $plan, $user['id'], true);
+                if (!$locked['ok']) {
+                    $pdo->rollBack();
+                    Receipts::remove($file);
+                    Response::error(409, $locked['error'], $locked['message']);
+                    return;
+                }
+                $row['amount_toman'] = $locked['final'];
+                $row += [
+                    'discount_code_id' => $locked['code']['id'],
+                    'list_price_toman' => $locked['list_price'],
+                    'discount_toman'   => $locked['discount'],
+                ];
+            }
             $pdo->prepare(
-                'INSERT INTO trainer_payment_requests
-                   (id, trainer_id, plan_id, amount_toman, reference_note, tracking_code, card_last4, paid_at, receipt_path)
-                 VALUES (:id, :trainer_id, :plan_id, :amount, :note, :tracking_code, :card_last4, :paid_at, :receipt_path)'
-            )->execute([
-                'id'            => $id,
-                'trainer_id'    => $user['id'],
-                'plan_id'       => $plan['id'],
-                // The plan's price at this moment: the admin may edit it later.
-                'amount'        => (int) $plan['price_toman'],
-                'note'          => self::text($data['reference_note'] ?? '', 500),
-                'tracking_code' => $fields['row']['tracking_code'],
-                'card_last4'    => $fields['row']['card_last4'],
-                'paid_at'       => $fields['row']['paid_at'],
-                'receipt_path'  => $file,
-            ]);
+                'INSERT INTO trainer_payment_requests (' . implode(', ', array_keys($row)) . ')
+                 VALUES (:' . implode(', :', array_keys($row)) . ')'
+            )->execute($row);
+            $pdo->commit();
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             Receipts::remove($file);
             throw $e;
         }
@@ -165,7 +217,7 @@ final class TrainerBillingController
                     'broadcast',
                     [
                         'name'   => trim($user['first_name'] . ' ' . $user['last_name']) ?: 'مربی',
-                        'amount' => number_format((int) $plan['price_toman']),
+                        'amount' => number_format((int) $row['amount_toman']),
                     ],
                     '/admin/trainer-billing'
                 );
@@ -178,6 +230,42 @@ final class TrainerBillingController
         }
 
         Response::ok(['id' => $id], 201);
+    }
+
+    /** POST /trainer-billing/discount-check {plan_id, code}: the price a code gives, before filing. */
+    public static function checkDiscount(): void
+    {
+        $user = self::requireTrainer();
+        $data = Validate::required(Validate::body(), ['code', 'plan_id']);
+        if (!self::ready()) {
+            return;
+        }
+        if (!TrainerDiscounts::ready()) {
+            Response::error(409, 'discounts_unavailable', 'کد تخفیف فعلاً پذیرفته نمی‌شود.');
+            return;
+        }
+
+        $pdo = Database::connection();
+        $plan = $pdo->prepare('SELECT id, name, price_toman FROM trainer_plans WHERE id = :id AND is_active = 1');
+        $plan->execute(['id' => (string) $data['plan_id']]);
+        $plan = $plan->fetch();
+        if ($plan === false) {
+            Response::error(404, 'plan_not_found', 'این پلن در دسترس نیست.');
+            return;
+        }
+
+        $result = TrainerDiscounts::evaluate($pdo, (string) $data['code'], $plan, $user['id']);
+        if (!$result['ok']) {
+            Response::error(409, $result['error'], $result['message']);
+            return;
+        }
+
+        Response::ok([
+            'code'             => $result['code']['code'],
+            'list_price_toman' => $result['list_price'],
+            'discount_toman'   => $result['discount'],
+            'final_toman'      => $result['final'],
+        ]);
     }
 
     /** GET /trainer-billing/requests/{id}/receipt: the trainer who filed it, or a finance admin. */
@@ -220,19 +308,22 @@ final class TrainerBillingController
         }
 
         $pdo = Database::connection();
+        $discounts = TrainerDiscounts::ready();
         $rows = $pdo->query(
             "SELECT r.id, r.trainer_id, r.plan_id, r.amount_toman, r.reference_note, r.tracking_code, r.card_last4,
                     r.paid_at, r.status, r.admin_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE '%.pdf') AS receipt_is_pdf,
                     p.name AS plan_name, t.first_name, t.last_name, t.phone,
-                    EXISTS (SELECT 1 FROM trainer_payment_requests o
-                            WHERE o.tracking_code = r.tracking_code AND o.id <> r.id) AS duplicate_tracking
+                    (r.tracking_code <> 'DISCOUNT' AND EXISTS (SELECT 1 FROM trainer_payment_requests o
+                            WHERE o.tracking_code = r.tracking_code AND o.id <> r.id)) AS duplicate_tracking"
+            . ($discounts ? ', r.list_price_toman, r.discount_toman, dc.code AS discount_code' : '') . "
              FROM trainer_payment_requests r
              JOIN trainer_plans p ON p.id = r.plan_id
-             JOIN profiles t ON t.id = r.trainer_id
+             JOIN profiles t ON t.id = r.trainer_id"
+            . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '') . "
              ORDER BY r.created_at DESC LIMIT 500"
         )->fetchAll();
-        $rows = Cast::rows($rows, [], ['amount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
+        $rows = Cast::rows($rows, [], ['amount_toman', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
 
         // When the file goes: the retention days after the review.
         $days = Settings::get('billing')['receipt_retention_days'];
@@ -243,6 +334,7 @@ final class TrainerBillingController
         }
         unset($row);
         Receipts::purgeIfDue($pdo);
+        TrainerBilling::remindIfDue($pdo);
 
         Response::ok(['ready' => true, 'items' => $rows]);
     }

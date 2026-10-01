@@ -9,6 +9,8 @@ use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Response;
+use Gymlic\TrainerBilling;
+use Gymlic\TrainerDiscounts;
 
 /**
  * CSV downloads of the admin lists, for Excel. UTF-8 with a BOM, which is
@@ -21,6 +23,7 @@ final class ExportController
     private const KINDS = [
         'users'         => 'users.view',
         'payments'      => 'finance',
+        'trainer-payments' => 'finance',
         'subscriptions' => 'finance',
         'revenue'       => 'finance',
     ];
@@ -42,6 +45,7 @@ final class ExportController
         $rows = match ($kind) {
             'users'         => self::users(),
             'payments'      => self::payments(),
+            'trainer-payments' => self::trainerPayments(),
             'subscriptions' => self::subscriptions(),
             'revenue'       => self::revenue(),
         };
@@ -185,9 +189,50 @@ final class ExportController
     /** Approved payments per Jalali month, newest first. @return list<list<mixed>> */
     private static function revenue(): array
     {
-        $rows = [['ماه', 'تعداد پرداخت تأییدشده', 'جمع دریافتی (تومان)', 'جمع تخفیف (تومان)']];
+        $rows = [['ماه', 'تعداد پرداخت تأییدشده', 'جمع دریافتی (تومان)', 'از باشگاه‌ها (تومان)', 'از مربیان (تومان)', 'جمع تخفیف (تومان)']];
         foreach (AdminBillingController::revenueSummary()['months'] as $m) {
-            $rows[] = [$m['month'], $m['count'], $m['total'], $m['discount']];
+            $rows[] = [$m['month'], $m['count'], $m['total'], $m['clubs_total'], $m['trainers_total'], $m['discount']];
+        }
+        return $rows;
+    }
+
+    /** Every payment trainers filed for their subscription. @return list<list<mixed>> */
+    private static function trainerPayments(): array
+    {
+        $rows = [['تاریخ ثبت', 'مربی', 'موبایل', 'پلن', 'مبلغ پرداختی (تومان)', 'قیمت پلن (تومان)', 'تخفیف (تومان)', 'کد تخفیف', 'کد پیگیری', 'چهار رقم آخر کارت', 'تاریخ واریز', 'وضعیت', 'تاریخ بررسی', 'توضیح مربی', 'یادداشت مدیریت']];
+        if (!TrainerBilling::ready()) {
+            return $rows;
+        }
+
+        $discounts = TrainerDiscounts::ready();
+        $stmt = Database::connection()->query(
+            'SELECT r.created_at, t.first_name, t.last_name, t.phone, p.name AS plan_name, r.amount_toman,
+                    r.tracking_code, r.card_last4, r.paid_at, r.status, r.reviewed_at, r.reference_note, r.admin_note'
+            . ($discounts ? ', r.list_price_toman, r.discount_toman, d.code AS discount_code' : '') . '
+             FROM trainer_payment_requests r
+             JOIN trainer_plans p ON p.id = r.plan_id
+             JOIN profiles t ON t.id = r.trainer_id'
+            . ($discounts ? ' LEFT JOIN trainer_discount_codes d ON d.id = r.discount_code_id' : '') . '
+             ORDER BY r.created_at DESC'
+        );
+        foreach ($stmt->fetchAll() as $r) {
+            $rows[] = [
+                Jalali::format($r['created_at']),
+                trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')),
+                $r['phone'],
+                $r['plan_name'],
+                (int) $r['amount_toman'],
+                isset($r['list_price_toman']) ? (int) $r['list_price_toman'] : null,
+                isset($r['discount_toman']) && (int) $r['discount_toman'] > 0 ? (int) $r['discount_toman'] : null,
+                $r['discount_code'] ?? null,
+                $r['tracking_code'] === 'DISCOUNT' ? null : $r['tracking_code'],
+                $r['tracking_code'] === 'DISCOUNT' ? null : $r['card_last4'],
+                Jalali::format($r['paid_at']),
+                self::REQUEST_STATUS[$r['status']] ?? $r['status'],
+                Jalali::format($r['reviewed_at']),
+                $r['reference_note'],
+                $r['admin_note'],
+            ];
         }
         return $rows;
     }

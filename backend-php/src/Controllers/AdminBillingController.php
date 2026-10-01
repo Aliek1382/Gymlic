@@ -10,6 +10,8 @@ use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Response;
 use Gymlic\Subscriptions;
+use Gymlic\TrainerBilling;
+use Gymlic\TrainerDiscounts;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use Gymlic\Templates;
@@ -307,49 +309,75 @@ final class AdminBillingController
 
     /**
      * Approved payments, by the Jalali month they were approved in (when the
-     * money counts as received) and by plan. The reports page and its CSV
-     * both come from here, so they always agree.
+     * money counts as received) and by plan: clubs' subscriptions and
+     * trainers' subscriptions together, with the split kept alongside. The
+     * reports page and its CSV both come from here, so they always agree.
      *
-     * @return array{total: int, count: int, discount_total: int, months: list<array>, plans: list<array>}
+     * @return array{total: int, count: int, discount_total: int, sources: array, months: list<array>, plans: list<array>}
      */
     public static function revenueSummary(): array
     {
+        $pdo = Database::connection();
         $discounts = Discounts::ready();
-        $rows = Database::connection()->query(
+        $payments = [];
+        foreach ($pdo->query(
             "SELECT COALESCE(pr.reviewed_at, pr.created_at) AS paid_at, pr.amount_toman, p.name AS plan_name"
             . ($discounts ? ', pr.discount_toman' : ', 0 AS discount_toman') . "
              FROM payment_requests pr
              JOIN plans p ON p.id = pr.plan_id
              WHERE pr.status = 'approved'"
-        )->fetchAll();
+        )->fetchAll() as $r) {
+            $payments[] = $r + ['kind' => 'club'];
+        }
+
+        if (TrainerBilling::ready()) {
+            $trainerDiscounts = TrainerDiscounts::ready();
+            foreach ($pdo->query(
+                "SELECT COALESCE(r.reviewed_at, r.created_at) AS paid_at, r.amount_toman, p.name AS plan_name"
+                . ($trainerDiscounts ? ', r.discount_toman' : ', 0 AS discount_toman') . "
+                 FROM trainer_payment_requests r
+                 JOIN trainer_plans p ON p.id = r.plan_id
+                 WHERE r.status = 'approved'"
+            )->fetchAll() as $r) {
+                $payments[] = $r + ['kind' => 'trainer'];
+            }
+        }
 
         $months = [];
         $plans = [];
+        $sources = ['clubs' => ['count' => 0, 'total' => 0], 'trainers' => ['count' => 0, 'total' => 0]];
         $total = 0;
         $discountTotal = 0;
-        foreach ($rows as $r) {
+        foreach ($payments as $r) {
             $amount = (int) $r['amount_toman'];
             $discount = (int) $r['discount_toman'];
+            $isTrainer = $r['kind'] === 'trainer';
             $total += $amount;
             $discountTotal += $discount;
+            $sources[$isTrainer ? 'trainers' : 'clubs']['count']++;
+            $sources[$isTrainer ? 'trainers' : 'clubs']['total'] += $amount;
 
             $key = substr(Jalali::format($r['paid_at']), 0, 7);
-            $months[$key] ??= ['month' => $key, 'count' => 0, 'total' => 0, 'discount' => 0];
+            $months[$key] ??= ['month' => $key, 'count' => 0, 'total' => 0, 'discount' => 0, 'clubs_total' => 0, 'trainers_total' => 0];
             $months[$key]['count']++;
             $months[$key]['total'] += $amount;
             $months[$key]['discount'] += $discount;
+            $months[$key][$isTrainer ? 'trainers_total' : 'clubs_total'] += $amount;
 
-            $plans[$r['plan_name']] ??= ['plan_name' => $r['plan_name'], 'count' => 0, 'total' => 0];
-            $plans[$r['plan_name']]['count']++;
-            $plans[$r['plan_name']]['total'] += $amount;
+            // A club plan and a trainer plan may share a name: keep them apart.
+            $planKey = $r['kind'] . '|' . $r['plan_name'];
+            $plans[$planKey] ??= ['plan_name' => $r['plan_name'], 'kind' => $r['kind'], 'count' => 0, 'total' => 0];
+            $plans[$planKey]['count']++;
+            $plans[$planKey]['total'] += $amount;
         }
         krsort($months);
         usort($plans, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
 
         return [
             'total'          => $total,
-            'count'          => count($rows),
+            'count'          => count($payments),
             'discount_total' => $discountTotal,
+            'sources'        => $sources,
             'months'         => array_values($months),
             'plans'          => array_values($plans),
         ];

@@ -75,9 +75,100 @@ final class TrainerBilling
              ON DUPLICATE KEY UPDATE plan_name = VALUES(plan_name), max_athletes = VALUES(max_athletes),
                                      expires_at = VALUES(expires_at)'
             . ($running ? '' : ', started_at = NOW()')
+            // A new expiry earns its own reminders.
+            . (self::remindersReady() ? ', reminder_stage = 0' : '')
         )->execute(['id' => $trainerId, 'plan' => $planName, 'cap' => $maxAthletes, 'expires' => $expiresAt]);
 
         return $expiresAt;
+    }
+
+    /** False until trainer-billing-extras-update.sql has been run on this database. */
+    public static function remindersReady(): bool
+    {
+        return Database::hasColumn('trainer_subscriptions', 'reminder_stage');
+    }
+
+    /**
+     * Tells trainers their subscription is about to end (once, from the
+     * "running out" window in the billing settings) and that it has ended
+     * (once). Each notice is sent once per expiry: extending the
+     * subscription starts over. Trainers who belong to a club are skipped,
+     * the club's subscription covers them. Returns how many of each.
+     *
+     * @return array{expiring: int, expired: int}
+     */
+    public static function sendReminders(PDO $pdo): array
+    {
+        $sent = ['expiring' => 0, 'expired' => 0];
+        if (!self::ready() || !self::remindersReady()) {
+            return $sent;
+        }
+
+        $window = (int) Settings::get('billing')['expiring_days'];
+        $due = $pdo->prepare(
+            "SELECT s.trainer_id, s.expires_at, s.reminder_stage FROM trainer_subscriptions s
+             JOIN profiles p ON p.id = s.trainer_id AND p.account_type = 'trainer' AND p.is_suspended = 0
+             WHERE ((s.reminder_stage < 1 AND s.expires_at > NOW() AND s.expires_at <= :soon)
+                 OR (s.reminder_stage < 2 AND s.expires_at <= NOW()))
+               AND NOT EXISTS (SELECT 1 FROM memberships m
+                               WHERE m.user_id = s.trainer_id AND m.role = 'trainer' AND m.status = 'active')"
+        );
+        $due->execute(['soon' => date('Y-m-d H:i:s', time() + $window * 86400)]);
+
+        foreach ($due->fetchAll() as $row) {
+            $expired = strtotime($row['expires_at']) <= time();
+            // Claim the notice first: a second run must not send it again.
+            $stage = $expired ? 2 : 1;
+            $claim = $pdo->prepare(
+                'UPDATE trainer_subscriptions SET reminder_stage = :stage WHERE trainer_id = :id AND reminder_stage < :below'
+            );
+            $claim->execute(['stage' => $stage, 'below' => $stage, 'id' => $row['trainer_id']]);
+            if ($claim->rowCount() === 0) {
+                continue;
+            }
+
+            Templates::notify(
+                $pdo,
+                $expired ? 'trainer_subscription_expired' : 'trainer_subscription_expiring',
+                $row['trainer_id'],
+                null,
+                'broadcast',
+                [
+                    'date' => Jalali::format($row['expires_at'], true),
+                    'days' => (string) max(1, (int) ceil((strtotime($row['expires_at']) - time()) / 86400)),
+                ],
+                '/subscription'
+            );
+            $sent[$expired ? 'expired' : 'expiring']++;
+        }
+
+        return $sent;
+    }
+
+    /**
+     * sendReminders at most once every few hours, for the requests that reach
+     * the host before (or without) its cron job. Never throws.
+     */
+    public static function remindIfDue(PDO $pdo): void
+    {
+        try {
+            $stmt = $pdo->prepare('SELECT value FROM app_settings WHERE setting_key = :key');
+            $stmt->execute(['key' => 'cron.trainer-subscription-reminders']);
+            $last = json_decode((string) $stmt->fetchColumn(), true);
+            if (is_array($last) && isset($last['at']) && strtotime((string) $last['at']) > time() - 6 * 3600) {
+                return;
+            }
+            $sent = self::sendReminders($pdo);
+            CronHeartbeat::record('trainer-subscription-reminders', self::reminderSummary($sent));
+        } catch (\Throwable $e) {
+            error_log('trainer reminders: ' . $e->getMessage());
+        }
+    }
+
+    /** @param array{expiring: int, expired: int} $sent */
+    public static function reminderSummary(array $sent): string
+    {
+        return "trainer reminders: {$sent['expiring']} ending soon, {$sent['expired']} expired";
     }
 
     /** Whether the trainer belongs to a club (and so is covered by the club's subscription). */

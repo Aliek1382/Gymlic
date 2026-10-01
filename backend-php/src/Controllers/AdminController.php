@@ -19,6 +19,7 @@ use Gymlic\Subscriptions;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use Gymlic\Templates;
+use Gymlic\TrainerBilling;
 use PDO;
 use Throwable;
 
@@ -575,6 +576,18 @@ final class AdminController
                (SELECT COALESCE(SUM(amount_toman), 0) FROM payment_requests
                  WHERE status = 'approved') AS total_revenue"
         )->fetch();
+
+        // Trainers' subscription payments count with the clubs': the same
+        // revenue figure as the finance report, and the same waiting queue.
+        if (TrainerBilling::ready()) {
+            $trainerPayments = $pdo->query(
+                "SELECT COALESCE(SUM(CASE WHEN status = 'approved' THEN amount_toman END), 0) AS revenue,
+                        COALESCE(SUM(status = 'pending'), 0) AS pending
+                 FROM trainer_payment_requests"
+            )->fetch();
+            $counts['total_revenue'] = (int) $counts['total_revenue'] + (int) $trainerPayments['revenue'];
+            $counts['pending_requests_count'] = (int) $counts['pending_requests_count'] + (int) $trainerPayments['pending'];
+        }
 
         // Counted from the expiry dates: the stored status column is never
         // moved on as time passes (see Subscriptions).
