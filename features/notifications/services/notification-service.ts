@@ -63,25 +63,3 @@ export async function markNotificationRead(id: string): Promise<void> {
 export async function markAllNotificationsRead(): Promise<void> {
   await api.post("/notifications/read-all");
 }
-
-export interface BroadcastNotificationInput {
-  title: string;
-  body?: string | null;
-  link?: string | null;
-  // Omitted or empty = every profile on the platform; otherwise only the
-  // active members (any role) of these clubs.
-  clubIds?: string[];
-}
-
-/** Fans out one notification to every profile (or every member of the given
- * clubs) — restricted server-side to profiles.is_platform_admin. */
-export async function sendBroadcastNotification(
-  input: BroadcastNotificationInput
-): Promise<void> {
-  await api.post("/admin/notifications/broadcast", {
-    title: input.title,
-    body: input.body ?? null,
-    link: input.link ?? null,
-    club_ids: input.clubIds && input.clubIds.length > 0 ? input.clubIds : null,
-  });
-}

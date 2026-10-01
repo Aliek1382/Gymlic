@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { GymlicMark } from "@/components/brand/gymlic-mark";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { SupportContact, usePublicSettings } from "@/features/site-settings";
+import { SitePageLinks } from "@/features/site-pages/components/site-page-links";
 import { useSignInWithPassword, useVerifyLoginCode } from "../hooks/use-sign-in-with-password";
 import { resendLoginCode, type TwoFactorChallenge } from "../services/auth-service";
 import { useSignUpWithPassword } from "../hooks/use-sign-up-with-password";
@@ -43,7 +44,7 @@ export function AuthSplitCard() {
   const [mode, setMode] = useState<Mode>("login");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4">
       <div className="flex w-full max-w-4xl overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-[58%]">
           <div className="mb-8 flex items-center justify-end gap-2.5 lg:hidden">
@@ -65,6 +66,7 @@ export function AuthSplitCard() {
           description={COPY[mode].description}
         />
       </div>
+      <SitePageLinks />
     </div>
   );
 }

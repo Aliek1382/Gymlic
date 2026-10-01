@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /**
  * A trainer's own custom form — free text, multiple choice and number
@@ -263,15 +264,13 @@ final class QuestionnaireController
             throw $e;
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            $invoiceId === null ? 'questionnaire_assigned' : 'questionnaire_invoiced',
             $athleteId,
             $user['id'],
             'questionnaire_assigned',
-            'پرسشنامهٔ جدید',
-            $invoiceId === null
-                ? 'مربی شما پرسشنامه «' . $questionnaire['title'] . '» را برایتان فرستاد.'
-                : 'برای پرسشنامه «' . $questionnaire['title'] . '» فاکتوری به مبلغ ' . number_format($price) . ' تومان صادر شد.',
+            ['title' => $questionnaire['title'], 'amount' => number_format((float) $price)],
             '/questionnaires',
             ['response_id' => $responseId, 'questionnaire_id' => $questionnaire['id']]
         );
@@ -390,13 +389,13 @@ final class QuestionnaireController
             throw $e;
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'questionnaire_submitted',
             $response['coach_id'],
             $user['id'],
             'questionnaire_submitted',
-            'پاسخ جدید',
-            'یکی از ورزشکارانتان به پرسشنامه «' . $response['title'] . '» پاسخ داد.',
+            ['title' => $response['title']],
             '/questionnaires',
             ['response_id' => $response['id'], 'questionnaire_id' => $response['questionnaire_id']]
         );

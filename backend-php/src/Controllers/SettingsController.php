@@ -11,6 +11,7 @@ use Gymlic\MailGateway;
 use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\SmsGateway;
+use Gymlic\Templates;
 use Gymlic\Validate;
 use Throwable;
 
@@ -30,6 +31,7 @@ final class SettingsController
         'limits'        => 'settings',
         'points_levels' => 'content',
         'billing'       => 'finance',
+        'templates'     => 'notifications',
     ];
 
     /**
@@ -71,6 +73,8 @@ final class SettingsController
         Response::ok([
             'settings'        => $settings,
             'feature_catalog' => Features::catalog(),
+            'template_catalog' => Templates::catalog(),
+            'template_groups' => Templates::GROUPS,
             'storage_ready'   => Settings::storageReady(),
             // What is actually in effect, wherever it comes from.
             'delivery'        => [
@@ -89,7 +93,7 @@ final class SettingsController
     /** Replaces one settings group. Body: {"value": {...}}. */
     public static function adminUpdate(array $params): void
     {
-        $admin = Auth::requireAdmin(['settings', 'content', 'finance']);
+        $admin = Auth::requireAdmin(['settings', 'content', 'finance', 'notifications']);
         $key = $params['key'];
 
         if (!in_array($key, Settings::KEYS, true)) {

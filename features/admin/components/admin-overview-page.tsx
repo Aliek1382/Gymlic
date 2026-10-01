@@ -4,11 +4,13 @@ import {
   Banknote,
   Clock,
   Dumbbell,
+  Headset,
   ReceiptText,
   Users,
   UsersRound,
 } from "lucide-react";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { getAdminOverview } from "../services/admin-service";
@@ -34,6 +36,8 @@ export function AdminOverviewPage() {
   const expiringSubs = data?.expiring_subs ?? 0;
   const expiredSubs = data?.expired_subs ?? 0;
   const totalRevenue = data?.total_revenue ?? 0;
+  // Only for an admin who answers support tickets, once the tables exist.
+  const openSupport = data?.open_support_tickets;
 
   return (
 
@@ -89,6 +93,16 @@ export function AdminOverviewPage() {
               value={`${formatToman(totalRevenue)} تومان`}
             />
           </>
+        )}
+        {openSupport !== undefined && (
+          <Link href="/admin/support" className="contents">
+            <StatisticCard
+              icon={Headset}
+              title="تیکت پشتیبانی منتظر پاسخ"
+              value={formatNumber(openSupport)}
+              iconClassName={openSupport > 0 ? "bg-warning-muted text-warning" : undefined}
+            />
+          </Link>
         )}
         <StatisticCard
           icon={Users}

@@ -11,6 +11,7 @@ use Gymlic\Security;
 use Gymlic\Settings;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 use PDO;
 
 final class AuthController
@@ -293,7 +294,7 @@ final class AuthController
         ]);
 
         if ($wasUnset && $role !== 'club') {
-            self::notify($pdo, $user['id'], $user['id'], 'complete_profile', 'تکمیل پروفایل', 'برای شروع، پروفایل خود را تکمیل کنید.', '/settings');
+            Templates::notify($pdo, 'complete_profile', $user['id'], $user['id'], 'complete_profile', [], '/settings');
         }
 
         Response::ok(['user' => self::profilePublic(self::fetchProfile($user['id']))]);

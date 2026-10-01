@@ -17,12 +17,14 @@ final class Gate
     /**
      * Never gated: the health check, signing in/out (an admin has to be able
      * to log in during maintenance), the settings the frontend needs to show
-     * the right screen, and the admin panel itself.
+     * the right screen, the public text pages (terms, privacy), and the admin
+     * panel itself.
      */
     private const OPEN = [
         '#^/health$#',
         '#^/auth/#',
         '#^/settings/public$#',
+        '#^/pages(/|$)#',
         '#^/admin/#',
     ];
 

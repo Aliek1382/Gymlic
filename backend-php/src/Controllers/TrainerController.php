@@ -10,6 +10,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /** Club-side trainer roster. The trainer's own athlete roster is AthleteController. */
 final class TrainerController
@@ -142,13 +143,13 @@ final class TrainerController
 
         $club = $pdo->prepare('SELECT name FROM clubs WHERE id = :id');
         $club->execute(['id' => $membership['club_id']]);
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'club_trainer_removed',
             $membership['user_id'],
             $user['id'],
             'membership_removed',
-            'پایان همکاری',
-            'همکاری شما با باشگاه «' . ($club->fetchColumn() ?: 'باشگاه') . '» پایان یافت.',
+            ['club' => $club->fetchColumn() ?: 'باشگاه'],
             '/dashboard'
         );
 

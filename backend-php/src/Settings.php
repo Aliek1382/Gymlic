@@ -19,7 +19,7 @@ final class Settings
     public const ROLES = ['club', 'trainer', 'athlete'];
 
     public const KEYS = [
-        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing',
+        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing', 'templates',
     ];
 
     /** The groups any visitor may read; everything else is admin-only. */
@@ -177,6 +177,8 @@ final class Settings
                 'instructions'   => self::text($v['instructions'] ?? null, 1000),
                 'expiring_days'  => self::int($v['expiring_days'] ?? null, 7, 1, 60),
             ],
+            // Notification texts; see Templates.
+            'templates' => Templates::normalize($v),
             // Empty = fall back to config.php (see SmsGateway / MailGateway).
             'sms' => [
                 'api_key' => self::text($v['api_key'] ?? null, 200),

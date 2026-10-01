@@ -23,6 +23,7 @@ use Gymlic\Controllers\AdminSystemController;
 use Gymlic\Controllers\AdminUsersController;
 use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\BillingController;
+use Gymlic\Controllers\BroadcastController;
 use Gymlic\Controllers\CalendarController;
 use Gymlic\Controllers\DashboardController;
 use Gymlic\Controllers\EarningsController;
@@ -36,10 +37,12 @@ use Gymlic\Controllers\MessageController;
 use Gymlic\Controllers\TicketController;
 use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\NutritionPlanBuilderController;
+use Gymlic\Controllers\PagesController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\PointsController;
 use Gymlic\Controllers\SessionPackageController;
 use Gymlic\Controllers\SupplementController;
+use Gymlic\Controllers\SupportController;
 use Gymlic\Controllers\TechniqueController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
@@ -349,6 +352,24 @@ $router->get('/notifications/archive', fn () => NotificationController::archive(
 $router->post('/notifications/{id}/read', fn (array $p) => NotificationController::markRead($p));
 $router->post('/notifications/read-all', fn () => NotificationController::markAllRead());
 $router->post('/admin/notifications/broadcast', fn () => NotificationController::broadcast());
+$router->get('/support', fn () => SupportController::listMine());
+$router->post('/support', fn () => SupportController::create());
+$router->get('/support/{id}', fn (array $p) => SupportController::get($p));
+$router->post('/support/{id}/messages', fn (array $p) => SupportController::reply($p));
+$router->post('/support/{id}/close', fn (array $p) => SupportController::close($p));
+$router->get('/admin/support', fn () => SupportController::adminList());
+$router->get('/admin/support/{id}', fn (array $p) => SupportController::adminGet($p));
+$router->post('/admin/support/{id}/messages', fn (array $p) => SupportController::adminReply($p));
+$router->patch('/admin/support/{id}/status', fn (array $p) => SupportController::adminSetStatus($p));
+$router->get('/pages', fn () => PagesController::listPublic());
+$router->get('/pages/{slug}', fn (array $p) => PagesController::getPublic($p));
+$router->get('/admin/pages', fn () => PagesController::adminList());
+$router->put('/admin/pages/{slug}', fn (array $p) => PagesController::save($p));
+$router->delete('/admin/pages/{slug}', fn (array $p) => PagesController::delete($p));
+$router->get('/admin/broadcasts', fn () => BroadcastController::list());
+$router->post('/admin/broadcasts', fn () => BroadcastController::create());
+$router->post('/admin/broadcasts/preview', fn () => BroadcastController::preview());
+$router->post('/admin/broadcasts/{id}/cancel', fn (array $p) => BroadcastController::cancel($p));
 
 try {
     // Maintenance mode and switched-off sections, before any endpoint runs.

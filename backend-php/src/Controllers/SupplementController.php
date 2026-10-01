@@ -9,6 +9,7 @@ use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 /**
  * A trainer's supplement plan for one athlete: a titled list of (supplement,
@@ -79,13 +80,13 @@ final class SupplementController
             throw $e;
         }
 
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'supplement_assigned',
             $athleteId,
             $user['id'],
             'supplement_assigned',
-            'برنامه مکمل جدید',
-            'مربی شما برنامه مکمل «' . $title . '» را برای شما ثبت کرد.',
+            ['title' => $title],
             '/nutrition',
             ['assignment_id' => $id]
         );
@@ -275,13 +276,13 @@ final class SupplementController
                 $entries
             );
 
-            AuthController::notify(
+            Templates::notify(
                 $pdo,
+                'supplement_reminder',
                 $first['athlete_id'],
                 $first['trainer_id'],
                 'supplement_reminder',
-                'زمان مصرف مکمل',
-                self::persianDigits(implode("\n", $lines)),
+                ['details' => self::persianDigits(implode("\n", $lines))],
                 '/nutrition',
                 [
                     'assignment_id' => $first['assignment_id'],

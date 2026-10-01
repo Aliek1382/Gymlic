@@ -18,6 +18,7 @@ export type AdminPermission =
   | "finance"
   | "content"
   | "notifications"
+  | "support"
   | "settings"
   | "system"
   | "activity";
@@ -148,6 +149,7 @@ export const ALL_PERMISSIONS: AdminPermission[] = [
   "finance",
   "content",
   "notifications",
+  "support",
   "settings",
   "system",
   "activity",

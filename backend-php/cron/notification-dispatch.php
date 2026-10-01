@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 
-// Sends the SMS / email copies of notifications queued in notification_deliveries
+// Sends scheduled admin broadcasts once their time comes, and the SMS / email
+// copies of notifications queued in notification_deliveries
 // (AuthController::notify queues them; nothing is sent during a web request).
 // Meant for the host's cron, every 5 minutes:
 //
@@ -26,6 +27,7 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+use Gymlic\Broadcasts;
 use Gymlic\CronHeartbeat;
 use Gymlic\Database;
 use Gymlic\DeliveryDispatcher;
@@ -33,6 +35,10 @@ use Gymlic\DeliveryDispatcher;
 const BATCH = 50;
 
 $pdo = Database::connection();
+
+// Scheduled broadcasts whose time has come: written as notifications (and
+// SMS / email rows), which the loop below then starts sending.
+$broadcasts = Broadcasts::sendDue($pdo);
 
 $ok = 0;
 $bad = 0;
@@ -49,6 +55,6 @@ foreach (DeliveryDispatcher::due($pdo, BATCH) as $row) {
     }
 }
 
-$summary = "deliveries sent: {$ok}, failed: {$bad}";
+$summary = "broadcasts: {$broadcasts}, deliveries sent: {$ok}, failed: {$bad}";
 CronHeartbeat::record('notification-dispatch', $summary);
 echo date('Y-m-d H:i:s'), " {$summary}\n";

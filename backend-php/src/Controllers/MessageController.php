@@ -11,6 +11,7 @@ use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\Templates;
 
 final class MessageController
 {
@@ -348,14 +349,16 @@ final class MessageController
         ]);
 
         // notify_message (0036).
-        AuthController::notify(
+        Templates::notify(
             $pdo,
+            'message_new',
             $recipientId,
             $user['id'],
             'message',
-            'پیام جدید',
-            trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) . ': '
-                . ($type === 'text' ? mb_substr($body, 0, 80) : self::TYPE_LABELS[$type]),
+            [
+                'name' => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
+                'text' => $type === 'text' ? mb_substr($body, 0, 80) : self::TYPE_LABELS[$type],
+            ],
             '/messages/' . $user['id']
         );
 
