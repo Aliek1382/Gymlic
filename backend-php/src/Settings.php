@@ -19,7 +19,7 @@ final class Settings
     public const ROLES = ['club', 'trainer', 'athlete'];
 
     public const KEYS = [
-        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security',
+        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing',
     ];
 
     /** The groups any visitor may read; everything else is admin-only. */
@@ -166,6 +166,17 @@ final class Settings
                 'ip_max_attempts' => self::int($v['ip_max_attempts'] ?? null, 30, 10, 1000),
                 'admin_2fa'       => self::bool($v['admin_2fa'] ?? null, false),
             ],
+            // Where clubs pay for their subscription, shown in their payment
+            // dialog (BillingController::info), and when a subscription
+            // counts as running out. Card and IBAN are kept as digits only.
+            'billing' => [
+                'card_number'    => self::digits($v['card_number'] ?? null, 19),
+                'sheba'          => self::sheba($v['sheba'] ?? null),
+                'account_holder' => self::text($v['account_holder'] ?? null, 100),
+                'bank_name'      => self::text($v['bank_name'] ?? null, 60),
+                'instructions'   => self::text($v['instructions'] ?? null, 1000),
+                'expiring_days'  => self::int($v['expiring_days'] ?? null, 7, 1, 60),
+            ],
             // Empty = fall back to config.php (see SmsGateway / MailGateway).
             'sms' => [
                 'api_key' => self::text($v['api_key'] ?? null, 200),
@@ -290,6 +301,23 @@ final class Settings
             return false;
         }
         return $default;
+    }
+
+    /** Latin digits only (Persian ones converted, spaces and dashes dropped). */
+    public static function digits(mixed $value, int $max): string
+    {
+        $text = strtr(self::text($value, 100), [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        ]);
+        return substr(preg_replace('/\D+/', '', $text) ?? '', 0, $max);
+    }
+
+    /** "IR" + the 24 digits, whether or not the admin typed the IR. */
+    private static function sheba(mixed $value): string
+    {
+        $digits = self::digits($value, 24);
+        return $digits === '' ? '' : 'IR' . $digits;
     }
 
     private static function text(mixed $value, int $max): string

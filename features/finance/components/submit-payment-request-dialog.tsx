@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { Loader2, Wallet } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,12 +27,18 @@ import {
 } from "@/components/ui/select";
 import { formatToman } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { submitPaymentRequest } from "../services/finance-service";
+import {
+  checkDiscountCode,
+  getBillingInfo,
+  submitPaymentRequest,
+  type DiscountQuote,
+} from "../services/finance-service";
 import {
   paymentRequestFormSchema,
   type PaymentRequestFormInput,
   type PaymentRequestFormValues,
 } from "../validators/finance-schemas";
+import { PaymentInfoCard } from "./payment-info-card";
 
 interface Plan {
   id: string;
@@ -42,27 +48,72 @@ interface Plan {
 }
 
 export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [quote, setQuote] = useState<DiscountQuote | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const { data: billing } = useQuery({
+    queryKey: ["finance", "billing-info"],
+    queryFn: getBillingInfo,
+    enabled: open,
+  });
 
   const form = useForm<PaymentRequestFormInput, unknown, PaymentRequestFormValues>({
     resolver: zodResolver(paymentRequestFormSchema),
     defaultValues: { planId: "", amountToman: 0, referenceNote: "" },
   });
+  const planId = form.watch("planId");
+  const plan = plans.find((p) => p.id === planId);
 
-  function handlePlanChange(planId: string) {
-    form.setValue("planId", planId);
-    const plan = plans.find((p) => p.id === planId);
+  function clearDiscount() {
+    setQuote(null);
     if (plan) form.setValue("amountToman", plan.priceToman);
   }
 
-  async function onSubmit(values: PaymentRequestFormValues) {
+  function handlePlanChange(nextPlanId: string) {
+    form.setValue("planId", nextPlanId);
+    const next = plans.find((p) => p.id === nextPlanId);
+    if (next) form.setValue("amountToman", next.priceToman);
+    // A code is priced for one plan; picking another means checking it again.
+    setQuote(null);
+  }
+
+  async function applyCode() {
+    if (!plan) {
+      toast.error("اول پلن را انتخاب کنید.");
+      return;
+    }
+    if (!code.trim()) return;
+    setChecking(true);
     try {
-      await submitPaymentRequest(values);
+      const result = await checkDiscountCode(plan.id, code.trim());
+      setQuote(result);
+      form.setValue("amountToman", result.final_toman);
+      toast.success("کد تخفیف اعمال شد.");
+    } catch (error) {
+      setQuote(null);
+      toast.error(getErrorMessage(error, "بررسی کد تخفیف ناموفق بود."));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function onSubmit(values: PaymentRequestFormValues) {
+    // Zero is only right when a code covers the whole price.
+    if (values.amountToman === 0 && quote?.final_toman !== 0) {
+      form.setError("amountToman", { message: "مبلغ را وارد کنید." });
+      return;
+    }
+    try {
+      await submitPaymentRequest({ ...values, discountCode: quote?.code });
       toast.success("درخواست پرداخت ثبت شد و در انتظار تایید مدیریت است.");
       form.reset({ planId: "", amountToman: 0, referenceNote: "" });
+      setCode("");
+      setQuote(null);
       setOpen(false);
-      router.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["finance"] });
     } catch (error) {
       toast.error(getErrorMessage(error, "ثبت درخواست با خطا مواجه شد."));
     }
@@ -78,7 +129,7 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
           ثبت درخواست پرداخت
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>ثبت درخواست پرداخت اشتراک</DialogTitle>
         </DialogHeader>
@@ -95,9 +146,9 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
                     <SelectValue placeholder="یک پلن را انتخاب کنید" />
                   </SelectTrigger>
                   <SelectContent>
-                    {plans.map((plan) => (
-                      <SelectItem key={plan.id} value={plan.id}>
-                        {plan.name} — {formatToman(plan.priceToman)} تومان
+                    {plans.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} — {formatToman(p.priceToman)} تومان
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -110,6 +161,54 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
               </p>
             )}
           </div>
+
+          {billing?.discounts_enabled && (
+            <div className="space-y-2">
+              <Label htmlFor="payment-discount">
+                کد تخفیف <span className="text-muted-foreground">(اگر دارید)</span>
+              </Label>
+              {quote ? (
+                <div className="space-y-1 rounded-xl border border-success/30 bg-success-muted px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      کد <span dir="ltr" className="font-mono font-medium">{quote.code}</span> اعمال شد
+                    </span>
+                    <Button type="button" size="icon" variant="ghost" onClick={clearDiscount} aria-label="حذف کد تخفیف">
+                      <X />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="line-through">{formatToman(quote.list_price_toman)}</span> ←{" "}
+                    <span className="font-medium text-foreground">{formatToman(quote.final_toman)} تومان</span>{" "}
+                    ({formatToman(quote.discount_toman)} تومان تخفیف)
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    id="payment-discount"
+                    dir="ltr"
+                    value={code}
+                    maxLength={40}
+                    className="font-mono uppercase"
+                    onChange={(e) => setCode(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void applyCode();
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" onClick={applyCode} disabled={checking || !code.trim()}>
+                    {checking && <Loader2 className="animate-spin" />}
+                    اعمال
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <PaymentInfoCard info={billing?.payment} />
 
           <div className="space-y-2">
             <Label htmlFor="payment-amount">مبلغ واریزی (تومان)</Label>

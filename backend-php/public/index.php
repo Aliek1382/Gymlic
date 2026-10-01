@@ -15,15 +15,18 @@ spl_autoload_register(static function (string $class): void {
 
 use Gymlic\Controllers\AthleteController;
 use Gymlic\Controllers\AdminController;
+use Gymlic\Controllers\AdminBillingController;
 use Gymlic\Controllers\AdminLibraryController;
 use Gymlic\Controllers\AdminPointsController;
 use Gymlic\Controllers\AdminRolesController;
 use Gymlic\Controllers\AdminSystemController;
 use Gymlic\Controllers\AdminUsersController;
 use Gymlic\Controllers\AuthController;
+use Gymlic\Controllers\BillingController;
 use Gymlic\Controllers\CalendarController;
 use Gymlic\Controllers\DashboardController;
 use Gymlic\Controllers\EarningsController;
+use Gymlic\Controllers\ExportController;
 use Gymlic\Controllers\ReportController;
 use Gymlic\Controllers\RevenueController;
 use Gymlic\Controllers\ClubController;
@@ -243,6 +246,8 @@ $router->delete('/earnings/{id}', fn (array $p) => EarningsController::remove($p
 $router->get('/plans-catalog', fn () => AdminController::listPlans());
 $router->get('/payment-requests', fn () => AdminController::listPaymentRequests());
 $router->post('/payment-requests', fn () => AdminController::submitPaymentRequest());
+$router->get('/billing/info', fn () => BillingController::info());
+$router->post('/billing/discount-check', fn () => BillingController::checkDiscount());
 
 $router->get('/admin/overview', fn () => AdminController::overview());
 $router->get('/admin/clubs', fn () => AdminController::listClubs());
@@ -258,6 +263,15 @@ $router->post('/admin/payment-requests/{id}/approve', fn (array $p) => AdminCont
 $router->post('/admin/payment-requests/{id}/reject', fn (array $p) => AdminController::rejectPaymentRequest($p));
 $router->post('/admin/plans', fn () => AdminController::createPlan());
 $router->patch('/admin/plans/{id}', fn (array $p) => AdminController::updatePlan($p));
+$router->get('/admin/subscriptions', fn () => AdminBillingController::subscriptions());
+$router->post('/admin/subscriptions/gift', fn () => AdminBillingController::giftAll());
+$router->post('/admin/clubs/{id}/subscription', fn (array $p) => AdminBillingController::updateSubscription($p));
+$router->get('/admin/reports/revenue', fn () => AdminBillingController::revenue());
+$router->get('/admin/discounts', fn () => AdminBillingController::listDiscounts());
+$router->post('/admin/discounts', fn () => AdminBillingController::createDiscount());
+$router->patch('/admin/discounts/{id}', fn (array $p) => AdminBillingController::updateDiscount($p));
+$router->delete('/admin/discounts/{id}', fn (array $p) => AdminBillingController::deleteDiscount($p));
+$router->get('/admin/export/{kind}', fn (array $p) => ExportController::download($p));
 $router->get('/admin/settings', fn () => SettingsController::adminGet());
 $router->post('/admin/settings/test-sms', fn () => SettingsController::testSms());
 $router->post('/admin/settings/test-mail', fn () => SettingsController::testMail());

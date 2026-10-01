@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatNumber, formatRelativeTime } from "@/lib/persian";
+import { formatNumber, formatPersianDate, formatRelativeTime, formatToman } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
 import { listAdminActivity } from "../services/admin-service";
@@ -46,6 +46,15 @@ const ADMIN_ACTIONS = [
   "login_unlocked",
   "admin_role_saved",
   "admin_role_deleted",
+  // Written on approval all along, but never listed here.
+  "payment_request_approved",
+  "subscription_renewed",
+  "subscription_gifted",
+  "subscription_set",
+  "subscriptions_gifted",
+  "discount_code_saved",
+  "discount_code_deleted",
+  "data_exported",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -75,7 +84,44 @@ const ACTION_LABEL: Record<string, string> = {
   login_unlocked: "باز کردن قفل ورود",
   admin_role_saved: "ذخیرهٔ نقش مدیریتی",
   admin_role_deleted: "حذف نقش مدیریتی",
+  payment_request_approved: "تأیید درخواست پرداخت",
+  subscription_renewed: "تمدید دستی اشتراک",
+  subscription_gifted: "روز هدیه به اشتراک",
+  subscription_set: "تنظیم دستی اشتراک",
+  subscriptions_gifted: "روز هدیه به همهٔ اشتراک‌ها",
+  discount_code_saved: "ذخیرهٔ کد تخفیف",
+  discount_code_deleted: "حذف کد تخفیف",
+  data_exported: "دانلود خروجی Excel",
 };
+
+const EXPORT_LABEL: Record<string, string> = {
+  users: "کاربران",
+  payments: "پرداخت‌ها",
+  subscriptions: "اشتراک‌ها",
+  revenue: "گزارش ماهانه",
+};
+
+/** What a finance action was about, for the "مربوط به" column. */
+function billingDetail(log: { action: string; metadata: Record<string, unknown> }): string {
+  const m = log.metadata ?? {};
+  switch (log.action) {
+    case "subscription_renewed":
+      return `${String(m.plan ?? "")}${Number(m.amount) > 0 ? ` · ${formatToman(Number(m.amount))} تومان` : ""}`;
+    case "subscription_gifted":
+      return `${formatNumber(Number(m.days ?? 0))} روز`;
+    case "subscription_set":
+      return m.expires_at ? `تا ${formatPersianDate(new Date(String(m.expires_at)))}` : "";
+    case "subscriptions_gifted":
+      return `${formatNumber(Number(m.days ?? 0))} روز به ${formatNumber(Number(m.count ?? 0))} باشگاه`;
+    case "discount_code_saved":
+    case "discount_code_deleted":
+      return String(m.code ?? "");
+    case "data_exported":
+      return EXPORT_LABEL[String(m.kind)] ?? String(m.kind ?? "");
+    default:
+      return "";
+  }
+}
 
 const SETTINGS_GROUP_LABEL: Record<string, string> = {
   maintenance: "حالت تعمیر",
@@ -88,6 +134,7 @@ const SETTINGS_GROUP_LABEL: Record<string, string> = {
   sms: "تنظیمات پیامک",
   mail: "تنظیمات ایمیل",
   security: "امنیت ورود",
+  billing: "اطلاعات پرداخت",
 };
 
 export function AdminActivityPage() {
@@ -156,6 +203,7 @@ export function AdminActivityPage() {
                       ? String(log.metadata?.email ?? log.metadata?.ip ?? "")
                       : "";
                 const subjectName =
+                  (billingDetail(log) || undefined) ??
                   (roleOrLock || undefined) ??
                   SETTINGS_GROUP_LABEL[settingsGroup] ??
                   (migration ||

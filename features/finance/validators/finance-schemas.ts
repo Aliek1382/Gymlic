@@ -2,7 +2,9 @@ import { z } from "zod";
 
 export const paymentRequestFormSchema = z.object({
   planId: z.string().min(1, "یک پلن را انتخاب کنید."),
-  amountToman: z.coerce.number().int().min(1, "مبلغ را وارد کنید."),
+  // 0 passes here only for a discount code that covers the whole price; the
+  // dialog checks that, since the schema can't see the code.
+  amountToman: z.coerce.number().int().min(0, "مبلغ را وارد کنید."),
   referenceNote: z.string().trim().optional(),
 });
 

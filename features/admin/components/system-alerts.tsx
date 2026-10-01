@@ -6,6 +6,7 @@ import { ChevronLeft, Clock, DatabaseZap, Inbox } from "lucide-react";
 
 import { formatNumber } from "@/lib/persian";
 import { getSystemAlerts } from "../services/admin-system-service";
+import { useAdminCan } from "../hooks/use-admin-access";
 
 /**
  * The overview's "needs attention" strip — the admin's version of
@@ -13,10 +14,13 @@ import { getSystemAlerts } from "../services/admin-system-service";
  * the request fails (an older backend without the endpoint).
  */
 export function SystemAlerts() {
+  // A role without "system" would only get a 403 for these.
+  const canSee = useAdminCan()("system");
   const { data } = useQuery({
     queryKey: ["admin", "system", "alerts"],
     queryFn: getSystemAlerts,
     retry: false,
+    enabled: canSee,
   });
   if (!data) return null;
 

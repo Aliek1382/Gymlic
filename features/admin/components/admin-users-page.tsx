@@ -65,6 +65,7 @@ import {
   type UserFilter,
 } from "../services/admin-users-service";
 import { useAdminCan } from "../hooks/use-admin-access";
+import { ExportButton } from "./export-button";
 import { AdminAccessDialog, ProfileEditDialog, SessionsDialog } from "./user-account-dialogs";
 
 const FILTERS: { value: UserFilter; label: string }[] = [
@@ -115,13 +116,16 @@ export function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">کاربران</h1>
-        <p className="text-sm text-muted-foreground">
-          همهٔ حساب‌های سایت، از جمله مدیران باشگاه و کسانی که ثبت‌نام کرده‌اند ولی هنوز نقش انتخاب
-          نکرده‌اند. از منوی هر ردیف: ویرایش پروفایل، دستگاه‌های فعال، تغییر نقش، رمز تازه،
-          مسدودسازی، و (برای مدیر کل) دسترسی مدیریت.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">کاربران</h1>
+          <p className="text-sm text-muted-foreground">
+            همهٔ حساب‌های سایت، از جمله مدیران باشگاه و کسانی که ثبت‌نام کرده‌اند ولی هنوز نقش
+            انتخاب نکرده‌اند. از منوی هر ردیف: ویرایش پروفایل، دستگاه‌های فعال، تغییر نقش، رمز تازه،
+            مسدودسازی، و (برای مدیر کل) دسترسی مدیریت.
+          </p>
+        </div>
+        <ExportButton kind="users" />
       </div>
 
       <Card className="gap-4 py-5">

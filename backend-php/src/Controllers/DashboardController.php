@@ -8,6 +8,7 @@ use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\Subscriptions;
 
 /**
  * Read-only aggregates. Each of these fired 8-13 parallel Supabase queries
@@ -178,6 +179,10 @@ final class DashboardController
              WHERE club_id = :club_id ORDER BY expires_at DESC LIMIT 1'
         );
         $subscription->execute(['club_id' => $clubId]);
+        $subscriptionRow = $subscription->fetch() ?: null;
+        if ($subscriptionRow !== null) {
+            $subscriptionRow['status'] = Subscriptions::status($subscriptionRow['expires_at']);
+        }
 
         $recentMembers = $pdo->prepare(
             "SELECT m.id, m.user_id, m.status, m.joined_at,
@@ -217,7 +222,7 @@ final class DashboardController
             ],
             'revenue_series'    => Cast::rows($series->fetchAll(), ['total']),
             'plan_distribution' => Cast::rows($planDistribution->fetchAll(), [], ['member_count']),
-            'subscription'      => $subscription->fetch() ?: null,
+            'subscription'      => $subscriptionRow,
             'recent_members'    => $recentMembers->fetchAll(),
             'trainers'          => $trainers->fetchAll(),
         ]);

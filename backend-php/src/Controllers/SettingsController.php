@@ -29,6 +29,7 @@ final class SettingsController
         'features'      => 'settings',
         'limits'        => 'settings',
         'points_levels' => 'content',
+        'billing'       => 'finance',
     ];
 
     /**
@@ -88,7 +89,7 @@ final class SettingsController
     /** Replaces one settings group. Body: {"value": {...}}. */
     public static function adminUpdate(array $params): void
     {
-        $admin = Auth::requireAdmin(['settings', 'content']);
+        $admin = Auth::requireAdmin(['settings', 'content', 'finance']);
         $key = $params['key'];
 
         if (!in_array($key, Settings::KEYS, true)) {
@@ -107,6 +108,14 @@ final class SettingsController
             && !Validate::email(trim((string) $body['value']['email']))) {
             Response::error(400, 'invalid_email', 'ایمیل پشتیبانی معتبر نیست.');
             return;
+        }
+
+        if ($key === 'billing') {
+            $error = self::billingError($body['value']);
+            if ($error !== null) {
+                Response::error(400, 'invalid_billing', $error);
+                return;
+            }
         }
 
         // Two-step login is only switched on through its own flow, which
@@ -135,6 +144,59 @@ final class SettingsController
         ]);
 
         Response::ok(['value' => self::masked($key, $saved)]);
+    }
+
+    /**
+     * A typo in the card number or IBAN would send clubs' money nowhere, so
+     * both are checked before saving: the card with the Luhn digit every
+     * Iranian bank card carries, the IBAN with its ISO 7064 check digits.
+     */
+    private static function billingError(array $value): ?string
+    {
+        $card = Settings::digits($value['card_number'] ?? '', 30);
+        if ($card !== '' && (strlen($card) !== 16 || !self::luhn($card))) {
+            return 'شمارهٔ کارت معتبر نیست؛ ۱۶ رقم کارت را دوباره بررسی کنید.';
+        }
+
+        $sheba = Settings::digits($value['sheba'] ?? '', 30);
+        if ($sheba !== '' && (strlen($sheba) !== 24 || !self::ibanValid('IR' . $sheba))) {
+            return 'شمارهٔ شبا معتبر نیست؛ باید IR و ۲۴ رقم باشد.';
+        }
+
+        return null;
+    }
+
+    private static function luhn(string $digits): bool
+    {
+        $sum = 0;
+        $length = strlen($digits);
+        for ($i = 0; $i < $length; $i++) {
+            $d = (int) $digits[$length - 1 - $i];
+            if ($i % 2 === 1) {
+                $d *= 2;
+                if ($d > 9) {
+                    $d -= 9;
+                }
+            }
+            $sum += $d;
+        }
+        return $sum % 10 === 0;
+    }
+
+    private static function ibanValid(string $iban): bool
+    {
+        // Country and check digits move to the end, letters become 10..35,
+        // and the whole number mod 97 must be 1 (done in chunks: it is 26+ digits).
+        $moved = substr($iban, 4) . substr($iban, 0, 4);
+        $numeric = '';
+        foreach (str_split($moved) as $char) {
+            $numeric .= ctype_alpha($char) ? (string) (ord(strtoupper($char)) - 55) : $char;
+        }
+        $remainder = 0;
+        foreach (str_split($numeric, 7) as $chunk) {
+            $remainder = (int) ($remainder . $chunk) % 97;
+        }
+        return $remainder === 1;
     }
 
     /** Sends one SMS through whatever is configured, and says why not if it fails. */

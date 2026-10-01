@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { approvePaymentRequest, rejectPaymentRequest } from "../services/admin-service";
 
 export function PaymentRequestActions({ requestId }: { requestId: string }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [mode, setMode] = useState<"approve" | "reject" | null>(null);
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,7 +41,8 @@ export function PaymentRequestActions({ requestId }: { requestId: string }) {
         toast.success("درخواست رد شد.");
       }
       close();
-      router.refresh();
+      // Payments, reports, the overview and subscriptions all change.
+      void queryClient.invalidateQueries({ queryKey: ["admin"] });
     } catch (error) {
       toast.error(getErrorMessage(error, "خطا در ثبت تصمیم."));
     } finally {
