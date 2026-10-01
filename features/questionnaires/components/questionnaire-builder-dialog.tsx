@@ -25,7 +25,12 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, normalizeAmount, toPersianDigits } from "@/lib/persian";
 import { MAX_OPTIONS, MAX_QUESTIONS, MIN_OPTIONS, QUESTION_TYPE_LABEL } from "../constants";
 import { useSaveQuestionnaire } from "../hooks/use-save-questionnaire";
-import type { Questionnaire, QuestionDraft, QuestionType } from "../types/questionnaire-types";
+import type {
+  Questionnaire,
+  QuestionDraft,
+  QuestionType,
+  SaveQuestionnaireInput,
+} from "../types/questionnaire-types";
 
 let draftCounter = 0;
 function newDraft(type: QuestionType = "text"): QuestionDraft {
@@ -62,11 +67,18 @@ export function QuestionnaireBuilderDialog({
   open,
   onOpenChange,
   questionnaire,
+  onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Set to edit; leave out to create. */
   questionnaire?: Questionnaire;
+  /**
+   * Saves somewhere other than the trainer's own questionnaires — the admin's
+   * public ones (/admin/content). Those are free and never priced, so the
+   * price field is left out.
+   */
+  onSave?: (input: SaveQuestionnaireInput) => Promise<void>;
 }) {
   const save = useSaveQuestionnaire();
   const questionsLocked = (questionnaire?.submittedCount ?? 0) > 0;
@@ -152,13 +164,18 @@ export function QuestionnaireBuilderDialog({
     }
 
     try {
-      await save.mutateAsync({
+      const input = {
         id: questionnaire?.id,
         title: trimmedTitle,
         description: description.trim() || null,
         priceToman,
         questions: cleaned,
-      });
+      };
+      if (onSave) {
+        await onSave(input);
+      } else {
+        await save.mutateAsync(input);
+      }
       toast.success(questionnaire ? "پرسشنامه ذخیره شد." : "پرسشنامه ساخته شد.");
       onOpenChange(false);
     } catch (error) {
@@ -172,7 +189,9 @@ export function QuestionnaireBuilderDialog({
         <DialogHeader>
           <DialogTitle>{questionnaire ? "ویرایش پرسشنامه" : "پرسشنامهٔ جدید"}</DialogTitle>
           <DialogDescription>
-            سؤالات خودتان را بسازید و بعد برای یک یا چند ورزشکار بفرستید.
+            {onSave
+              ? "پرسشنامه‌ای آماده برای همهٔ مربی‌ها؛ هر مربی نسخهٔ خودش را برمی‌دارد و می‌تواند تغییرش دهد."
+              : "سؤالات خودتان را بسازید و بعد برای یک یا چند ورزشکار بفرستید."}
           </DialogDescription>
         </DialogHeader>
 
@@ -197,20 +216,22 @@ export function QuestionnaireBuilderDialog({
             />
           </div>
 
-          <div className="space-y-2 rounded-xl border border-border p-3">
-            <Label htmlFor="questionnaire-price">تعیین قیمت (اختیاری)</Label>
-            <Input
-              id="questionnaire-price"
-              inputMode="numeric"
-              value={priceText}
-              onChange={(e) => setPriceText(e.target.value)}
-              placeholder="خالی = رایگان · مثلاً ۲۰۰٬۰۰۰"
-            />
-            <p className="text-xs text-muted-foreground">
-              با تعیین قیمت، هنگام ارسال برای ورزشکار فاکتور صادر می‌شود و سؤالات تا ثبت پرداخت
-              برایش قفل می‌ماند. تغییر قیمت روی فاکتورهای قبلی اثری ندارد.
-            </p>
-          </div>
+          {!onSave && (
+            <div className="space-y-2 rounded-xl border border-border p-3">
+              <Label htmlFor="questionnaire-price">تعیین قیمت (اختیاری)</Label>
+              <Input
+                id="questionnaire-price"
+                inputMode="numeric"
+                value={priceText}
+                onChange={(e) => setPriceText(e.target.value)}
+                placeholder="خالی = رایگان · مثلاً ۲۰۰٬۰۰۰"
+              />
+              <p className="text-xs text-muted-foreground">
+                با تعیین قیمت، هنگام ارسال برای ورزشکار فاکتور صادر می‌شود و سؤالات تا ثبت پرداخت
+                برایش قفل می‌ماند. تغییر قیمت روی فاکتورهای قبلی اثری ندارد.
+              </p>
+            </div>
+          )}
 
           {questionsLocked ? (
             <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">

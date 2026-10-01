@@ -76,6 +76,9 @@ final class AdminLibraryController
             $columns[] = 'l.' . $column;
         }
         $columns[] = self::hiddenReady($kind) ? 'l.is_hidden' : '0 AS is_hidden';
+        if ($kind['table'] === 'exercises' && AdminExerciseMediaController::ready()) {
+            array_push($columns, 'l.image_url', 'l.video_url');
+        }
 
         $stmt = $pdo->prepare(
             'SELECT ' . implode(', ', $columns) . ",

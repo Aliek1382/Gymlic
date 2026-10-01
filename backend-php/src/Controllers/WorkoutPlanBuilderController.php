@@ -331,7 +331,7 @@ final class WorkoutPlanBuilderController
     }
 
     /** @return array<int, array<string, mixed>> */
-    private static function daysWithExercises(string $assignmentId): array
+    public static function daysWithExercises(string $assignmentId): array
     {
         $stmt = Database::connection()->prepare(
             'SELECT id, week_number, day_number, day_name, sort_order
@@ -348,9 +348,10 @@ final class WorkoutPlanBuilderController
 
         $dayIds = array_column($days, 'id');
         $placeholders = implode(',', array_fill(0, count($dayIds), '?'));
+        $media = Database::hasColumn('exercises', 'video_url') ? 'x.image_url, x.video_url,' : '';
         $stmt = Database::connection()->prepare(
             "SELECT e.id, e.day_id, e.exercise_id, e.sets, e.reps, e.weight_kg, e.rest_seconds, e.note, e.technique_id, e.sort_order,
-                    x.name AS exercise_name, x.name_en AS exercise_name_en, x.muscle_group,
+                    x.name AS exercise_name, x.name_en AS exercise_name_en, x.muscle_group, {$media}
                     t.name AS technique_name, t.description AS technique_description
              FROM workout_plan_exercises e
              JOIN exercises x ON x.id = e.exercise_id

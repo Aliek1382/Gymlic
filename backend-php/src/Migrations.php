@@ -142,6 +142,19 @@ final class Migrations
                 ['column', 'profiles', 'last_seen_at'],
             ],
         ],
+        [
+            'id'    => 'content',
+            'file'  => 'content-update.sql',
+            'title' => 'محتوای آماده برای مربی‌ها و عکس و ویدیوی حرکات (فاز ۸)',
+            'check' => [
+                ['column', 'workout_assignments', 'is_public'],
+                ['column', 'nutrition_assignments', 'is_public'],
+                ['column', 'techniques', 'is_public'],
+                ['column', 'questionnaires', 'is_public'],
+                ['column', 'exercises', 'image_url'],
+                ['column', 'exercises', 'video_url'],
+            ],
+        ],
     ];
 
     /**

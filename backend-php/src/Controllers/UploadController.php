@@ -297,7 +297,7 @@ final class UploadController
         return [(int) round($width * $ratio), (int) round($height * $ratio)];
     }
 
-    private static function baseUrl(): string
+    public static function baseUrl(): string
     {
         $https = ($_SERVER['HTTPS'] ?? '') !== '' && $_SERVER['HTTPS'] !== 'off';
         $scheme = $https || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' ? 'https' : 'http';

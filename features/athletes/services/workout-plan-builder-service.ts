@@ -17,6 +17,8 @@ interface ExerciseRow {
   exercise_name: string;
   exercise_name_en: string | null;
   muscle_group: string;
+  image_url?: string | null;
+  video_url?: string | null;
 }
 
 interface DayRow {
@@ -44,6 +46,8 @@ function toExercise(row: ExerciseRow): WorkoutPlanExerciseEntry {
     techniqueName: row.technique_name,
     techniqueDescription: row.technique_description,
     sortOrder: row.sort_order,
+    imageUrl: row.image_url ?? null,
+    videoUrl: row.video_url ?? null,
   };
 }
 

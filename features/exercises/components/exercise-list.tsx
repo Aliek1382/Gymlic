@@ -11,6 +11,7 @@ import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashbo
 import { useExercises } from "../hooks/use-exercises";
 import { getMuscleGroupBadgeVariant } from "../utils/muscle-group-color";
 import type { ExerciseSummary } from "../types/exercise-types";
+import { ExerciseMediaButton } from "./exercise-media";
 
 function groupByMuscle(exercises: ExerciseSummary[]) {
   const groups = new Map<string, ExerciseSummary[]>();
@@ -123,6 +124,11 @@ export function ExerciseList() {
                     {exercise.isCustom && (
                       <Badge variant="info">حرکت شما</Badge>
                     )}
+                    <ExerciseMediaButton
+                      name={exercise.name}
+                      media={exercise}
+                      description={exercise.description}
+                    />
                   </div>
                 </div>
               ))}

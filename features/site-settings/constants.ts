@@ -21,6 +21,7 @@ export const FEATURE_KEYS = [
   "reports",
   "club_finance",
   "support",
+  "content_library",
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -44,6 +45,7 @@ const FEATURE_PAGES: Record<string, FeatureKey> = {
   "/reports": "reports",
   "/finance": "club_finance",
   "/support": "support",
+  "/content-library": "content_library",
 };
 
 export function featureForPath(href: string): FeatureKey | null {

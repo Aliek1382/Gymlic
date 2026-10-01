@@ -46,6 +46,8 @@ export interface ParsedExerciseRow {
   // `technique` above, which is the fixed superset/tri-set/drop-set grammar of
   // the free-text lines.
   customTechnique?: { name: string; description: string | null } | null;
+  // The exercise's how-to image / video from the library (structured plans only).
+  media?: { imageUrl: string | null; videoUrl: string | null } | null;
 }
 
 export interface ParsedTextRow {
@@ -423,6 +425,10 @@ export function structuredDaysToSections(days: WorkoutPlanDay[]): ParsedSection[
           customTechnique: exercise.techniqueName
             ? { name: exercise.techniqueName, description: exercise.techniqueDescription }
             : null,
+          media:
+            exercise.imageUrl || exercise.videoUrl
+              ? { imageUrl: exercise.imageUrl ?? null, videoUrl: exercise.videoUrl ?? null }
+              : null,
         })),
     }));
 }

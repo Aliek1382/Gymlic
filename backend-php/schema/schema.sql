@@ -223,6 +223,7 @@ CREATE TABLE workout_assignments (
   description    TEXT NULL,
   status         ENUM('active','completed','cancelled','draft') NOT NULL DEFAULT 'active',
   is_template    TINYINT(1) NOT NULL DEFAULT 0,
+  is_public      TINYINT(1) NOT NULL DEFAULT 0,  -- a template the admin offers every trainer (is_template = 1)
   -- 'structured' once a trainer builds this plan from workout_plan_days
   -- instead of typing description free-text; the two are never mixed on one
   -- assignment (see workout_plan_days below).
@@ -250,6 +251,7 @@ CREATE TABLE nutrition_assignments (
   description    TEXT NULL,
   status         ENUM('active','completed','cancelled','draft') NOT NULL DEFAULT 'active',
   is_template    TINYINT(1) NOT NULL DEFAULT 0,
+  is_public      TINYINT(1) NOT NULL DEFAULT 0,  -- a template the admin offers every trainer (is_template = 1)
   assigned_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_na_club (club_id),
@@ -360,6 +362,8 @@ CREATE TABLE exercises (
   name          VARCHAR(255) NOT NULL,
   name_en       VARCHAR(255) NULL,
   description   TEXT NULL,
+  image_url     VARCHAR(1024) NULL,  -- how-to image / GIF, set by the admin
+  video_url     VARCHAR(1024) NULL,  -- uploaded video or an Aparat / YouTube link
   muscle_group  VARCHAR(100) NOT NULL,
   created_by    CHAR(36) NULL,
   is_hidden     TINYINT(1) NOT NULL DEFAULT 0,  -- hidden by the admin from lists/pickers
@@ -409,6 +413,7 @@ CREATE TABLE techniques (
   coach_id    CHAR(36) NOT NULL,
   name        VARCHAR(255) NOT NULL,
   description TEXT NULL,
+  is_public   TINYINT(1) NOT NULL DEFAULT 0,  -- offered to every trainer to copy (owned by an admin)
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_techniques_coach_name (coach_id, name),
@@ -803,6 +808,7 @@ CREATE TABLE questionnaires (
   description  TEXT NULL,
   price_toman  BIGINT NULL,     -- NULL = رایگان
   is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  is_public    TINYINT(1) NOT NULL DEFAULT 0,  -- offered to every trainer to copy (owned by an admin)
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_q_coach (coach_id, created_at DESC),

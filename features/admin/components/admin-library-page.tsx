@@ -39,6 +39,7 @@ import {
   type LibraryScope,
 } from "../services/admin-library-service";
 import { KIND_LABEL, LibraryEntryDialog } from "./library-entry-dialog";
+import { ExerciseMediaDialog } from "./exercise-media-dialog";
 
 const KIND_TABS: { value: LibraryKind; label: string }[] = [
   { value: "exercises", label: "حرکات" },
@@ -290,6 +291,7 @@ function LibraryRow({
               انتقال به بانک عمومی
             </Button>
           )}
+          {kind === "exercises" && "video_url" in entry && <ExerciseMediaDialog entry={entry} onSaved={onChanged} />}
           <LibraryEntryDialog kind={kind} entry={entry} suggestions={suggestions} onSaved={onChanged} />
           <Button
             size="sm"

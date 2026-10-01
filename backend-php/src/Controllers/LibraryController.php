@@ -48,8 +48,10 @@ final class LibraryController
         $kind = self::kind($params['kind']);
 
         // RLS used to hide other trainers' custom entries; now the filter is explicit.
+        // The how-to image / video exercises carry once phase 8's SQL has run.
+        $media = $params['kind'] === 'exercises' && Database::hasColumn('exercises', 'video_url') ? ', image_url, video_url' : '';
         $stmt = Database::connection()->prepare(
-            "SELECT id, name, name_en, description, {$kind['extra']}, created_by, created_at
+            "SELECT id, name, name_en, description, {$kind['extra']}, created_by, created_at{$media}
              FROM {$kind['table']}
              WHERE (created_by IS NULL OR created_by = :user_id)" . self::notHidden($kind['table'], $kind['table']) . "
              ORDER BY name ASC"

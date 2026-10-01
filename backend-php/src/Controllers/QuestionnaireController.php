@@ -11,6 +11,7 @@ use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use Gymlic\Templates;
+use Gymlic\ContentLibrary;
 
 /**
  * A trainer's own custom form — free text, multiple choice and number
@@ -158,7 +159,7 @@ final class QuestionnaireController
                     (SELECT COUNT(*) FROM questionnaire_responses r
                      WHERE r.questionnaire_id = q.id AND r.status = 'submitted') AS submitted_count
              FROM questionnaires q
-             WHERE q.coach_id = :coach_id
+             WHERE q.coach_id = :coach_id" . ContentLibrary::ownOnly('q.') . "
              ORDER BY q.created_at DESC"
         );
         $stmt->execute(['coach_id' => $user['id']]);
@@ -494,7 +495,7 @@ final class QuestionnaireController
      * @param string[] $questionnaireIds
      * @return array<string, array<int, array<string, mixed>>> questionnaire_id => questions in order
      */
-    private static function questionsFor(array $questionnaireIds): array
+    public static function questionsFor(array $questionnaireIds): array
     {
         $questionnaireIds = array_values($questionnaireIds);
         if ($questionnaireIds === []) {
@@ -550,7 +551,7 @@ final class QuestionnaireController
     }
 
     /** @param array<int, array{type: string, label: string, options: ?array, is_required: bool}> $questions */
-    private static function insertQuestions(string $questionnaireId, array $questions): void
+    public static function insertQuestions(string $questionnaireId, array $questions): void
     {
         $marks = implode(',', array_fill(0, count($questions), '(?, ?, ?, ?, ?, ?, ?)'));
         $bind = [];
@@ -574,7 +575,7 @@ final class QuestionnaireController
     }
 
     /** Validated, normalised questions from the request body; ends the request with 400 on the first problem. */
-    private static function questions(mixed $raw): array
+    public static function questions(mixed $raw): array
     {
         if (!is_array($raw) || !array_is_list($raw) || $raw === []) {
             self::fail('questions must be a non-empty list.');
@@ -686,7 +687,7 @@ final class QuestionnaireController
     private static function ownedOr404(string $id, string $userId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT id, coach_id, title, price_toman, is_active FROM questionnaires WHERE id = :id'
+            'SELECT id, coach_id, title, price_toman, is_active FROM questionnaires WHERE id = :id' . ContentLibrary::ownOnly()
         );
         $stmt->execute(['id' => $id]);
         $questionnaire = $stmt->fetch();

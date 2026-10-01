@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+// Local development only (dev-server.sh routes every request here): hand
+// existing static files such as uploads back to PHP's built-in server.
+// Apache never runs this; on the host it serves uploads/ itself.
+if (PHP_SAPI === 'cli-server') {
+    $static = __DIR__ . (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+    if (is_file($static) && !str_ends_with($static, '.php')) {
+        return false;
+    }
+}
+
 // Maps Gymlic\Foo\Bar to src/Foo/Bar.php. Composer isn't available on the
 // shared hosts this targets, and the mapping is one rule.
 spl_autoload_register(static function (string $class): void {
@@ -15,6 +25,8 @@ spl_autoload_register(static function (string $class): void {
 
 use Gymlic\Controllers\AthleteController;
 use Gymlic\Controllers\AdminController;
+use Gymlic\Controllers\AdminContentController;
+use Gymlic\Controllers\AdminExerciseMediaController;
 use Gymlic\Controllers\AdminBillingController;
 use Gymlic\Controllers\AdminLibraryController;
 use Gymlic\Controllers\AdminPointsController;
@@ -31,6 +43,7 @@ use Gymlic\Controllers\ExportController;
 use Gymlic\Controllers\ReportController;
 use Gymlic\Controllers\RevenueController;
 use Gymlic\Controllers\ClubController;
+use Gymlic\Controllers\ContentLibraryController;
 use Gymlic\Controllers\LibraryController;
 use Gymlic\Controllers\MemberController;
 use Gymlic\Controllers\MessageController;
@@ -220,6 +233,10 @@ $router->get('/library/{kind}/picker', fn (array $p) => LibraryController::picke
 $router->post('/library/{kind}', fn (array $p) => LibraryController::create($p));
 $router->post('/library/{kind}/{id}/usage', fn (array $p) => LibraryController::recordUsage($p));
 
+$router->get('/content-library', fn () => ContentLibraryController::list());
+$router->post('/content-library/technique/copy-all', fn () => ContentLibraryController::copyAllTechniques());
+$router->get('/content-library/{kind}/{id}', fn (array $p) => ContentLibraryController::get($p));
+$router->post('/content-library/{kind}/{id}/copy', fn (array $p) => ContentLibraryController::copy($p));
 $router->get('/techniques', fn () => TechniqueController::list());
 $router->post('/techniques', fn () => TechniqueController::create());
 $router->patch('/techniques/{id}', fn (array $p) => TechniqueController::update($p));
@@ -366,6 +383,15 @@ $router->get('/pages/{slug}', fn (array $p) => PagesController::getPublic($p));
 $router->get('/admin/pages', fn () => PagesController::adminList());
 $router->put('/admin/pages/{slug}', fn (array $p) => PagesController::save($p));
 $router->delete('/admin/pages/{slug}', fn (array $p) => PagesController::delete($p));
+$router->get('/admin/content', fn () => AdminContentController::list());
+$router->get('/admin/content/candidates', fn () => AdminContentController::candidates());
+$router->get('/admin/content/{kind}/{id}', fn (array $p) => AdminContentController::get($p));
+$router->post('/admin/content/{kind}/publish', fn (array $p) => AdminContentController::publish($p));
+$router->post('/admin/content/{kind}', fn (array $p) => AdminContentController::create($p));
+$router->patch('/admin/content/{kind}/{id}', fn (array $p) => AdminContentController::update($p));
+$router->delete('/admin/content/{kind}/{id}', fn (array $p) => AdminContentController::delete($p));
+$router->post('/admin/library/exercises/{id}/media', fn (array $p) => AdminExerciseMediaController::upload($p));
+$router->put('/admin/library/exercises/{id}/media', fn (array $p) => AdminExerciseMediaController::setLink($p));
 $router->get('/admin/broadcasts', fn () => BroadcastController::list());
 $router->post('/admin/broadcasts', fn () => BroadcastController::create());
 $router->post('/admin/broadcasts/preview', fn () => BroadcastController::preview());

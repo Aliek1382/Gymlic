@@ -15,6 +15,9 @@ export interface WorkoutPlanExerciseEntry {
   techniqueName: string | null;
   techniqueDescription: string | null;
   sortOrder: number;
+  /** The library's how-to image and video for this exercise, if the admin set them. */
+  imageUrl?: string | null;
+  videoUrl?: string | null;
 }
 
 export interface WorkoutPlanDay {
