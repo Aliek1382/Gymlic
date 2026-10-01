@@ -1,0 +1,358 @@
+# جیم‌لیک (Gymlic) — شناسنامهٔ کامل پروژه برای هوش مصنوعی
+
+> این فایل را کامل به هوش مصنوعی بدهید تا پروژه را بشناسد.
+> زبان محصول فارسی و راست‌به‌چپ (RTL) است. متن‌های رابط کاربری، پیام‌های خطا و اعلان‌ها همه فارسی‌اند.
+> تاریخ‌ها شمسی (جلالی) نمایش داده می‌شوند، ولی در دیتابیس میلادی ذخیره می‌شوند.
+
+---
+
+## ۱. جیم‌لیک چیست؟
+
+یک پلتفرم SaaS برای مدیریت باشگاه ورزشی، مربی و ورزشکار.
+
+- **باشگاه** عضو و مربی را مدیریت می‌کند و اشتراک پلتفرم را می‌خرد.
+- **مربی** برای شاگردانش برنامهٔ تمرینی، غذایی و مکمل می‌نویسد. با آن‌ها پیام‌رسانی، پیگیری پیشرفت و حسابداری انجام می‌دهد.
+- **ورزشکار** برنامه‌اش را می‌بیند، تمرین را تیک می‌زند، اندازه‌ها را ثبت می‌کند و با مربی گفتگو می‌کند.
+- **مدیر پلتفرم (ادمین)** کل سایت را اداره می‌کند: کاربران، اشتراک‌ها، پرداخت‌ها، محتوا، تنظیمات و سلامت سیستم.
+
+## ۲. این پروژه زنده است (مهم‌ترین بخش)
+
+پروژه در محیط واقعی و روی هاست اشتراکی ایرانی کار می‌کند. هر تغییر یعنی تغییر روی سایت زنده، نه روی یک نمونهٔ آزمایشی.
+
+| | |
+| --- | --- |
+| سایت | `https://gymlic-panel.ir`، خروجی استاتیک پوشهٔ `out/` |
+| API | `https://api.gymlic-panel.ir`، پوشهٔ `backend-php/`، PHP 8.1 بدون Composer |
+| دیتابیس | MySQL روی همان هاست. فقط از طریق phpMyAdmin یا صفحهٔ «به‌روزرسانی دیتابیس» پنل ادمین در دسترس است |
+
+نه Supabase وجود دارد و نه Vercel. هر دو عمداً حذف شده‌اند. پوشهٔ `supabase/migrations/` فقط مرجع تاریخی schema قدیمی Postgres است و هیچ کدی آن را نمی‌خواند.
+
+### قوانین استقرار
+
+استقرار را **مالک پروژه** از ویندوز خودش با `deploy\deploy.bat` (WinSCP روی FTP) انجام می‌دهد. هیچ CI ای چیزی را مستقر نمی‌کند و ما به هاست دسترسی نداریم.
+
+- **merge شدن PR یعنی مستقر شدن نیست.** همیشه بگویید مالک چه کاری باید انجام دهد.
+- **تغییر دیتابیس** باید یک فایل `backend-php/schema/*-update.sql` باشد و در `backend-php/src/Migrations.php` ثبت شود. همان SQL دقیق باید در توضیح PR هم بیاید. مالک آن را از پنل ادمین (صفحهٔ دیتابیس) یا دستی در phpMyAdmin اجرا می‌کند. اسکریپت استقرار هرگز به دیتابیس دست نمی‌زند.
+- **هرگز نگویید `schema/schema.sql` دوباره ایمپورت شود.** روی جدول‌های موجود خطا می‌دهد و چیزی را عوض نمی‌کند.
+- **ترتیب استقرار:** اول بک‌اند، بعد SQL دیتابیس، بعد فرانت. بک‌اند قبل از اجرای SQL به هاست می‌رسد، پس باید بدون جدول یا ستون جدید هم کار کند (تشخیص بدهد و تحمل کند). صفحه‌ای که زودتر از endpoint خودش برسد، برای هر کسی که بازش کند خطای زنده است. کلاس‌های `Settings`، `Features`، `PointsService` و `Database::hasColumn` نمونهٔ همین الگو هستند.
+
+### چیزهایی که اگر فراموش شوند خراب می‌شوند
+
+- `backend-php/config.php` رمزهای واقعی دارد و در git نیست. نسخهٔ داخل git مقدار `CHANGE_ME` دارد و اگر روی هاست بنشیند API از کار می‌افتد. اسکریپت استقرار آن را نادیده می‌گیرد. **هرگز به کسی نگویید آن را overwrite کند.**
+- مالک ویندوز دارد. هر چیزی در `package.json` (بخش scripts) یا پوشهٔ `deploy/` باید در cmd.exe اجرا شود. دستور یونیکسی مثل `cp` یک بار استقرار را خراب کرد.
+- `.gitattributes` پایان خطوط را ثابت می‌کند. `.htaccess`، `*.php`، `*.sh` و `*.sql` باید LF باشند، چون Apache فایل `.htaccess` با CRLF را با خطای ۵۰۰ رد می‌کند. اسکریپت‌های ویندوزی CRLF هستند. اگر نوع فایل تازه‌ای اضافه می‌کنید که هاست آن را parse می‌کند، باید آن را در `.gitattributes` هم بیاورید.
+- **استقرار فرانت فایل حذف می‌کند.** هر چیزی که در `out/` نباشد از `public_html` پاک می‌شود (از جمله zip بک‌آپی که داخل `public_html` ساخته شده باشد).
+- `NEXT_PUBLIC_API_URL` هنگام **build** در باندل درج می‌شود، نه هنگام اجرا. با تغییرش باید دوباره build و آپلود کرد.
+- دامنهٔ سایت باید در `cors_origins` داخل `config.php` باشد.
+
+**منابع کامل استقرار:** بخش‌های استقرار `README.md` (چرخهٔ یک فیچر، عیب‌یابی، بازیابی بک‌اند) و `docs/deploy-guide/` (همان مطالب به‌صورت PDF برای مالک).
+
+## ۳. تکنولوژی
+
+### فرانت
+- Next.js 15 (App Router) با **static export**، React 19 و TypeScript
+- Tailwind CSS 4 و shadcn/ui (Radix)
+- TanStack Query برای دادهٔ سرور، با persist برای حالت آفلاین
+- react-hook-form و zod برای فرم‌ها
+- recharts برای نمودارها، sonner برای toast، lucide-react برای آیکون
+- فونت Vazirmatn. تم فعلاً فقط روشن است (بدون dark mode)
+- PWA: service worker (`public/sw.js`)، صفحهٔ `offline.html`، پیشنهاد نصب، صف نوشتن آفلاین و همگام‌سازی
+
+### بک‌اند
+- PHP 8.1 خام، بدون Composer و بدون framework. روتر و کنترلرها در `src/`.
+- MySQL با PDO، `utf8mb4`
+- شناسه‌ها UUID هستند (`CHAR(36)`)
+- ارسال پیامک با ملی‌پیامک (`SmsGateway`)، ایمیل با `mail()` یا SMTP (`MailGateway`)، اعلان Web Push (`WebPush`)
+
+### محدودیت‌های هاست اشتراکی
+نه Node در اجرا، نه WebSocket، نه SSH، نه Composer. به همین دلیل پیام‌ها و اعلان‌ها با polling (`lib/api/polling.ts`) به‌روز می‌شوند و کارهای زمان‌بندی‌شده با cron هاست اجرا می‌شوند.
+
+## ۴. ساختار پوشه‌ها
+
+```
+app/                    صفحه‌های Next.js (App Router)
+  (auth)/               ورود، انتخاب نقش، ساخت باشگاه، دعوت‌نامه
+  (dashboard)/          پنل باشگاه / مربی / ورزشکار (یک مجموعه صفحه با sidebar پویا به‌ازای نقش)
+  admin/                پنل مدیر پلتفرم
+  join/[code]/          لینک دعوت (در استقرار با rewrite در deploy/.htaccess می‌رسد)
+  view-as/              دیدن پنل یک کاربر به‌عنوان ادمین
+  page/                 صفحه‌های متنی عمومی (قوانین، راهنما و ...)
+components/
+  ui/                   کامپوننت‌های shadcn
+  layout/               shell، sidebar، header، جستجوی سراسری
+                        (sidebar-nav.ts و admin-sidebar-nav.ts منوها را تعریف می‌کنند)
+  brand/  pwa/  providers/
+features/<نام>/         هر فیچر: components/ hooks/ services/ types/ validators/ constants/
+lib/api/client.ts       کلاینت API (توکن در localStorage، هدر Bearer، صف آفلاین)
+lib/                    ابزارها: persian.ts، iso-date.ts، offline-*.ts، view-as.ts، brand-theme.ts
+backend-php/
+  public/index.php      front controller و تعریف همهٔ روت‌ها
+  src/                  Router، Auth، Acl، Gate، Features، Settings، Migrations، Controllers/...
+  schema/               schema.sql، seed.sql و فایل‌های *-update.sql
+  cron/                 اسکریپت‌های cron
+  config.php            رمزها (در git نیست! نسخهٔ git فقط CHANGE_ME دارد)
+deploy/                 deploy.bat، فایل‌های WinSCP، .htaccess و serve.json
+docs/deploy-guide/      راهنمای استقرار (HTML و PDF)
+supabase/migrations/    فقط مرجع تاریخی. هیچ کدی آن را نمی‌خواند
+```
+
+الگوی هر فیچر در فرانت: `services/*.ts` (فراخوانی API) ← `hooks/use-*.ts` (React Query) ← `components/*` ← `app/.../page.tsx` (فقط یک wrapper نازک).
+
+## ۵. نقش‌ها و دسترسی
+
+### نقش حساب (`profiles.account_type`)
+`club` (مالک باشگاه)، `trainer` (مربی) و `athlete` (ورزشکار). کاربر بعد از ثبت‌نام «نقش» را انتخاب می‌کند (`/choose-role`).
+
+### نقش عضویت در باشگاه (`memberships.role`)
+`owner`، `trainer`، `reception` (پذیرش) و `athlete`. وضعیت‌ها: `active`، `pending` و `suspended`. «مدیریت باشگاه» یعنی `owner` یا `reception` (`Acl::managesClub`).
+
+### مدیر پلتفرم
+- **ادمین کامل:** `profiles.is_platform_admin = 1`.
+- **ادمین محدود (staff):** نقشی از جدول `admin_roles` با مجوزهای زیر. `AdminAccess` آن را اعمال می‌کند.
+
+| مجوز | کاربرد |
+| --- | --- |
+| `users.view` / `users.manage` | مشاهده و مدیریت کاربران |
+| `finance` | پرداخت‌ها، پلن‌ها و گزارش مالی |
+| `content` | کتابخانه‌ها، امتیاز مربیان و صفحه‌های متنی |
+| `notifications` | اعلان همگانی و متن اعلان‌های خودکار |
+| `support` | تیکت‌های پشتیبانی |
+| `settings` | تنظیمات سایت |
+| `system` | سلامت سایت و صف پیامک/ایمیل |
+| `activity` | لاگ فعالیت ادمین‌ها |
+
+فقط ادمین کامل می‌تواند این کارها را انجام دهد: مدیریت نقش‌ها و دسترسی ادمین‌ها، امنیت، کلیدهای پیامک و ایمیل، صفحهٔ دیتابیس و مهاجرت‌ها.
+
+### کنترل دسترسی در بک‌اند
+هیچ RLS ای وجود ندارد. هر endpoint خودش دسترسی را بررسی می‌کند:
+- `Auth::requireUser()` و `Auth::requirePlatformAdmin()`
+- `Acl` (`isClubMember`، `hasClubRole`، `managesClub`، `isTrainerOf`، `isClubAthleteOfManager`)
+- `Gate`: دروازهٔ اشتراک و فیچر
+- `Features`: بخش‌هایی که ادمین می‌تواند برای هر نقش خاموش کند (با regex روی مسیر API)
+
+## ۶. احراز هویت
+
+- نشست با **توکن Bearer** (جدول `sessions`) است، نه cookie. سایت و API روی ساب‌دامین‌های جدا هستند. مدت اعتبار ۳۰ روز.
+- روت‌ها: `/auth/signup`، `/auth/login`، `/auth/login/verify` و `/auth/login/resend` (ورود دومرحله‌ای ادمین)، `/auth/logout`، `/auth/me`، `/auth/choose-role`.
+- امنیت (`Security`): قفل شدن بعد از چند تلاش ناموفق (`login_attempts`)، محدودیت بر اساس IP، و 2FA اختیاری برای ادمین (`login_challenges`).
+- ادمین می‌تواند نشست‌های هر کاربر را ببیند و ببندد، رمز او را عوض کند، و پنلش را «به‌جای او» ببیند (`view-as`).
+
+## ۷. قابلیت‌ها بر اساس نقش
+
+### ۷.۱ مالک و پذیرش باشگاه
+منوی باشگاه: داشبورد، اعضا، مربیان، کلاس‌ها، امور مالی، اعلان‌ها، پشتیبانی، تنظیمات.
+- ساخت باشگاه، ویرایش مشخصات و آپلود لوگو
+- **پلن‌های عضویت** باشگاه (ساخت، ویرایش، حذف)
+- **اعضا:** فهرست، پروفایل هر عضو، دعوت با لینک، تغییر وضعیت یا عضویت، حذف، ظرفیت باشگاه (`/clubs/{id}/capacity`)
+- **مربی‌ها:** فهرست، دعوت، تغییر و حذف عضویت
+- **داشبورد باشگاه:** آمار و شاخص‌ها
+- **درآمد باشگاه** (`revenue_entries`): ثبت، ویرایش و حذف
+- **خرید و تمدید اشتراک پلتفرم:** انتخاب پلن، کد تخفیف، ثبت درخواست پرداخت (کارت‌به‌کارت) که ادمین تأیید یا رد می‌کند
+- حضور و غیاب کلاس (`class_attendance_logs`)
+
+### ۷.۲ مربی
+منوی مربی: داشبورد، ورزشکاران، برنامه‌ها (تمرینی و غذایی، قالب‌ها، محتوای آماده)، کتابخانه‌ها (حرکات، غذاها)، ارتباطات (پیام‌ها، تیکت‌ها)، پیشرفت ورزشکاران، پرسشنامه‌ها، تقویم، مالی (درآمد من، فاکتورهای من)، گزارش‌ها، اعلان‌ها، راهنما، پشتیبانی، حساب من (تنظیمات، رزومه، امتیاز من).
+
+- **ورزشکاران:** افزودن با لینک دعوت (`athlete-invites`)، فهرست، پروفایل کامل، یادداشت خصوصی، هدف تغذیه (کالری و ماکروها)، حذف
+- **برنامهٔ تمرینی** (`plans/workout`):
+  - دو حالت ساخت: `text` (متنی) و `structured` (ساختاریافته با روز، حرکت، ست، تکرار و تکنیک)
+  - کپی روز و کپی هفته
+  - ذخیره و اعمال قالب
+  - وضعیت‌های `draft`، `active`، `completed` و `cancelled`
+  - چاپ برنامه
+  - نظر و کامنت روی برنامه
+  - `workout_assignments` برنامه را به ورزشکار نسبت می‌دهد
+- **برنامهٔ غذایی** (`plans/nutrition`): وعده‌ها و آیتم‌های هر وعده، محاسبهٔ خودکار کالری و ماکروها (پروتئین، کربوهیدرات، چربی)، قالب، چاپ، هدف کالری
+- **برنامهٔ مکمل** (`supplement-plans`): مکمل‌ها با زمان مصرف (صبحانه، ناهار، شام، قبل از خواب، قبل یا بعد از تمرین، زمان دلخواه) و یادآور خودکار
+- **کتابخانه‌ها:** حرکات (با عکس و ویدیو)، غذاها، مکمل‌ها و تکنیک‌های تمرینی. هر مربی موارد خودش را اضافه می‌کند و موارد عمومی را هم می‌بیند. مواردی را هم می‌شود پنهان کرد.
+- **محتوای آماده** (`content-library`): قالب‌ها، تکنیک‌ها و پرسشنامه‌هایی که ادمین منتشر می‌کند و مربی به مال خودش کپی می‌کند
+- **پرسشنامه‌ها:** ساخت (متنی، چندگزینه‌ای، عددی)، ارسال برای ورزشکار، مشاهدهٔ پاسخ‌ها
+- **پیشرفت:** ثبت اندازه‌های بدن (`measurements`)، نمودار، یادآور ارزیابی دوره‌ای (هر ۲، ۴، ۶ یا ۸ هفته)
+- **تقویم شمسی** (`calendar_events`): جلسه و یادآور، با تکرار (`Recurrence`)
+- **جلسات خصوصی** (`session-packages`): بستهٔ جلسه برای ورزشکار و زمان‌بندی تک‌تک جلسات (`unscheduled`، `scheduled`، `done`، `canceled`)
+- **فاکتور:** برای برنامه، بستهٔ جلسه، پرسشنامه و موارد دیگر. ورزشکار پرداخت یا لغو را می‌بیند. مربی «پرداخت‌شد» می‌زند.
+- **درآمد من** (`trainer_payments`): ثبت شهریه با روش پرداخت (نقدی، کارت‌به‌کارت، آنلاین) و گزارش ماهانه
+- **گزارش‌ها:** آمار ماهانه، پایبندی هفتگی، نرخ تکمیل برنامه‌ها، پیشرفت ورزشکاران، خلاصهٔ مالی
+- **پیام‌ها:** گفتگو با ورزشکار با متن، پیام صوتی، عکس، ویدیو و فایل. بایگانی گفتگو، وضعیت خوانده‌شدن
+- **تیکت‌ها:** درخواست رسمی ورزشکار با شمارهٔ پیگیری. مربی پاسخ می‌دهد و وضعیت را تغییر می‌دهد.
+- **رزومهٔ مربی** (`trainer_profiles`): بیو، مدارک (آپلود گواهی) و تعرفه. شاگردان آن را می‌بینند.
+- **یادداشت‌ها** (`notes`): یادداشت‌های خصوصی
+- **امتیاز و سطح** (`points`): گیمیفیکیشن. امتیازها با `PointsService::award` ثبت می‌شوند. قوانین پیش‌فرض: ساخت برنامهٔ تمرینی +۵، ساخت برنامهٔ غذایی +۵، افزودن ورزشکار +۱۰، پاسخ به تیکت +۳. ادمین قوانین و سطح‌ها را از `/admin/points` بدون استقرار عوض می‌کند.
+- **تیکت پشتیبانی** به جیم‌لیک (`support`)
+- جستجوی سراسری در هدر
+
+### ۷.۳ ورزشکار
+منوی ورزشکار: داشبورد، برنامه تمرینی، برنامه غذایی، جلسات خصوصی، پرسشنامه‌ها، ارتباطات (پیام، تیکت)، پیشرفت، اعلان‌ها، پشتیبانی، حساب من (پروفایل، رزومهٔ مربی).
+- ثبت‌نام و ورود با لینک دعوت مربی یا باشگاه (`/join/{code}`)
+- دیدن برنامهٔ تمرینی و تیک زدن روزهای انجام‌شده (`workout_day_logs`)، با استریک (روزهای پیاپی)
+- دیدن برنامهٔ غذایی و مکمل‌ها، دریافت یادآور مکمل
+- پاسخ به پرسشنامه‌ها
+- ثبت اندازه‌های بدن و دیدن نمودار پیشرفت
+- پیام‌رسانی با مربی و ثبت تیکت
+- دیدن فاکتورها و بستهٔ جلسات خصوصی
+- دیدن رزومهٔ مربی
+- نظر گذاشتن روی برنامه
+- ویرایش پروفایل، ایمیل، رمز و آواتار
+- تنظیم دریافت اعلان با پیامک و ایمیل و Web Push
+
+### ۷.۴ مدیر پلتفرم (`/admin/*`)
+
+| بخش | کاربرد |
+| --- | --- |
+| نمای کلی، آمار رشد و استفاده | شاخص‌ها، کاربران فعال روزانه (`daily_active`) |
+| باشگاه‌ها، مربی‌ها، ورزشکاران، همهٔ کاربران | فهرست و جزئیات، تعلیق و فعال‌سازی، ویرایش پروفایل، تغییر نقش، تعیین رمز، مدیریت نشست‌ها، ورود به‌جای کاربر (view-as)، تأیید یا تعلیق باشگاه |
+| درخواست‌های پرداخت | تأیید یا رد پرداخت اشتراک باشگاه‌ها |
+| اشتراک باشگاه‌ها | مشاهده و ویرایش اشتراک، هدیهٔ اشتراک همگانی |
+| پلن‌ها | ساخت و ویرایش پلن‌های اشتراک (`plans`) |
+| کدهای تخفیف | CRUD (`discount_codes`) |
+| اطلاعات پرداخت | شمارهٔ کارت و حساب برای پرداخت کارت‌به‌کارت (تنظیم `billing`) |
+| گزارش مالی | درآمد پلتفرم، خروجی (`/admin/export/{kind}`) |
+| کتابخانه‌ها | حرکات، غذاها و مکمل‌های عمومی. شامل ساخت، ویرایش، انتشار و رسانهٔ حرکت |
+| محتوای آماده | قالب، تکنیک و پرسشنامهٔ آماده برای انتشار به مربیان |
+| امتیاز مربیان | قوانین امتیاز، سطح‌ها و تنظیم دستی امتیاز |
+| صفحه‌های متنی | قوانین، راهنما و ... (`site_pages`) |
+| اعلان همگانی | ارسال به گروه‌ها با پیامک و ایمیل و زمان‌بندی (`broadcasts`)، و ویرایش متن اعلان‌های خودکار (`Templates`) |
+| پشتیبانی | تیکت‌های کاربران به جیم‌لیک (`support_tickets`) و تیکت‌های مربی و ورزشکار |
+| تنظیمات سایت | حالت تعمیر، ثبت‌نام، اطلاعیه، پشتیبانی، محدودیت‌های پیام و آپلود |
+| بخش‌ها (features) | خاموش و روشن کردن هر بخش برای هر نقش |
+| برندینگ | لوگو و رنگ سایت |
+| نقش‌ها و دسترسی | ساخت نقش ادمین محدود، تعیین ادمین |
+| امنیت | قفل ورود، 2FA ادمین، باز کردن قفل |
+| سیستم | سلامت سایت، هشدارها، صف ارسال پیامک و ایمیل (`/admin/deliveries`) با retry، لاگ فعالیت ادمین‌ها |
+| دیتابیس | بک‌آپ، اجرای مهاجرت‌های `schema/*-update.sql` (یک بار هر کدام) |
+
+## ۸. بخش‌های قابل خاموش‌شدن (`Features::CATALOG`)
+
+ادمین هر کدام را برای هر نقش جدا خاموش می‌کند. کلیدها: `messages`، `tickets`، `questionnaires`، `nutrition`، `supplements`، `progress`، `session_packages`، `trainer_resume`، `templates`، `content_library`، `notes`، `calendar`، `points`، `earnings`، `reports`، `support`، `club_finance`.
+
+نقشهٔ مسیرهای فرانت برای هر کلید در `features/site-settings/constants.ts` است و کلیدها باید با بک‌اند یکی باشند.
+
+## ۹. تنظیمات سایت (`app_settings`)
+
+هر گروه یک ردیف JSON دارد و همیشه از `Settings::get()` با مقدار پیش‌فرض خوانده می‌شود. نبودن جدول یا ردیف یعنی مقدار پیش‌فرض.
+
+گروه‌ها: `maintenance`، `signup`، `announcement`، `support`، `features`، `points_levels`، `limits`، `sms`، `mail`، `security`، `billing`، `templates`، `branding`.
+
+- گروه‌های عمومی (قابل خواندن برای هر بازدیدکننده): `maintenance`، `signup`، `announcement`، `support`، `features`، `limits`، `branding`. بقیه فقط برای ادمین‌اند.
+- کلیدهای محرمانه (`sms.api_key` و `mail.smtp_pass`) هرگز به مرورگر برنمی‌گردند و فقط به‌صورت نشانهٔ ماسک‌شده دیده می‌شوند.
+- حداکثر طول پیام ۱۰۰۰ کاراکتر است (ستون `VARCHAR(1000)`). فقط می‌شود کمترش کرد.
+
+## ۱۰. اشتراک پلتفرم
+
+- هر باشگاه یک ردیف در `subscriptions` دارد.
+- **وضعیت** (`active` یا `expiring` یا `expired`) هر بار از روی `expires_at` محاسبه می‌شود و به ستون ذخیره‌شده اعتماد نمی‌شود (`Subscriptions::status`). مرز «در حال انقضا» تنظیم `billing.expiring_days` است.
+- سطح عضو (`plan_tier`): `elite`، `basic` و `daily`.
+- مسیر خرید: انتخاب پلن در `/plans-catalog` ← کد تخفیف (`/billing/discount-check`) ← ثبت `payment_requests` ← تأیید ادمین ← فعال شدن اشتراک.
+- پلن‌ها و کدهای تخفیف را ادمین از پنل مدیریت می‌کند.
+
+## ۱۱. اعلان‌ها و ارسال
+
+- اعلان درون‌برنامه‌ای (`notifications`)، با بایگانی و «همه را خواندم».
+- کاربر می‌تواند دریافت اعلان با **پیامک** و **ایمیل** را روشن کند. `AuthController::notify` فقط یک ردیف در `notification_deliveries` می‌گذارد و cron آن را می‌فرستد.
+- هر ردیف حداکثر ۳ بار تلاش می‌شود و علت خطا در `last_error` است.
+- **Web Push:** کلیدهای VAPID در `push_vapid_keys`، اشتراک‌ها در `push_subscriptions`.
+- متن اعلان‌های خودکار با placeholder مثل `{name}` و `{club}` از `Templates.php` ساخته می‌شود و ادمین ویرایشش می‌کند.
+
+## ۱۲. Cron (روی هاست در cPanel تنظیم می‌شود)
+
+فقط از خط فرمان اجرا می‌شوند و روی HTTP خطای ۴۰۴ می‌دهند.
+
+| اسکریپت | زمان‌بندی پیشنهادی | کار |
+| --- | --- | --- |
+| `cron/calendar-reminders.php` | هر ۵ دقیقه | یادآور رویدادهای تقویم و یادآور مکمل‌ها (`SupplementController::sendDueReminders`) |
+| `cron/notification-dispatch.php` | هر ۵ دقیقه | ارسال صف پیامک و ایمیل (حداکثر ۵۰ ردیف در هر اجرا) |
+| `cron/assessment-reminders.php` | روزی یک بار | یادآور ثبت دوبارهٔ اندازه‌ها |
+| `cron/push-check.php` | طبق راهنمای `backend-php/README.md` | بررسی و ارسال Web Push |
+| `CronHeartbeat` | | ثبت اینکه cron زنده است. پنل ادمین از آن برای هشدار استفاده می‌کند |
+
+زمان‌بندی دقیق هر کدام در `backend-php/README.md` آمده است.
+
+## ۱۳. دیتابیس
+
+MySQL با engine InnoDB و `utf8mb4`. فایل مبنا `schema/schema.sql` است (فقط برای نصب اولیهٔ پایگاه خالی) و تغییرات بعدی در فایل‌های `*-update.sql` می‌آیند. `seed.sql` تمرین‌ها و غذاهای آماده را پر می‌کند.
+
+گروه‌بندی جدول‌ها:
+- **حساب و باشگاه:** `profiles`، `sessions`، `clubs`، `club_membership_plans`، `memberships`، `trainer_athletes`، `invitations`، `trainer_profiles`، `admin_roles`، `login_attempts`، `login_challenges`
+- **اشتراک و مالی پلتفرم:** `plans`، `subscriptions`، `payment_requests`، `discount_codes`
+- **مالی باشگاه و مربی:** `revenue_entries`، `trainer_payments`، `invoices`، `session_packages`، `package_sessions`
+- **برنامه‌ها:** `plans` (برنامهٔ تمرینی و غذایی با فیلد `kind`)، `workout_assignments`، `nutrition_assignments`، `workout_plan_days`، `workout_plan_exercises`، `nutrition_plan_meals`، `nutrition_plan_items`، `workout_day_logs`
+- **کتابخانه‌ها:** `exercises`، `exercise_usage`، `foods`، `food_usage`، `supplements`، `supplement_usage`، `supplement_assignments`، `supplement_plan_items`، `techniques`
+- **پیشرفت:** `measurements`، `assessment_reminders`
+- **ارتباط:** `messages`، `conversation_archives`، `tickets`، `ticket_messages`، `support_tickets`، `support_messages`، `notifications`، `notification_deliveries`، `broadcasts`، `push_subscriptions`، `push_vapid_keys`
+- **پرسشنامه:** `questionnaires`، `questionnaire_questions`، `questionnaire_responses`، `questionnaire_answers`
+- **سایر:** `calendar_events`، `notes`، `point_rules`، `coach_point_logs`، `app_settings`، `site_pages`، `activity_logs`، `daily_active`، `class_attendance_logs`
+
+> **توجه:** جدول `plans` دو معنا دارد. در پنل ادمین یعنی «پلن اشتراک پلتفرم»؛ در مسیر `/plans/{kind}` یعنی «برنامهٔ تمرینی یا غذایی ورزشکار». پیش از هر تغییر، فایل `schema.sql` و کنترلر مربوط را بخوانید.
+
+### مهاجرت‌ها (`Migrations.php`)
+هر تغییر دیتابیس این‌ها را دارد:
+1. فایل `backend-php/schema/<نام>-update.sql`
+2. یک ورودی در انتهای `Migrations::LIST` با `id`، `file`، `title` و `check`. `check` می‌گوید تغییر قبلاً اعمال شده یا نه (`table`، `column`، `scale`، `preset`، `described`).
+3. همان SQL دقیق در توضیح PR
+4. کد بک‌اند بدون آن SQL هم کار کند
+
+## ۱۴. API
+
+آدرس پایه: `https://api.gymlic-panel.ir`. همهٔ روت‌ها در `backend-php/public/index.php` تعریف شده‌اند.
+
+الگوی پاسخ: `Response::ok(...)` و خطاها با کد HTTP و پیام فارسی. احراز هویت با هدر `Authorization: Bearer <token>`.
+
+گروه‌های روت (برای جزئیات، `index.php` را بخوانید):
+- `/health`، `/settings/public`، `/pages`
+- `/auth/*`، `/invitations/*`، `/me/*`، `/profiles/{id}`
+- `/clubs/*`، `/membership-plans/*`، `/memberships/*`، `/trainer-memberships/*`
+- `/athletes/*`، `/athlete-invites/*`، `/trainer/club`
+- `/plans/{kind}/*` (kind برابر `workout` یا `nutrition`)، `/plans/workout/{id}/days/*`، `/plans/nutrition/{id}/meals/*`
+- `/workout-day-logs`، `/library/{kind}`، `/content-library/*`، `/techniques`
+- `/supplement-plans`، `/questionnaires/*`، `/session-packages/*`، `/invoices/*`
+- `/messages/*`، `/tickets/*`، `/support/*`، `/notifications/*`، `/push/*`
+- `/calendar/events`، `/notes`، `/athletes/{id}/measurements`، `/progress/reminders/*`
+- `/dashboard/{athlete|trainer|club}`، `/reports/*`، `/revenue/*`، `/earnings`
+- `/points/me`، `/trainer-profile*`
+- `/payment-requests`، `/plans-catalog`، `/billing/*`
+- `/admin/*`: همهٔ بخش‌های پنل مدیر
+
+آپلودها (آواتار، لوگو، گواهی، رسانهٔ پیام و حرکت) در `backend-php/public/uploads/` ذخیره می‌شوند (حداکثر ۸ مگابایت به‌طور پیش‌فرض). این پوشه هرگز با استقرار پاک یا جایگزین نمی‌شود.
+
+## ۱۵. فرانت: نکته‌های ساختاری
+
+- چون export استاتیک است، مسیر پویا (`[id]`) فقط برای `join/[code]` وجود دارد. بقیهٔ جزئیات با query string کار می‌کنند، مثل `/athletes/profile?id=...`، `/members/profile`، `/admin/clubs/detail` و `/admin/trainers/detail`.
+- روت `/join/<code>` بیرون از برنامه به shell صادرشده rewrite می‌شود (`deploy/.htaccess` برای Apache و `deploy/serve.json` برای `npm run preview`).
+- `lib/api/client.ts` خطاها را به پیام فارسی تبدیل می‌کند. نوشتن‌های قابل‌صف‌شدن هنگام آفلاین بودن در `offline-queue` می‌مانند و با برگشت اینترنت ارسال می‌شوند. هنگام خروج یا تغییر توکن همه پاک می‌شوند.
+- کش React Query در حالت آفلاین ذخیره می‌شود (`query-persist.ts`) و با خروج پاک می‌شود.
+- منوی هر نقش در `components/layout/sidebar-nav.ts` و منوی ادمین در `admin-sidebar-nav.ts` است. یک صفحهٔ تازه باید اینجا ثبت شود و، اگر قابل خاموش‌شدن است، در `features/site-settings/constants.ts` و `Features::CATALOG` هم بیاید.
+- `view-as`: ادمین با توکن جدا و کوتاه‌مدت پنل کاربر را می‌بیند و بنر مخصوص نشان داده می‌شود.
+- جلالی: `Jalali.php` در بک‌اند، `jalali-date-field` و `lib/persian.ts` در فرانت.
+
+## ۱۶. اجرای محلی
+
+```bash
+# بک‌اند
+mysql -u root -e "CREATE DATABASE gymlic_dev CHARACTER SET utf8mb4"
+mysql -u root gymlic_dev < backend-php/schema/schema.sql
+mysql -u root gymlic_dev < backend-php/schema/seed.sql
+./backend-php/dev-server.sh            # http://127.0.0.1:8099
+
+# فرانت
+cp .env.example .env.local             # NEXT_PUBLIC_API_URL=http://127.0.0.1:8099
+npm install
+npm run dev                            # http://localhost:3000
+
+npm run build                          # خروجی در out/
+npm run preview                        # پیش‌نمایش همان خروجی
+npm run lint
+```
+
+## ۱۷. قواعد کار برای هوش مصنوعی
+
+1. **قبل از هر پیشنهاد** بخش‌های استقرار `README.md` را بخوانید. هر ردیف عیب‌یابی از اتفاقی واقعی روی همین هاست آمده است.
+2. کد جدید را با همان سبک پروژه بنویسید: PHP خام با PDO و prepared statement، بدون Composer؛ فرانت با ساختار `features/<نام>/...`؛ متن‌های UI فارسی.
+3. هر endpoint جدید در بک‌اند دسترسی را خودش بررسی کند (`Auth` و `Acl`)، چون RLS ای وجود ندارد.
+4. هر چیزی که به جدول یا ستون جدید وابسته است باید تا اجرای SQL بدون خطا کار کند (`Database::hasColumn`، `try/catch`، مقدار پیش‌فرض).
+5. تغییر دیتابیس فقط با `schema/*-update.sql` ثبت‌شده در `Migrations.php` و SQL کامل در PR.
+6. هر چیزی در `package.json` یا `deploy/` باید در **cmd.exe ویندوز** کار کند (بدون `cp`، `rm`، `&&` ی که فقط bash بفهمد).
+7. فایل جدیدی که هاست parse می‌کند را در `.gitattributes` با پایان خط درست ثبت کنید (LF برای `.htaccess`، `.php`، `.sh`، `.sql`).
+8. **هرگز `backend-php/config.php` را در دستورالعمل overwrite نکنید.** اگر کلید تازه‌ای لازم است، به مالک بگویید دستی آن را اضافه کند.
+9. در پایان هر کار بگویید **مالک چه کاری باقی مانده** (استقرار بک‌اند، اجرای SQL، استقرار فرانت، یا تنظیم cron جدید).
+10. به `supabase/migrations/` به‌عنوان منبع حقیقت تکیه نکنید؛ فقط مرجع تاریخی است.
+11. به `NEXT_PUBLIC_API_URL` وابسته نباشید که در زمان اجرا تغییر کند. فقط هنگام build درج می‌شود.
