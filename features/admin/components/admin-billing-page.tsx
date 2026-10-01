@@ -268,6 +268,31 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
           <ReceiptStorage />
         </div>
 
+        <div className="space-y-4 border-t border-border px-6 pt-5">
+          <div className="space-y-1">
+            <CardTitle className="text-base">اشتراک مربیان</CardTitle>
+            <CardDescription>
+              مربیان با همین کارت و همین قواعد رسید، اشتراک می‌خرند (پلن‌ها در «اشتراک مربیان»). تا
+              وقتی این گزینه خاموش است، هیچ مربی‌ای محدود نمی‌شود و اشتراک فقط ثبت می‌شود.
+            </CardDescription>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+            <div>
+              <Label htmlFor="billing-trainer-enforce">الزام اشتراک مربی</Label>
+              <p className="text-xs leading-5 text-muted-foreground">
+                وقتی روشن باشد، مربیِ بدون باشگاه فقط با اشتراک فعال و در سقف ورزشکار پلنش می‌تواند
+                ورزشکار تازه دعوت کند. ورزشکاران فعلی هیچ‌وقت حذف نمی‌شوند و مربیِ عضو باشگاه مشمول نیست.
+              </p>
+            </div>
+            <Switch
+              id="billing-trainer-enforce"
+              checked={draft.trainer_enforce}
+              disabled={locked}
+              onCheckedChange={(trainer_enforce) => patch({ trainer_enforce })}
+            />
+          </div>
+        </div>
+
         <div className="px-6">
           <Button onClick={save} disabled={saving || locked}>
             {saving && <Loader2 className="animate-spin" />}

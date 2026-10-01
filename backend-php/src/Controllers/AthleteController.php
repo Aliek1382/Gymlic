@@ -8,6 +8,7 @@ use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\TrainerBilling;
 use Gymlic\Uuid;
 use Gymlic\Validate;
 use Gymlic\Templates;
@@ -177,6 +178,14 @@ final class AthleteController
     {
         $user = Auth::requireUser();
         $data = Validate::body();
+
+        // Only once the admin has switched trainer subscriptions on (and only
+        // for a trainer outside a club); see TrainerBilling::inviteBlock.
+        $blocked = TrainerBilling::inviteBlock(Database::connection(), $user['id']);
+        if ($blocked !== null) {
+            Response::error(402, 'trainer_plan_required', $blocked);
+            return;
+        }
 
         $club = self::trainerClub($user['id']);
         $code = Uuid::v4();
