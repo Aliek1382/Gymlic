@@ -14,7 +14,7 @@ import { DEFAULT_BRAND_NAME } from "./brand-mark";
  */
 export function BrandTheme() {
   const { branding } = usePublicSettings();
-  const { primary_color: color, app_name: name, logo_url: logo } = branding;
+  const { primary_color: color, app_name: name, logo_url: logo }: Partial<typeof branding> = branding ?? {};
 
   useEffect(() => {
     applyBrandColor(color || null);
