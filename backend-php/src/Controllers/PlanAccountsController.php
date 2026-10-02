@@ -11,6 +11,7 @@ use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Subscriptions;
 use Gymlic\Templates;
+use Gymlic\Tiers;
 use Gymlic\TrainerBilling;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -341,6 +342,7 @@ final class PlanAccountsController
                    reminder_stage = 0, override_on = 0, override_max_athletes = NULL'
             )->execute(['id' => $id, 'plan_id' => $plan['id'], 'name' => $plan['name'], 'cap' => $plan['cap'], 'start' => $start, 'end' => $end]);
             Limits::restore($pdo, $id);
+            Tiers::setTrainerTier($pdo, $id, Tiers::planTier($pdo, 'trainer_plans', $plan['id']));
 
             if ($amount > 0) {
                 $pdo->prepare(
@@ -361,6 +363,7 @@ final class PlanAccountsController
             }
         } else {
             Subscriptions::set($pdo, $id, $plan['name'], $end, $plan['id'], $start, true);
+            Tiers::setClubTier($pdo, $id, Tiers::planTier($pdo, 'plans', $plan['id']));
             // A paid plan opens a club still waiting for approval, as an
             // approved payment does; a suspended club stays suspended.
             $pdo->prepare("UPDATE clubs SET status = 'active' WHERE id = :id AND status = 'pending'")->execute(['id' => $id]);

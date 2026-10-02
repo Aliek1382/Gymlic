@@ -11,7 +11,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useState } from "react";
-import { Settings2 } from "lucide-react";
+import { Settings2, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { deleteClub } from "../services/admin-ops-service";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -72,6 +76,8 @@ export function AdminClubDetailPage() {
   const canManageSubscription = can("finance");
   const queryClient = useQueryClient();
   const [managing, setManaging] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
   const { data: plans } = useQuery({
     queryKey: ["admin", "plans"],
     queryFn: listCatalogPlans,
@@ -111,7 +117,15 @@ export function AdminClubDetailPage() {
             )}
           </p>
         </div>
-        <ClubStatusToggle clubId={club.id} status={club.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ClubStatusToggle clubId={club.id} status={club.status} />
+          {can("super") && (
+            <Button size="sm" variant="outline" className="text-destructive" onClick={() => setDeleting(true)}>
+              <Trash2 />
+              حذف باشگاه
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -270,6 +284,21 @@ export function AdminClubDetailPage() {
           </Table>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`حذف ${club.name}`}
+        description="باشگاه با عضویت‌ها، پلن‌های عضویت، اشتراک و پرداخت‌هایش به سطل زباله می‌رود و تا ۳۰ روز قابل بازگرداندن است. حساب مدیر باشگاه و حساب اعضا می‌مانند."
+        confirmLabel="حذف باشگاه"
+        errorMessage="حذف باشگاه انجام نشد."
+        onConfirm={async () => {
+          await deleteClub(club.id);
+          toast.success("باشگاه به سطل زباله رفت.");
+          void queryClient.invalidateQueries({ queryKey: ["admin"] });
+          router.replace("/admin/clubs");
+        }}
+      />
 
       {canManageSubscription && (
         <SubscriptionDialog

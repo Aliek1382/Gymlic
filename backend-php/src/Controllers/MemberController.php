@@ -9,9 +9,10 @@ use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Limits;
 use Gymlic\Response;
+use Gymlic\Templates;
+use Gymlic\Tiers;
 use Gymlic\Uuid;
 use Gymlic\Validate;
-use Gymlic\Templates;
 use Throwable;
 
 final class MemberController

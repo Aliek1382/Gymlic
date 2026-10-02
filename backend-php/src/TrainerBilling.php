@@ -216,13 +216,32 @@ final class TrainerBilling
     /**
      * Why this trainer may not invite another athlete right now, in words for
      * the trainer; null when they may (including whenever enforcement is off).
-     * Once plan-limits-update.sql has run this is Limits' job; the rule below
-     * is the one from before it, for the days between the backend upload and
-     * running the database update.
+     * The free tier's cap (Tiers) applies while enforcement is off. With it on,
+     * once plan-limits-update.sql has run, the caps are Limits' job; the rule
+     * at the end is the one from before it, for the days between the backend
+     * upload and running the database update.
      */
     public static function inviteBlock(PDO $pdo, string $trainerId): ?string
     {
-        if (Limits::ready() || !Settings::get('billing')['trainer_enforce'] || !self::ready() || self::inClub($pdo, $trainerId)) {
+        if (self::inClub($pdo, $trainerId)) {
+            return null;
+        }
+
+        // The free tier's cap (Tiers), for a trainer with no running plan
+        // while subscriptions aren't required: set in the admin's plan tiers.
+        $freeCap = Tiers::freeCap('max_athletes');
+        if ($freeCap !== null && !Settings::get('billing')['trainer_enforce']) {
+            $own = self::ready() ? self::subscription($pdo, $trainerId) : null;
+            if ($own === null || $own['status'] === 'expired') {
+                $counts = self::athleteCounts($pdo, $trainerId);
+                if ($counts['active'] + $counts['pending_invites'] >= $freeCap) {
+                    return "در پلن رایگان حداکثر {$freeCap} ورزشکار می‌توانید داشته باشید و به سقف رسیده‌اید. برای دعوت بیشتر، از «اشتراک من» پلن تهیه کنید.";
+                }
+            }
+        }
+
+        // Once plan-limits-update.sql has run, Limits decides the rest.
+        if (Limits::ready() || !Settings::get('billing')['trainer_enforce'] || !self::ready()) {
             return null;
         }
 

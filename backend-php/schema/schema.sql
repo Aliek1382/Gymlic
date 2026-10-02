@@ -165,6 +165,7 @@ CREATE TABLE plans (
   price_toman   BIGINT NOT NULL,
   duration_days INT NOT NULL,
   max_members   INT NULL,
+  tier          VARCHAR(20) NULL,   -- free | silver | gold | diamond (Tiers); NULL = not set
   max_trainers  INT NULL,
   -- Read by later phases; NULL = unlimited, like the caps.
   max_custom_exercises INT NULL,
@@ -186,6 +187,7 @@ CREATE TABLE subscriptions (
   club_id    CHAR(36) NOT NULL,
   plan_id    CHAR(36) NULL,
   plan_name  VARCHAR(255) NOT NULL,
+  tier       VARCHAR(20) NULL,      -- the plan's tier when bought; NULL = not limited by tier
   status     ENUM('active','expiring','grace','expired') NOT NULL DEFAULT 'active',
   started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NOT NULL,
@@ -736,6 +738,7 @@ CREATE TABLE trainer_plans (
   max_templates        INT NULL,
   history_months       INT NULL,
   report_level         ENUM('count','basic','full','full_excel') NULL,
+  tier          VARCHAR(20) NULL,   -- free | silver | gold | diamond (Tiers); NULL = not set
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -747,6 +750,7 @@ CREATE TABLE trainer_subscriptions (
   trainer_id   CHAR(36) NOT NULL PRIMARY KEY,
   plan_id      CHAR(36) NULL,
   plan_name    VARCHAR(255) NOT NULL,
+  tier         VARCHAR(20) NULL,    -- the plan's tier when bought; NULL = not limited by tier
   max_athletes INT NULL,                       -- the plan's cap when bought; the plan's own is what counts
   started_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at   DATETIME NULL,                  -- NULL on the free plan
@@ -1120,6 +1124,39 @@ CREATE TABLE daily_active (
   CONSTRAINT fk_daily_active_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- PHP and browser errors, one row per kind of error (ErrorLog).
+CREATE TABLE error_logs (
+  id          CHAR(36) NOT NULL PRIMARY KEY,
+  fingerprint CHAR(40) NOT NULL,
+  source      ENUM('server','browser') NOT NULL,
+  message     VARCHAR(1000) NOT NULL,
+  location    VARCHAR(500) NULL,
+  detail      TEXT NULL,
+  url         VARCHAR(500) NULL,
+  user_id     CHAR(36) NULL,
+  user_agent  VARCHAR(255) NULL,
+  occurrences INT NOT NULL DEFAULT 1,
+  first_seen  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  resolved_at DATETIME NULL,
+  UNIQUE KEY uq_error_logs_fingerprint (fingerprint),
+  KEY idx_error_logs_last_seen (last_seen),
+  CONSTRAINT fk_error_logs_user FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- What an admin deleted, restorable for 30 days (Trash): the rows as JSON.
+CREATE TABLE trash (
+  id         CHAR(36) NOT NULL PRIMARY KEY,
+  kind       VARCHAR(30) NOT NULL,
+  label      VARCHAR(255) NOT NULL,
+  summary    VARCHAR(500) NULL,
+  payload    LONGTEXT NOT NULL,
+  deleted_by CHAR(36) NULL,
+  deleted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_trash_deleted_at (deleted_at),
+  CONSTRAINT fk_trash_deleted_by FOREIGN KEY (deleted_by) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =========================================================================
@@ -1185,6 +1222,12 @@ CREATE TABLE trainer_profiles (
   certificates   JSON NULL,   -- array of image URLs (output of UploadController)
   pricing_table  JSON NULL,   -- array of {"title":"...", "price_toman":..., "description":"..."}
   social_links   JSON NULL,   -- {"instagram":"...", "telegram":"...", "website":"..."}
+  -- The admin's check of the certificates; 'verified' shows the badge.
+  verification_status ENUM('none','pending','verified','rejected') NOT NULL DEFAULT 'none',
+  verification_note   VARCHAR(500) NULL,
+  verification_requested_at DATETIME NULL,
+  verified_at    DATETIME NULL,
+  verified_by    CHAR(36) NULL,
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_trainer_profiles_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -1385,12 +1428,12 @@ INSERT INTO site_pages (slug, title, body, is_published, sort_order) VALUES
 
 -- The plans on sale (plan-limits-update.sql adds the same rows to an existing
 -- database). The free trainer plan never expires; its duration is unused.
-INSERT INTO trainer_plans (id, name, price_toman, duration_days, max_athletes, is_free, max_custom_exercises, max_templates, history_months, report_level) VALUES
-  ('7a000000-0000-4000-8000-000000000001', 'رایگان', 0, 30, 3, 1, 5, 0, 3, 'count'),
-  ('7a000000-0000-4000-8000-000000000002', 'نقره‌ای', 290000, 30, 15, 0, 30, 5, 12, 'basic'),
-  ('7a000000-0000-4000-8000-000000000003', 'طلایی', 590000, 30, 40, 0, NULL, 20, NULL, 'full'),
-  ('7a000000-0000-4000-8000-000000000004', 'الماسی', 990000, 30, NULL, 0, NULL, NULL, NULL, 'full_excel');
-INSERT INTO plans (id, name, price_toman, duration_days, max_members, max_trainers) VALUES
-  ('7c000000-0000-4000-8000-000000000002', 'نقره‌ای', 990000, 30, 100, 3),
-  ('7c000000-0000-4000-8000-000000000003', 'طلایی', 1800000, 30, 300, 8),
-  ('7c000000-0000-4000-8000-000000000004', 'الماسی', 2900000, 30, NULL, NULL);
+INSERT INTO trainer_plans (id, name, price_toman, duration_days, max_athletes, is_free, max_custom_exercises, max_templates, history_months, report_level, tier) VALUES
+  ('7a000000-0000-4000-8000-000000000001', 'رایگان', 0, 30, 3, 1, 5, 0, 3, 'count', 'free'),
+  ('7a000000-0000-4000-8000-000000000002', 'نقره‌ای', 290000, 30, 15, 0, 30, 5, 12, 'basic', 'silver'),
+  ('7a000000-0000-4000-8000-000000000003', 'طلایی', 590000, 30, 40, 0, NULL, 20, NULL, 'full', 'gold'),
+  ('7a000000-0000-4000-8000-000000000004', 'الماسی', 990000, 30, NULL, 0, NULL, NULL, NULL, 'full_excel', 'diamond');
+INSERT INTO plans (id, name, price_toman, duration_days, max_members, max_trainers, tier) VALUES
+  ('7c000000-0000-4000-8000-000000000002', 'نقره‌ای', 990000, 30, 100, 3, 'silver'),
+  ('7c000000-0000-4000-8000-000000000003', 'طلایی', 1800000, 30, 300, 8, 'gold'),
+  ('7c000000-0000-4000-8000-000000000004', 'الماسی', 2900000, 30, NULL, NULL, 'diamond');

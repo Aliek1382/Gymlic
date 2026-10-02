@@ -26,6 +26,7 @@ import { ReceiptViewer } from "./receipt-viewer";
 import { SubmitPaymentRequestDialog } from "./submit-payment-request-dialog";
 import { ClubRevenueSection } from "@/features/revenue";
 import type { PaymentRequestStatus, SubscriptionStatus } from "@/types/database.types";
+import { MyTierBadge } from "@/features/site-settings/components/my-tier-badge";
 
 const REQUEST_STATUS_LABEL: Record<PaymentRequestStatus, string> = {
   pending: "در انتظار بررسی",
@@ -92,7 +93,10 @@ export function FinancePage() {
 
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">امور مالی باشگاه</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground">امور مالی باشگاه</h1>
+            <MyTierBadge />
+          </div>
           <p className="text-sm text-muted-foreground">
             درآمد و شهریه‌های دریافتی باشگاه، و وضعیت اشتراک شما در پلتفرم.
           </p>

@@ -5,6 +5,7 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { reportError } from "@/lib/error-reporter";
 import { SupportContact } from "@/features/site-settings";
 
 /**
@@ -24,8 +25,10 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Also lands in the browser console, where the stack is still attached.
+    // Also lands in the browser console, where the stack is still attached,
+    // and in the admin's error log.
     console.error("Dashboard error boundary:", error);
+    reportError(error, "dashboard error boundary");
   }, [error]);
 
   return (

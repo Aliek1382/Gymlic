@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getMyResume,
   getTrainerResume,
+  requestVerification,
   saveMyResume,
   uploadCertificate,
 } from "../services/trainer-resume-service";
@@ -32,5 +33,13 @@ export function useTrainerResume(trainerId: string | null) {
     queryKey: [...resumeKey, "view", trainerId],
     queryFn: () => getTrainerResume(trainerId as string),
     enabled: !!trainerId,
+  });
+}
+
+export function useRequestVerification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: requestVerification,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: resumeKey }),
   });
 }

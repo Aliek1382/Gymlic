@@ -167,6 +167,8 @@ export interface AdminProfileRow {
   /** Set when listing trainers. */
   athlete_count?: number;
   club_name?: string | null;
+  /** Trainers: has the «مربی تأییدشده» badge. */
+  is_verified?: boolean;
 }
 
 export async function listAdminProfiles(

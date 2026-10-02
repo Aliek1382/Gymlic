@@ -286,6 +286,14 @@ final class Limits
             $maxTrainers = self::intOrNull($row['override_max_trainers']);
         }
         $enforcing = self::enforcing();
+        $running = in_array($status, ['active', 'expiring', 'grace'], true);
+
+        // While enforcement is off, a club with no plan running still gets
+        // the free tier's member cap when the admin set one (Tiers).
+        $freeCap = Tiers::freeCap('max_members');
+        if (!$enforcing && !$running && $freeCap !== null) {
+            $maxMembers = $maxMembers === null ? $freeCap : min($maxMembers, $freeCap);
+        }
 
         return [
             'ready'        => $ready,
@@ -303,7 +311,7 @@ final class Limits
             'override_on'  => $ready && (int) ($row['override_on'] ?? 0) === 1,
             'override_max_members'  => $ready ? self::intOrNull($row['override_max_members'] ?? null) : null,
             'override_max_trainers' => $ready ? self::intOrNull($row['override_max_trainers'] ?? null) : null,
-            'can_invite'   => !$enforcing || in_array($status, ['active', 'expiring', 'grace'], true),
+            'can_invite'   => !$enforcing || $running,
             'usage'        => $usage,
             'over_cap'     => ($maxMembers !== null && $usage['members'] > $maxMembers)
                 || ($maxTrainers !== null && $usage['trainers'] > $maxTrainers),

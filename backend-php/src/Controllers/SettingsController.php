@@ -33,6 +33,8 @@ final class SettingsController
         'billing'       => 'finance',
         'templates'     => 'notifications',
         'branding'      => 'settings',
+        'reports'       => 'settings',
+        'tiers'         => 'finance',
     ];
 
     /**
@@ -120,6 +122,18 @@ final class SettingsController
             if ($error !== null) {
                 Response::error(400, 'invalid_billing', $error);
                 return;
+            }
+        }
+
+        if ($key === 'reports') {
+            $raw = $body['value']['recipients'] ?? [];
+            $items = is_array($raw) ? $raw : preg_split('/[\s,،;]+/u', (string) $raw);
+            foreach ($items ?: [] as $item) {
+                $item = trim((string) $item);
+                if ($item !== '' && filter_var($item, FILTER_VALIDATE_EMAIL) === false) {
+                    Response::error(400, 'invalid_email', "«{$item}» ایمیل معتبری نیست.");
+                    return;
+                }
             }
         }
 

@@ -302,6 +302,11 @@ allows; every cap is checked on the server.
   is on in `/admin/billing`; until then caps are only shown. The one check
   that predates this, a club manager's invite against the member cap, runs
   either way.
+- **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
+  plan opens; the seven plans carry their tier (free/silver/gold/diamond),
+  and a plan counts as running for tiers through its grace days too. The
+  free tier's caps from /admin/tiers apply only while enforcement is off;
+  with it on, the plans' caps (`Limits`) decide.
 - `tests/plan-limits-scenarios.php` runs the scenarios against a local API and
   a `*_dev` database (never the live site).
 

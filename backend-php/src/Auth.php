@@ -100,6 +100,9 @@ final class Auth
     /** @var array{impersonated_by: ?string, read_only: bool, expires_at: string}|null the session behind the last currentUser() */
     private static ?array $session = null;
 
+    /** The user the last currentUser() found, for ErrorLog (which must not query again). */
+    private static ?string $lastUserId = null;
+
     /**
      * Returns the authenticated profile row, or null if no/invalid/expired token.
      *
@@ -138,6 +141,7 @@ final class Auth
         foreach (self::SESSION_COLUMNS as $column) {
             unset($user[$column]);
         }
+        self::$lastUserId = (string) $user['id'];
 
         if (self::$session['read_only']) {
             self::enforceReadOnly($pdo);
@@ -177,6 +181,11 @@ final class Auth
     public static function session(): ?array
     {
         return self::$session;
+    }
+
+    public static function lastUserId(): ?string
+    {
+        return self::$lastUserId;
     }
 
     /**

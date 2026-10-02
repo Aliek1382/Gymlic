@@ -58,6 +58,7 @@ import {
   type StatsInactiveUser,
   type StatsSubscription,
 } from "../services/admin-stats-service";
+import { WeeklyReportCard } from "./weekly-report-card";
 
 const ROLES = [
   { key: "club", label: "باشگاه", color: "var(--chart-1)" },
@@ -99,6 +100,7 @@ function changeBadge(now: number, before: number) {
 
 /** /admin/stats — sign-ups, active users, who stopped coming, subscriptions running out, and which sections are used. */
 export function AdminStatsPage() {
+  const can = useAdminCan();
   const [inactiveDays, setInactiveDays] = useState(14);
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin", "stats", inactiveDays],
@@ -133,6 +135,7 @@ export function AdminStatsPage() {
           <InactiveCard data={data} days={inactiveDays} onDaysChange={setInactiveDays} />
           {data.subscriptions && <SubscriptionsCard subscriptions={data.subscriptions} />}
           <UsageCard data={data} />
+          {can("settings") && <WeeklyReportCard />}
         </>
       )}
     </div>

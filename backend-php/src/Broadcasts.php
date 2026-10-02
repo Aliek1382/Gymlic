@@ -34,7 +34,15 @@ final class Broadcasts
         return Database::hasColumn('broadcasts', 'audience');
     }
 
-    /** @return array{roles: list<string>, club_ids: list<string>, inactive_days: int} */
+    /** At most this many chosen users in one broadcast (the users page's selection). */
+    public const MAX_USER_IDS = 500;
+
+    /**
+     * user_ids: chosen accounts (from the users page); with any, the other
+     * filters still narrow it down, and only those accounts can receive it.
+     *
+     * @return array{roles: list<string>, club_ids: list<string>, inactive_days: int, user_ids: list<string>}
+     */
     public static function normalizeAudience(mixed $value): array
     {
         $v = is_array($value) ? $value : [];
@@ -44,8 +52,12 @@ final class Broadcasts
             static fn ($id): bool => is_string($id) && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1
         )));
         $days = is_numeric($v['inactive_days'] ?? null) ? max(0, min(3650, (int) $v['inactive_days'])) : 0;
+        $userIds = array_slice(array_values(array_unique(array_filter(
+            is_array($v['user_ids'] ?? null) ? $v['user_ids'] : [],
+            static fn ($id): bool => is_string($id) && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1
+        ))), 0, self::MAX_USER_IDS);
 
-        return ['roles' => $roles, 'club_ids' => $clubIds, 'inactive_days' => $days];
+        return ['roles' => $roles, 'club_ids' => $clubIds, 'inactive_days' => $days, 'user_ids' => $userIds];
     }
 
     /** @return array{sms: string, email: string} */
@@ -77,6 +89,10 @@ final class Broadcasts
             $where[] = "p.id IN (SELECT m.user_id FROM memberships m WHERE m.status = 'active' AND m.club_id IN ("
                 . implode(',', array_fill(0, count($audience['club_ids']), '?')) . '))';
             array_push($bind, ...$audience['club_ids']);
+        }
+        if (($audience['user_ids'] ?? []) !== []) {
+            $where[] = 'p.id IN (' . implode(',', array_fill(0, count($audience['user_ids']), '?')) . ')';
+            array_push($bind, ...$audience['user_ids']);
         }
         if ($audience['inactive_days'] > 0) {
             // last_seen_at once phase 7's SQL has run; before that, the last

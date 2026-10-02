@@ -34,6 +34,7 @@ use Gymlic\Controllers\AdminRolesController;
 use Gymlic\Controllers\AdminStatsController;
 use Gymlic\Controllers\AdminSystemController;
 use Gymlic\Controllers\AdminUsersController;
+use Gymlic\Controllers\AdminVerificationController;
 use Gymlic\Controllers\AuthController;
 use Gymlic\Controllers\BillingController;
 use Gymlic\Controllers\BrandingController;
@@ -41,6 +42,7 @@ use Gymlic\Controllers\BroadcastController;
 use Gymlic\Controllers\CalendarController;
 use Gymlic\Controllers\DashboardController;
 use Gymlic\Controllers\EarningsController;
+use Gymlic\Controllers\ErrorLogController;
 use Gymlic\Controllers\ExportController;
 use Gymlic\Controllers\ReportController;
 use Gymlic\Controllers\RevenueController;
@@ -51,6 +53,7 @@ use Gymlic\Controllers\MemberController;
 use Gymlic\Controllers\MemberPaymentController;
 use Gymlic\Controllers\MessageController;
 use Gymlic\Controllers\TicketController;
+use Gymlic\Controllers\TiersController;
 use Gymlic\Controllers\InvoiceClaimController;
 use Gymlic\Controllers\InvoiceController;
 use Gymlic\Controllers\NutritionPlanBuilderController;
@@ -78,14 +81,21 @@ use Gymlic\Controllers\PushController;
 use Gymlic\Controllers\QuestionnaireController;
 use Gymlic\Controllers\SecurityController;
 use Gymlic\Controllers\SettingsController;
+use Gymlic\Controllers\StorageController;
 use Gymlic\Controllers\TrainerProfileController;
+use Gymlic\Controllers\TrashController;
 use Gymlic\Controllers\UploadController;
+use Gymlic\Controllers\WeeklyReportController;
 use Gymlic\Controllers\WorkoutPlanBuilderController;
+use Gymlic\ErrorLog;
 use Gymlic\Gate;
 use Gymlic\Response;
 use Gymlic\Router;
 
 $config = require __DIR__ . '/../config.php';
+
+// PHP warnings and fatal errors go to the admin's error log too (ErrorLog).
+ErrorLog::register();
 
 // --- CORS -------------------------------------------------------------
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -110,6 +120,18 @@ $path = preg_replace('#^/api#', '', $path) ?: '/';
 $router = new Router();
 
 $router->get('/health', fn () => HealthController::check());
+$router->post('/client-errors', fn () => ErrorLogController::report());
+$router->get('/admin/errors', fn () => ErrorLogController::list());
+$router->post('/admin/errors/resolve-all', fn () => ErrorLogController::resolveAll());
+$router->delete('/admin/errors/resolved', fn () => ErrorLogController::clearResolved());
+$router->patch('/admin/errors/{id}', fn (array $p) => ErrorLogController::setResolved($p));
+$router->get('/admin/trash', fn () => TrashController::list());
+$router->post('/admin/trash/{id}/restore', fn (array $p) => TrashController::restore($p));
+$router->delete('/admin/trash/{id}', fn (array $p) => TrashController::purge($p));
+$router->delete('/admin/users/{id}', fn (array $p) => TrashController::deleteUser($p));
+$router->delete('/admin/clubs/{id}', fn (array $p) => TrashController::deleteClub($p));
+$router->get('/admin/storage', fn () => StorageController::overview());
+$router->post('/admin/storage/clean', fn () => StorageController::clean());
 
 $router->get('/settings/public', fn () => SettingsController::publicSettings());
 
@@ -359,7 +381,14 @@ $router->put('/admin/settings/{key}', fn (array $p) => SettingsController::admin
 $router->post('/admin/branding/logo', fn () => BrandingController::uploadLogo());
 $router->delete('/admin/branding/logo', fn () => BrandingController::removeLogo());
 $router->get('/admin/stats', fn () => AdminStatsController::overview());
+$router->get('/admin/weekly-report', fn () => WeeklyReportController::get());
+$router->get('/admin/tiers', fn () => TiersController::overview());
+$router->put('/admin/tiers/plans/{kind}/{id}', fn (array $p) => TiersController::setPlanTier($p));
+$router->post('/admin/weekly-report/send', fn () => WeeklyReportController::sendNow());
 $router->get('/admin/users', fn () => AdminUsersController::list());
+$router->post('/admin/users/bulk', fn () => AdminUsersController::bulk());
+$router->get('/admin/verifications', fn () => AdminVerificationController::list());
+$router->post('/admin/verifications/{trainerId}', fn (array $p) => AdminVerificationController::decide($p));
 $router->get('/admin/system/health', fn () => AdminSystemController::health());
 $router->get('/admin/system/alerts', fn () => AdminSystemController::alerts());
 $router->get('/admin/system/migrations', fn () => AdminSystemController::migrations());
@@ -406,6 +435,7 @@ $router->post('/plans/{kind}/{id}/comments', fn (array $p) => MessageController:
 $router->get('/trainer-profile', fn () => TrainerProfileController::mine());
 $router->put('/trainer-profile', fn () => TrainerProfileController::save());
 $router->post('/trainer-profile/certificates', fn () => TrainerProfileController::uploadCertificate());
+$router->post('/trainer-profile/verification', fn () => TrainerProfileController::requestVerification());
 $router->get('/trainer-profile/{trainerId}', fn (array $p) => TrainerProfileController::view($p));
 
 $router->get('/tickets/mine', fn () => TicketController::listMine());
@@ -468,7 +498,9 @@ try {
     Gate::enforce('/' . trim($path, '/'));
     $router->dispatch($_SERVER['REQUEST_METHOD'], $path);
 } catch (PDOException $e) {
+    ErrorLog::exception($e);
     Response::error(500, 'db_connection_failed', 'Could not reach the database.');
 } catch (Throwable $e) {
+    ErrorLog::exception($e);
     Response::error(500, 'server_error', 'Something went wrong.');
 }
