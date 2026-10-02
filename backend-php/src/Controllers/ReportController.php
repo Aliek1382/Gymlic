@@ -7,10 +7,18 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Jalali;
 use Gymlic\Limits;
 use Gymlic\Response;
 
-/** Trainer-side analytics. All read-only. */
+/**
+ * Trainer-side analytics. All read-only. Each section needs a report level
+ * of the trainer's plan (Limits::requireReport, phase 4): the athlete count
+ * any; plans this month, completion rates and athlete progress basic;
+ * weekly adherence full. The financial summary («درآمد من») is open to all.
+ * Counts run over all of the trainer's plans, whatever the history limit
+ * (phase 3) hides from their lists.
+ */
 final class ReportController
 {
     /**
@@ -22,15 +30,34 @@ final class ReportController
      */
     private const INVOICES_DEPLOYED = false;
 
+    /**
+     * The athlete count is open to every plan (report level count); the
+     * plans made this (Jalali) month need level basic and are null below it,
+     * with locked set, so the page shows the count beside a locked card.
+     */
     public static function monthlyStats(): void
     {
         $user = Auth::requireUser();
-        $monthStart = date('Y-m-01 00:00:00');
+        $pdo = Database::connection();
+        $open = $user['account_type'] !== 'trainer' || !Limits::enforcing()
+            || Limits::reportAllows(Limits::forTrainer($pdo, $user['id'])['reports']['effective'], 'basic');
 
-        $stmt = Database::connection()->prepare(
+        $athletes = $pdo->prepare("SELECT COUNT(*) FROM trainer_athletes WHERE trainer_id = :u AND status = 'active'");
+        $athletes->execute(['u' => $user['id']]);
+        $out = [
+            'athletes_count'             => (int) $athletes->fetchColumn(),
+            'workout_plans_this_month'   => null,
+            'nutrition_plans_this_month' => null,
+            'locked'                     => !$open,
+        ];
+        if (!$open) {
+            Response::ok($out);
+            return;
+        }
+
+        $monthStart = Jalali::monthStart() . ' 00:00:00';
+        $stmt = $pdo->prepare(
             "SELECT
-               (SELECT COUNT(*) FROM trainer_athletes
-                 WHERE trainer_id = :u1 AND status = 'active') AS athletes_count,
                (SELECT COUNT(*) FROM workout_assignments
                  WHERE trainer_id = :u2 AND is_template = 0 AND status <> 'draft'
                    AND assigned_at >= :m1) AS workout_plans_this_month,
@@ -39,13 +66,13 @@ final class ReportController
                    AND assigned_at >= :m2) AS nutrition_plans_this_month"
         );
         $stmt->execute([
-            'u1' => $user['id'], 'u2' => $user['id'], 'u3' => $user['id'],
+            'u2' => $user['id'], 'u3' => $user['id'],
             'm1' => $monthStart, 'm2' => $monthStart,
         ]);
 
-        Response::ok(Cast::row($stmt->fetch(), [], [
-            'athletes_count', 'workout_plans_this_month', 'nutrition_plans_this_month',
-        ]));
+        Response::ok(array_merge($out, Cast::row($stmt->fetch(), [], [
+            'workout_plans_this_month', 'nutrition_plans_this_month',
+        ])));
     }
 
     /**
@@ -111,6 +138,7 @@ final class ReportController
     public static function athleteProgress(): void
     {
         $user = Auth::requireUser();
+        Limits::requireReport($user, 'basic', 'پیشرفت ورزشکاران');
 
         $stmt = Database::connection()->prepare(
             "SELECT ta.athlete_id, p.first_name, p.last_name,
@@ -140,6 +168,7 @@ final class ReportController
     public static function weeklyAdherence(): void
     {
         $user = Auth::requireUser();
+        Limits::requireReport($user, 'full', 'پایبندی هفتگی');
         $from = $_GET['from'] ?? date('Y-m-d', strtotime('-7 days'));
         $pdo = Database::connection();
 
@@ -191,6 +220,7 @@ final class ReportController
     public static function completionRates(): void
     {
         $user = Auth::requireUser();
+        Limits::requireReport($user, 'basic', 'نرخ تکمیل');
 
         $stmt = Database::connection()->prepare(
             "SELECT
@@ -221,6 +251,8 @@ final class ReportController
         Acl::require(
             $user['id'] === $athleteId || Acl::isTrainerOf($user['id'], $athleteId)
         );
+        // Opened from «پیشرفت ورزشکاران» on the reports page.
+        Limits::requireReport($user, 'basic', 'پیشرفت ورزشکاران');
 
         $pdo = Database::connection();
         $rows = [];

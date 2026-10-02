@@ -326,9 +326,18 @@ allows; every cap is checked on the server.
   recent activity. Athletes always see all of theirs; no limit while the
   trainer's club has a plan running. `Limits::historyCutoff` /
   `historyVisibleSql` are separate pieces, so the full export of a later
-  phase simply doesn't apply them. Not filtered yet (statistics, phase 4):
-  the reports' counts and rates, the dashboard counters, per-athlete plan
-  counts, workout logs and progress, and invoices (a financial record).
+  phase simply doesn't apply them. Counts and rates (phase 4) run over all
+  plans, hidden or not; invoices are a financial record and never hidden.
+- **Report levels (phase 4).** `report_level` of the plan in effect decides
+  the reports page's sections, on the server (`Limits::requireReport`, 402
+  `report_locked`): any level gets the athlete count and the dashboard
+  counters; `basic` this (Jalali) month's plans, completion rates and athlete
+  progress with its completed-plans list; `full` weekly adherence;
+  `full_excel` the Excel export. NULL is unlimited. Grace days keep the paid
+  level, then the free plan's `count`; no limit while enforcement is off or
+  the trainer's club has a plan running. Never limited: progress
+  measurements, earnings and its summary, streaks, birthdays, anything an
+  athlete sees.
 - **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
   plan opens; the seven plans carry their tier (free/silver/gold/diamond),
   and a plan counts as running for tiers through its grace days too. The

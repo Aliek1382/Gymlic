@@ -96,6 +96,12 @@ export interface TrainerLimits {
    * in the admin's list only.
    */
   history?: { months: number | null; cutoff: string | null; hidden?: number };
+  /**
+   * Report sections (phase 4). level: the plan's (null = unlimited).
+   * effective: what applies now; full_excel while enforcement is off or the
+   * trainer's club has a plan running.
+   */
+  reports?: { level: ReportLevel | null; effective: ReportLevel };
   content: {
     via_club: boolean;
     exercises: ContentUsage;

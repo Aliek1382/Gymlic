@@ -53,8 +53,6 @@ final class PlanAccountsController
         'payment_request_approved', 'subscription_renewed', 'subscription_gifted', 'subscription_set',
     ];
 
-    private const REPORT_LEVELS = ['count', 'basic', 'full', 'full_excel'];
-
     // ---- Reading ---------------------------------------------------------
 
     /** GET /admin/plan-accounts */
@@ -628,7 +626,7 @@ final class PlanAccountsController
         }
         if (array_key_exists('report_level', $data)) {
             $level = $data['report_level'];
-            if ($level !== null && $level !== '' && !in_array($level, self::REPORT_LEVELS, true)) {
+            if ($level !== null && $level !== '' && !in_array($level, Limits::REPORT_LEVELS, true)) {
                 return ['error' => ['invalid_report_level', 'سطح گزارش معتبر نیست.']];
             }
             $out['report_level'] = $level === '' ? null : $level;

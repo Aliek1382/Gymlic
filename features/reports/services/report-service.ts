@@ -22,14 +22,16 @@ const STREAK_WEEKS = 12;
 export async function getTrainerMonthlyStats(): Promise<TrainerMonthlyStatsSummary> {
   const data = await api.get<{
     athletes_count: number;
-    workout_plans_this_month: number;
-    nutrition_plans_this_month: number;
+    workout_plans_this_month: number | null;
+    nutrition_plans_this_month: number | null;
+    locked?: boolean;
   }>("/reports/trainer/monthly-stats");
 
   return {
     athletesCount: data.athletes_count,
     workoutPlansThisMonth: data.workout_plans_this_month,
     nutritionPlansThisMonth: data.nutrition_plans_this_month,
+    locked: data.locked ?? false,
   };
 }
 

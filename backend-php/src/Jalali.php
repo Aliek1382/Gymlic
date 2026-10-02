@@ -55,6 +55,14 @@ final class Jalali
             : $text;
     }
 
+    /** 'Y-m-d' of the first day of the Jalali month that $timestamp (default now) falls in. */
+    public static function monthStart(?int $timestamp = null): string
+    {
+        $timestamp ??= time();
+        [, , $jd] = self::fromGregorian((int) date('Y', $timestamp), (int) date('n', $timestamp), (int) date('j', $timestamp));
+        return date('Y-m-d', strtotime('-' . ($jd - 1) . ' days', strtotime(date('Y-m-d', $timestamp))));
+    }
+
     public static function isLeapYear(int $jy): bool
     {
         return self::cal($jy)['leap'] === 0;

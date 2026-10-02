@@ -240,6 +240,7 @@ export function PlanAccountsView({ data }: { data: PlanAccountsData }) {
                 <TableHead>شروع</TableHead>
                 <TableHead>پایان</TableHead>
                 <TableHead>مصرف</TableHead>
+                {kind === "trainer" && <TableHead>سطح گزارش</TableHead>}
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -263,6 +264,14 @@ export function PlanAccountsView({ data }: { data: PlanAccountsData }) {
     </div>
   );
 }
+
+/** The report level in effect now (phase 4): the plan's, or everything while enforcement is off or a club's plan runs. */
+const REPORT_LEVEL_LABEL: Record<string, string> = {
+  count: "تعداد",
+  basic: "پایه",
+  full: "کامل",
+  full_excel: "کامل + اکسل",
+};
 
 function AccountRow({ account, onManage }: { account: PlanAccount; onManage: () => void }) {
   const isTrainer = account.kind === "trainer";
@@ -349,6 +358,11 @@ function AccountRow({ account, onManage }: { account: PlanAccount; onManage: () 
           </>
         )}
       </TableCell>
+      {isTrainer && (
+        <TableCell className="text-muted-foreground">
+          {account.limits.reports ? REPORT_LEVEL_LABEL[account.limits.reports.effective] : "—"}
+        </TableCell>
+      )}
       <TableCell>
         <Button size="sm" variant="outline" onClick={onManage}>
           <Settings2 />

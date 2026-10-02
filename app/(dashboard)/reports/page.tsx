@@ -3,6 +3,7 @@ import {
   TrainerCompletionRates,
   TrainerMonthlyStats,
   TrainerWeeklyAdherence,
+  ReportSection,
 } from "@/features/reports";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 
@@ -20,9 +21,16 @@ export default function ReportsPage() {
         </div>
 
         <TrainerMonthlyStats />
-        <TrainerCompletionRates />
-        <TrainerWeeklyAdherence />
-        <AthleteProgressList />
+        {/* Each section needs a report level of the trainer's plan; the server refuses it otherwise. */}
+        <ReportSection title="نرخ تکمیل" need="basic">
+          <TrainerCompletionRates />
+        </ReportSection>
+        <ReportSection title="پایبندی هفتگی" need="full">
+          <TrainerWeeklyAdherence />
+        </ReportSection>
+        <ReportSection title="پیشرفت ورزشکاران" need="basic">
+          <AthleteProgressList />
+        </ReportSection>
       </div>
     </RoleGate>
   );

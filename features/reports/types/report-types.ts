@@ -2,8 +2,10 @@ import type { PlanKind } from "@/features/athletes";
 
 export interface TrainerMonthlyStatsSummary {
   athletesCount: number;
-  workoutPlansThisMonth: number;
-  nutritionPlansThisMonth: number;
+  /** null when the trainer's plan doesn't open monthly stats (locked). */
+  workoutPlansThisMonth: number | null;
+  nutritionPlansThisMonth: number | null;
+  locked: boolean;
 }
 
 export interface AthleteProgressSummary {

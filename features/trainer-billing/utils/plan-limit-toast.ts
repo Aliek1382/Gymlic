@@ -13,6 +13,7 @@ const PLAN_LIMIT_CODES = new Set([
   "exercise_limit",
   "template_limit",
   "history_hidden",
+  "report_locked",
 ]);
 
 /**

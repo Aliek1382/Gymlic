@@ -461,8 +461,6 @@ check(($hidden['count'] ?? 0) === 3 && ($hidden['months'] ?? 0) === 3, 'the list
 check($status === 403 && ($data['error']['code'] ?? '') === 'history_hidden', 'opening a hidden plan by id is refused with the upgrade message', [$status, $data]);
 check(call('GET', "/plans/workout/{$p4}/days", null, $h1)[0] === 403, 'and so is its structure');
 check(call('POST', '/plans/workout', ['id' => $p4, 'title' => 'ویرایش'], $h1)[0] === 403, 'and editing it');
-[, $comp] = call('GET', "/athletes/{$hAthlete}/completed-plans", null, $h1);
-check(!in_array('چهارماهه', array_column($comp['items'] ?? [], 'title'), true) && in_array('دوماهه', array_column($comp['items'] ?? [], 'title'), true), 'the completed-plans list hides it too');
 [, $conv] = call('GET', "/messages/conversation/{$hAthlete}", null, $h1);
 $convIds = array_column($conv['plans'] ?? [], 'id');
 check(!in_array($p4, $convIds, true) && in_array($p2, $convIds, true), 'and the plans offered in messages');
@@ -479,6 +477,9 @@ call('POST', '/admin/trainer-billing/requests/' . ($data['id'] ?? '') . '/approv
 [$titles, $hidden] = planList($h1, $hAthlete);
 check(in_array('یازده‌ماهه', $titles, true) && !in_array('سیزده‌ماهه', $titles, true), 'silver: the 11-month plan shows, the 13-month one does not', $titles);
 check(($hidden['count'] ?? 0) === 1 && ($hidden['months'] ?? 0) === 12, 'one hidden, beyond 12 months', $hidden);
+// The completed-plans list is a report (phase 4: basic), so it is checked on silver.
+[, $comp] = call('GET', "/athletes/{$hAthlete}/completed-plans", null, $h1);
+check(!in_array('سیزده‌ماهه', array_column($comp['items'] ?? [], 'title'), true) && in_array('دوماهه', array_column($comp['items'] ?? [], 'title'), true), 'the completed-plans list hides it too', array_column($comp['items'] ?? [], 'title'));
 check(call('GET', "/plans/workout/{$p4}", null, $h1)[0] === 200, 'right after the payment, the 4-month plan opens again');
 admin('trainer', $h1Id, ['action' => 'activate', 'plan_id' => $tPlan['طلایی'], 'expires_at' => $day(30)]);
 [$titles, $hidden] = planList($h1, $hAthlete);
@@ -510,6 +511,92 @@ admin('club', $clubId, ['action' => 'activate', 'plan_id' => $cPlan['نقره‌
 [, , $clubAthlete] = accept($inv['code'], 'history-club-athlete');
 agedPlan($c3, $clubAthlete, 'قدیمی باشگاهی', 20, 'completed');
 check(in_array('قدیمی باشگاهی', planList($c3, $clubAthlete)[0], true), "a club trainer sees all (the club's plan runs)");
+
+// ---- Phase 4: report levels -----------------------------------------------
+
+/** Status and error code of each report section, for this trainer. */
+function reports(string $token, string $athlete): array
+{
+    $out = [];
+    foreach ([
+        'completion' => '/reports/trainer/completion-rates',
+        'progress'   => '/reports/trainer/athlete-progress',
+        'completed'  => "/athletes/{$athlete}/completed-plans",
+        'adherence'  => '/reports/trainer/weekly-adherence',
+    ] as $key => $path) {
+        [$status, $data] = call('GET', $path, null, $token);
+        $out[$key] = $status === 200 ? 200 : $status . ':' . ($data['error']['code'] ?? '');
+    }
+    return $out;
+}
+
+echo "\nPhase 4: a free trainer gets the counts only\n";
+[$r1, $r1Id] = account('reports1', 'trainer');
+[, $inv] = invite($r1);
+[, , $rAthlete, $rAthleteToken] = accept($inv['code'], 'reports-athlete');
+call('POST', '/plans/workout', ['title' => 'برنامهٔ گزارش', 'athlete_id' => $rAthlete], $r1);
+check((limits($r1)['reports']['effective'] ?? null) === 'count', 'the trainer\'s report level is count', limits($r1)['reports'] ?? null);
+[$status, $monthly] = call('GET', '/reports/trainer/monthly-stats', null, $r1);
+check($status === 200 && $monthly['athletes_count'] === 1 && $monthly['workout_plans_this_month'] === null
+    && $monthly['nutrition_plans_this_month'] === null && $monthly['locked'] === true,
+    'monthly stats: the athlete count, and no plan counts', $monthly);
+$locked = reports($r1, $rAthlete);
+check($locked === ['completion' => '402:report_locked', 'progress' => '402:report_locked', 'completed' => '402:report_locked', 'adherence' => '402:report_locked'],
+    'completion rates, athlete progress and weekly adherence are refused by the server', $locked);
+[, $err] = call('GET', '/reports/trainer/weekly-adherence', null, $r1);
+check(str_contains($err['error']['message'] ?? '', 'طلایی'), 'the message names the plan that opens it', $err);
+[$status, $dash] = call('GET', '/dashboard/trainer', null, $r1);
+check($status === 200 && ($dash['statistics']['athletes_count'] ?? null) === 1 && ($dash['statistics']['active_workout_count'] ?? null) === 1,
+    'the dashboard counts stay open', $dash['statistics'] ?? null);
+
+echo "\nNever locked: progress, «درآمد من», streaks, birthdays, the athlete's own view\n";
+check(call('GET', "/athletes/{$rAthlete}/measurements", null, $r1)[0] === 200, 'progress measurements');
+check(call('POST', "/athletes/{$rAthlete}/measurements", ['measured_at' => date('Y-m-d'), 'weight_kg' => 70], $r1)[0] === 201, 'recording a measurement');
+check(call('GET', '/earnings', null, $r1)[0] === 200, 'earnings');
+check(call('GET', '/reports/financial-summary?from=' . $day(-365) . '&to=' . $day(0), null, $r1)[0] === 200, 'the monthly earnings summary and 12-month trend');
+check(call('GET', "/workout-day-logs?from={$day(-84)}&athlete_ids={$rAthlete}", null, $r1)[0] === 200, 'the training logs streaks are counted from');
+[$status, $roster] = call('GET', '/athletes', null, $r1);
+check($status === 200 && array_key_exists('birth_date', ($roster['items'] ?? [[]])[0] ?? []), 'the roster with birth dates (birthday reminder)', $roster['items'][0] ?? $roster);
+check(call('GET', "/athletes/{$rAthlete}/completed-plans", null, $rAthleteToken)[0] === 200, "the athlete's own completed plans");
+
+echo "\nSilver: basic; gold: full; diamond: full_excel\n";
+admin('trainer', $r1Id, ['action' => 'activate', 'plan_id' => $tPlan['نقره‌ای'], 'expires_at' => $day(30)]);
+[, $monthly] = call('GET', '/reports/trainer/monthly-stats', null, $r1);
+check($monthly['workout_plans_this_month'] === 1 && $monthly['locked'] === false, 'silver: monthly stats open', $monthly);
+$silver = reports($r1, $rAthlete);
+check($silver === ['completion' => 200, 'progress' => 200, 'completed' => 200, 'adherence' => '402:report_locked'], 'silver: completion rates open, weekly adherence locked', $silver);
+admin('trainer', $r1Id, ['action' => 'activate', 'plan_id' => $tPlan['طلایی'], 'expires_at' => $day(30)]);
+check(!in_array(false, array_map(fn ($v) => $v === 200, reports($r1, $rAthlete)), true), 'gold: every section open');
+check((limits($r1)['reports']['effective'] ?? null) === 'full', 'gold: level full');
+admin('trainer', $r1Id, ['action' => 'activate', 'plan_id' => $tPlan['الماسی'], 'expires_at' => $day(30)]);
+check((limits($r1)['reports']['effective'] ?? null) === 'full_excel', 'diamond: level full_excel');
+
+echo "\nGrace days keep the paid level; from day 8, count; a renewal restores it\n";
+admin('trainer', $r1Id, ['action' => 'activate', 'plan_id' => $tPlan['طلایی'], 'started_at' => $day(-40), 'expires_at' => $day(-1)]);
+check(reports($r1, $rAthlete)['adherence'] === 200, 'in the grace days: weekly adherence still open');
+admin('trainer', $r1Id, ['action' => 'dates', 'started_at' => $day(-40), 'expires_at' => $day(-8)]);
+check(reports($r1, $rAthlete)['adherence'] === '402:report_locked' && (limits($r1)['reports']['effective'] ?? null) === 'count', 'after them: count');
+admin('trainer', $r1Id, ['action' => 'extend', 'days' => 30]);
+check(reports($r1, $rAthlete)['adherence'] === 200, 'a renewal opens it again at once');
+
+echo "\nAdmin list, enforcement off, club trainers, plan validation\n";
+admin('trainer', $r1Id, ['action' => 'dates', 'started_at' => $day(-60), 'expires_at' => $day(-20)]);
+[, $accounts] = call('GET', '/admin/plan-accounts', null, $adminToken);
+$row = array_values(array_filter($accounts['trainers'] ?? [], fn ($t) => $t['id'] === $r1Id))[0] ?? null;
+check(($row['limits']['reports']['effective'] ?? null) === 'count', 'the admin list shows the trainer\'s report level', $row['limits']['reports'] ?? null);
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => false, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+$off = reports($r1, $rAthlete);
+check(!in_array(false, array_map(fn ($v) => $v === 200, $off), true) && call('GET', '/reports/trainer/monthly-stats', null, $r1)[1]['locked'] === false,
+    'with enforcement off, nothing is locked', $off);
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => true, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+check(reports($c3, $clubAthlete)['adherence'] === 200, "a club trainer on the free plan sees everything (the club's plan runs)");
+[$status] = call('PATCH', '/admin/trainer-plans/' . $tPlan['طلایی'], ['report_level' => 'everything'], $adminToken);
+check($status === 400, 'an invalid report level is refused on a trainer plan', $status);
+[$status] = call('PATCH', '/admin/plans/' . $cPlan['طلایی'], ['report_level' => 'everything'], $adminToken);
+check($status === 400, 'and on a club plan', $status);
+$lvl = $pdo->prepare('SELECT report_level FROM trainer_plans WHERE id = :id');
+$lvl->execute(['id' => $tPlan['طلایی']]);
+check($lvl->fetchColumn() === 'full', 'the plan keeps its level');
 
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);
