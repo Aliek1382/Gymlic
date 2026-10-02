@@ -27,7 +27,7 @@ export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
 
   const feature = featureForPath(pathname);
   const switchedOn = !feature || isFeatureEnabled(features, feature, context?.accountType);
-  const inPlan = !feature || isTierAllowed(tiers, feature, context?.tier?.key);
+  const inPlan = !feature || isTierAllowed(tiers, feature, context?.tier);
 
   if (switchedOn && inPlan) return <>{children}</>;
 
@@ -40,6 +40,25 @@ export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
         </div>
         {children}
       </>
+    );
+  }
+
+  // Switched off for this account by the admin (not by the plan): no upgrade offer.
+  const offByHand = !!feature && context?.tier?.access?.[feature] === false;
+  if (switchedOn && !inPlan && offByHand) {
+    return (
+      <Card className="flex flex-col items-center gap-4 py-16 text-center">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+          <EyeOff className="size-6" />
+        </div>
+        <div className="space-y-1.5 px-6">
+          <h2 className="text-lg font-semibold text-foreground">این بخش برای حساب شما فعال نیست</h2>
+          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+            مدیریت این بخش را برای حساب شما{context?.accountType === "athlete" ? " (یا مربی‌تان)" : ""} غیرفعال کرده است.
+            برای فعال‌شدن با پشتیبانی تماس بگیرید.
+          </p>
+        </div>
+      </Card>
     );
   }
 

@@ -35,7 +35,7 @@ final class ReceiptController
         $stmt->execute(['id' => $params['id']]);
         $row = $stmt->fetch();
 
-        $allowed = $row !== false && ($row['owner_id'] === $user['id'] || AdminAccess::can($user, 'finance'));
+        $allowed = $row !== false && ($row['owner_id'] === $user['id'] || AdminAccess::can($user, 'finance.payments'));
         $path = $allowed ? Receipts::path($row['receipt_path']) : null;
         if ($path === null || !is_file($path)) {
             // The same answer for "not yours", "no receipt" and "already deleted".
@@ -54,7 +54,7 @@ final class ReceiptController
     /** DELETE /admin/payment-requests/{id}/receipt: remove one file now. */
     public static function remove(array $params): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.payments');
         if (!Receipts::ready()) {
             Response::error(409, 'receipts_unavailable', 'به‌روزرسانی دیتابیس برای رسیدها هنوز اجرا نشده است.');
             return;
@@ -79,7 +79,7 @@ final class ReceiptController
     /** GET /admin/receipts/stats: what is stored and the current rules. */
     public static function stats(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin(['finance.payments', 'finance.plans']);
 
         Response::ok(['ready' => Receipts::ready()] + Receipts::stats());
     }
@@ -87,7 +87,7 @@ final class ReceiptController
     /** POST /admin/receipts/purge: run the cleanup now instead of waiting for the cron. */
     public static function purge(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.payments');
         if (!Receipts::ready()) {
             Response::error(409, 'receipts_unavailable', 'به‌روزرسانی دیتابیس برای رسیدها هنوز اجرا نشده است.');
             return;

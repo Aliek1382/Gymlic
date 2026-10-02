@@ -275,15 +275,29 @@ final class AuthController
             'membership'  => $membership,
             'trainer'     => $trainer,
             'view_as'     => $viewAs,
-            // The plan tier that decides which sections open (Tiers); null = not limited.
+            // The plan tier that decides which sections open (Tiers), and the
+            // sections the admin set by hand for this account; null = not limited.
             'tier'        => self::tierInfo($pdo, $user),
         ]);
     }
 
+    /**
+     * The tier and the sections set by hand for this user's accounts
+     * (AccountAccess, resolved as the API applies them); null when neither
+     * limits anything.
+     */
     private static function tierInfo(\PDO $pdo, array $user): ?array
     {
         $tier = Tiers::effective($pdo, $user);
-        return $tier === null ? null : ['key' => $tier, 'label' => Tiers::label($tier)];
+        $access = Tiers::accessFor($pdo, $user);
+        if ($tier === null && $access === []) {
+            return null;
+        }
+        return [
+            'key'    => $tier,
+            'label'  => $tier === null ? '' : Tiers::label($tier),
+            'access' => (object) $access,
+        ];
     }
 
     public static function chooseRole(): void

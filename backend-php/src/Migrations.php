@@ -283,6 +283,12 @@ final class Migrations
             'title' => 'نام تازهٔ ستون سطح عضویت ورزشکار در باشگاه (membership_level)',
             'check' => [['column', 'memberships', 'membership_level'], ['column', 'invitations', 'membership_level']],
         ],
+        [
+            'id'    => 'account-access',
+            'file'  => 'account-access-update.sql',
+            'title' => 'دسترسی اختصاصی هر مربی و باشگاه: سطح، بخش‌ها و سقف‌ها مستقل از پلن',
+            'check' => [['table', 'trainer_access'], ['table', 'club_access']],
+        ],
     ];
 
     /**

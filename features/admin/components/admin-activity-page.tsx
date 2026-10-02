@@ -52,6 +52,7 @@ const ADMIN_ACTIONS = [
   "storage_cleaned",
   "trainer_verification",
   "plan_tier_set",
+  "account_access_set",
   "weekly_report_sent",
   "user_viewed_as",
   "two_factor_enabled",
@@ -126,6 +127,7 @@ const ACTION_LABEL: Record<string, string> = {
   storage_cleaned: "پاک‌کردن فایل‌های بی‌استفاده",
   trainer_verification: "بررسی مدارک مربی",
   plan_tier_set: "تعیین سطح پلن",
+  account_access_set: "دسترسی اختصاصی",
   weekly_report_sent: "ارسال گزارش هفتگی",
   user_viewed_as: "دیدن پنل کاربر (فقط‌خواندنی)",
   two_factor_enabled: "روشن‌کردن ورود دومرحله‌ای",
@@ -181,6 +183,8 @@ function billingDetail(log: { action: string; metadata: Record<string, unknown> 
       return `${String(m.plan ?? "")} ← ${m.tier ? String(m.tier) : "بدون سطح"}`;
     case "weekly_report_sent":
       return `${formatNumber(Number(m.sent ?? 0))} گیرنده`;
+    case "account_access_set":
+      return `${String(m.name ?? "")}${m.note ? ` · ${String(m.note)}` : ""}`;
     case "subscription_renewed":
       return `${String(m.plan ?? "")}${Number(m.amount) > 0 ? ` · ${formatToman(Number(m.amount))} تومان` : ""}`;
     case "subscription_gifted":

@@ -41,6 +41,7 @@ import {
   type PlanAccount,
   type PlanAccountChange,
 } from "../services/plan-accounts-service";
+import { AccountAccessDialog } from "./account-access-dialog";
 import { SUBSCRIPTION_STATUS_LABEL, SubscriptionStatusBadge } from "./subscription-status-badge";
 
 type Mode = "activate" | "dates" | "extend" | "override" | "other" | "history";
@@ -55,6 +56,7 @@ export const PLAN_ACTION_LABEL: Record<string, string> = {
   plan_dates: "تغییر تاریخ اشتراک",
   plan_extend: "تمدید اشتراک",
   plan_override: "تغییر سقف دستی",
+  account_access_set: "تغییر دسترسی اختصاصی",
   plan_reactivate: "فعال‌سازی مجدد ورزشکاران",
   plan_revoke_invites: "ابطال دعوت‌های در انتظار",
   trainer_payment_approved: "تأیید پرداخت اشتراک مربی",
@@ -131,6 +133,7 @@ function AccountForm({
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
   const [preview, setPreview] = useState<TrainerLimits | ClubLimits | null>(null);
 
   const plan = sellable.find((p) => p.id === planId);
@@ -336,6 +339,24 @@ function AccountForm({
         </TabsContent>
 
         <TabsContent value="other" className="space-y-3 pt-3">
+          <div className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <p className="font-medium text-foreground">دسترسی اختصاصی</p>
+              <p className="text-xs text-muted-foreground">
+                سطح ثابت، باز یا بستن تک‌تک بخش‌ها{isTrainer ? " و سقف حرکت، قالب، تاریخچه و گزارش" : ""}، مستقل از پلن.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setAccessOpen(true)}>
+              تنظیم
+            </Button>
+          </div>
+          <AccountAccessDialog
+            kind={account.kind}
+            id={account.id}
+            name={account.name}
+            open={accessOpen}
+            onClose={() => setAccessOpen(false)}
+          />
           {trainer && (
             <div className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm">

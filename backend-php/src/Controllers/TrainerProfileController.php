@@ -55,7 +55,7 @@ final class TrainerProfileController
         )->execute(['id' => $user['id']]);
 
         $name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) ?: (string) $user['email'];
-        foreach (AdminAccess::holders($pdo, 'users.manage') as $adminId) {
+        foreach (AdminAccess::holders($pdo, 'users.verify') as $adminId) {
             Templates::notify($pdo, 'trainer_verification_requested', $adminId, $user['id'], 'broadcast', ['name' => $name], '/admin/verifications');
         }
 

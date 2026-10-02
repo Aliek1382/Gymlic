@@ -23,21 +23,39 @@ final class AdminAccess
 {
     /** The permissions a role can be given: key => [label, what it covers]. */
     public const PERMISSIONS = [
-        'users.view'    => ['مشاهدهٔ کاربران', 'دیدن باشگاه‌ها، مربی‌ها، ورزشکاران و فهرست همهٔ کاربران.'],
-        'users.manage'  => ['مدیریت کاربران', 'مسدودسازی، ویرایش پروفایل، تغییر نقش، تعیین رمز، خارج‌کردن از دستگاه‌ها، و تأیید/تعلیق باشگاه. حساب مدیران را نمی‌تواند تغییر دهد.'],
-        'finance'       => ['مالی', 'درخواست‌های پرداخت، پلن‌ها و گزارش مالی.'],
-        'content'       => ['محتوا', 'کتابخانه‌های حرکات، غذاها و مکمل‌ها، امتیاز مربیان، و صفحه‌های متنی (قوانین، راهنما و…).'],
-        'notifications' => ['اعلان همگانی', 'ارسال اعلان به گروه‌های کاربران (با پیامک و ایمیل و زمان‌بندی) و ویرایش متن اعلان‌های خودکار.'],
-        'support'       => ['پشتیبانی', 'دیدن و پاسخ‌دادن به تیکت‌های پشتیبانی کاربران.'],
-        'settings'      => ['تنظیمات سایت', 'مدیریت بخش‌ها، حالت تعمیر، ثبت‌نام، اطلاعیه، پشتیبانی و محدودیت‌ها (بدون کلیدهای پیامک و ایمیل).'],
-        'system'        => ['سیستم', 'سلامت سایت و صف پیامک و ایمیل.'],
-        'activity'      => ['لاگ فعالیت', 'دیدن کارهایی که مدیران در پنل انجام داده‌اند.'],
+        'users.view'       => ['مشاهدهٔ کاربران', 'دیدن باشگاه‌ها، مربی‌ها، ورزشکاران، فهرست همهٔ کاربران و آمار رشد و استفاده.'],
+        'users.manage'     => ['مدیریت کاربران', 'مسدودسازی، ویرایش پروفایل، تغییر نقش، تعیین رمز، خارج‌کردن از دستگاه‌ها، عملیات گروهی و تأیید/تعلیق باشگاه. حساب مدیران را نمی‌تواند تغییر دهد.'],
+        'users.verify'     => ['تأیید مدارک مربی', 'بررسی مدارک رزومهٔ مربی‌ها و دادن یا برداشتن نشان «مربی تأییدشده».'],
+        'finance.payments' => ['بررسی پرداخت‌ها', 'دیدن رسیدها و تأیید یا رد پرداخت‌های باشگاه‌ها و مربیان، و پاک‌کردن فایل رسیدها.'],
+        'finance.plans'    => ['پلن‌ها و اشتراک‌ها', 'پلن‌ها و قیمت‌ها، سطح پلن‌ها، کدهای تخفیف، اشتراک و سقف‌های هر باشگاه و مربی، دسترسی اختصاصی حساب‌ها و تنظیمات پرداخت (به‌جز شمارهٔ کارت و شبا).'],
+        'finance.reports'  => ['گزارش مالی', 'گزارش درآمد و خروجی‌های آن، درآمد در نمای کلی، و گزارش هفتگی ایمیلی (بدون تغییر گیرنده‌ها).'],
+        'content'          => ['محتوا', 'کتابخانه‌های حرکات، غذاها و مکمل‌ها، محتوای آماده، امتیاز مربیان، و صفحه‌های متنی (قوانین، راهنما و…).'],
+        'notifications'    => ['اعلان همگانی', 'ارسال اعلان به گروه‌های کاربران (با پیامک و ایمیل و زمان‌بندی) و ویرایش متن اعلان‌های خودکار.'],
+        'support'          => ['پشتیبانی', 'دیدن و پاسخ‌دادن به تیکت‌های پشتیبانی کاربران و تیکت‌های مربی و ورزشکار.'],
+        'settings'         => ['تنظیمات سایت', 'مدیریت بخش‌ها، حالت تعمیر، ثبت‌نام، اطلاعیه، پشتیبانی، محدودیت‌ها و برند و ظاهر (بدون کلیدهای پیامک و ایمیل).'],
+        'system'           => ['سیستم', 'سلامت سایت، صف پیامک و ایمیل، خطاهای سایت، و دیدن فضای هاست (پاک‌کردن فایل‌ها فقط با مدیر کل).'],
+        'activity'         => ['لاگ فعالیت', 'دیدن کارهایی که مدیران در پنل انجام داده‌اند.'],
     ];
+
+    /**
+     * Keys of earlier versions, and what they now mean. "finance" was one
+     * permission for every money matter; a role saved before the split keeps
+     * all of it until a super admin edits the role (which saves only the
+     * new keys).
+     */
+    private const LEGACY = [
+        'finance' => ['finance.payments', 'finance.plans', 'finance.reports'],
+    ];
+
+    /** Any of these: some finance permission (for pages that only read). */
+    public const ANY_FINANCE = ['finance.payments', 'finance.plans', 'finance.reports'];
 
     /**
      * What only a super admin can do, whatever a role says: roles and admin
      * access themselves, security, the SMS/email credentials, database
-     * updates and backups (which carry every password hash and key).
+     * updates and backups (which carry every password hash and key);
+     * deleting accounts and files for good; and where money and data go
+     * (the payment card and IBAN, the weekly report's recipients).
      */
     public const SUPER = 'super';
 
@@ -109,6 +127,17 @@ final class AdminAccess
         return in_array($permission, $access['permissions'], true);
     }
 
+    /** Whether this user has at least one of $permissions. */
+    public static function canAny(array $user, array $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if (self::can($user, $permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether an account is any kind of admin — what only a super admin may change. */
     public static function isAdminAccount(array $target): bool
     {
@@ -117,7 +146,8 @@ final class AdminAccess
     }
 
     /**
-     * Known keys only, deduplicated; managing users implies seeing them.
+     * Known keys only (old ones expanded, see LEGACY), deduplicated;
+     * managing users or verifying trainers implies seeing them.
      *
      * @return string[]
      */
@@ -125,11 +155,16 @@ final class AdminAccess
     {
         $out = [];
         foreach (is_array($permissions) ? $permissions : [] as $permission) {
-            if (is_string($permission) && isset(self::PERMISSIONS[$permission])) {
-                $out[$permission] = true;
+            if (!is_string($permission)) {
+                continue;
+            }
+            foreach (self::LEGACY[$permission] ?? [$permission] as $key) {
+                if (isset(self::PERMISSIONS[$key])) {
+                    $out[$key] = true;
+                }
             }
         }
-        if (isset($out['users.manage'])) {
+        if (isset($out['users.manage']) || isset($out['users.verify'])) {
             $out['users.view'] = true;
         }
         return array_values(array_filter(array_keys(self::PERMISSIONS), static fn (string $k): bool => isset($out[$k])));

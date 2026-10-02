@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Gift, Loader2, ReceiptText, Tags, UserCheck, X } from "lucide-react";
+import { Gift, Loader2, Tags, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -32,26 +32,21 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
-import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
 import {
-  approveTrainerRequest,
   createTrainerDiscount,
   deleteTrainerDiscount,
   grantTrainerDays,
   listTrainerDiscounts,
   updateTrainerDiscount,
   listAdminTrainerPlans,
-  listTrainerRequests,
   listTrainerSubscriptions,
-  rejectTrainerRequest,
   updateTrainerPlan,
-  type AdminTrainerRequest,
   type AdminTrainerSubscriptionRow,
   type TrainerPlan,
-  type TrainerRequestStatus,
 } from "../services/trainer-billing-service";
+import { useAdminCan } from "@/features/admin/hooks/use-admin-access";
 import { DiscountCodesManager } from "@/features/admin/components/discount-codes-manager";
 import { SubscriptionStatusBadge } from "@/features/admin/components/subscription-status-badge";
 import { TrainerPlanDialog } from "./trainer-plan-dialog";
@@ -68,41 +63,43 @@ const DISCOUNT_CONFIG = {
   emptyText: "با «کد جدید» اولین کد را بسازید.",
 };
 
-const STATUS_LABEL: Record<TrainerRequestStatus, string> = {
-  pending: "در انتظار",
-  approved: "تاییدشده",
-  rejected: "ردشده",
-};
-const STATUS_VARIANT: Record<TrainerRequestStatus, "warning" | "success" | "destructive"> = {
-  pending: "warning",
-  approved: "success",
-  rejected: "destructive",
-};
-
 const parseDate = (value: string) => new Date(value.replace(" ", "T"));
 const fullName = (first: string | null, last: string | null) =>
   [first, last].filter(Boolean).join(" ") || "—";
 
-/** Everything the admin does about trainer subscriptions: payments, plans, and who has what. */
+/**
+ * Trainer plans, their discount codes, and who has what. Trainers' payments
+ * are reviewed with the clubs' in /admin/payments.
+ */
 export function AdminTrainerBillingPage() {
-  const requests = useQuery({ queryKey: ["admin", "trainer-requests"], queryFn: listTrainerRequests });
-  const pendingCount = (requests.data?.items ?? []).filter((r) => r.status === "pending").length;
+  const plans = useQuery({ queryKey: ["admin", "trainer-plans"], queryFn: listAdminTrainerPlans });
+  const canReview = useAdminCan()("finance.payments");
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-foreground">اشتراک مربیان</h1>
         <p className="text-sm text-muted-foreground">
-          پرداخت‌های کارت‌به‌کارت مربیان، پلن‌های مخصوص مربی و وضعیت اشتراک هر مربی. کارت دریافت از
-          «اطلاعات پرداخت» می‌آید و همان کارت باشگاه‌هاست.
+          پلن‌های مخصوص مربی، کدهای تخفیفشان و وضعیت اشتراک هر مربی. کارت دریافت از «اطلاعات پرداخت» می‌آید و همان
+          کارت باشگاه‌هاست.
+          {canReview && (
+            <>
+              {" "}
+              پرداخت‌ها و رسیدهای مربیان در{" "}
+              <Link href="/admin/payments?tab=trainers" className="text-primary underline-offset-4 hover:underline">
+                درخواست‌های پرداخت
+              </Link>{" "}
+              بررسی می‌شوند.
+            </>
+          )}
         </p>
       </div>
 
-      {requests.isLoading ? (
+      {plans.isLoading ? (
         <Skeleton className="h-64 w-full rounded-2xl" />
-      ) : requests.isError ? (
+      ) : plans.isError ? (
         <ErrorState message="دریافت اطلاعات با خطا مواجه شد." />
-      ) : requests.data && !requests.data.ready ? (
+      ) : plans.data && !plans.data.ready ? (
         <Card className="py-5">
           <p className="px-6 text-sm text-muted-foreground">
             اشتراک مربی هنوز فعال نشده است: به‌روزرسانی «اشتراک و پرداخت کارت‌به‌کارت مربی به
@@ -110,16 +107,12 @@ export function AdminTrainerBillingPage() {
           </p>
         </Card>
       ) : (
-        <Tabs defaultValue="requests" className="space-y-4">
+        <Tabs defaultValue="plans" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="requests">پرداخت‌ها ({formatNumber(pendingCount)} در انتظار)</TabsTrigger>
             <TabsTrigger value="plans">پلن‌ها</TabsTrigger>
             <TabsTrigger value="discounts">کدهای تخفیف</TabsTrigger>
             <TabsTrigger value="subscriptions">اشتراک‌ها</TabsTrigger>
           </TabsList>
-          <TabsContent value="requests">
-            <RequestsTab rows={requests.data?.items ?? []} />
-          </TabsContent>
           <TabsContent value="plans">
             <PlansTab />
           </TabsContent>
@@ -137,211 +130,6 @@ export function AdminTrainerBillingPage() {
         </Tabs>
       )}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Payments
-// ---------------------------------------------------------------------------
-
-function RequestsTab({ rows }: { rows: AdminTrainerRequest[] }) {
-  const [filter, setFilter] = useState<"pending" | "reviewed">("pending");
-  const shown = rows.filter((r) => (filter === "pending" ? r.status === "pending" : r.status !== "pending"));
-
-  return (
-    <Card className="gap-4 py-5">
-      <div className="flex gap-2 px-6">
-        {(["pending", "reviewed"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setFilter(value)}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-              filter === value
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {value === "pending" ? "در انتظار" : "بررسی‌شده"}
-          </button>
-        ))}
-      </div>
-      {shown.length === 0 ? (
-        <div className="px-6">
-          <EmptyState
-            icon={ReceiptText}
-            title="درخواستی وجود ندارد."
-            description="با ثبت پرداخت توسط مربیان، اینجا نمایش داده می‌شود."
-          />
-        </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>مربی</TableHead>
-              <TableHead>پلن و مبلغ</TableHead>
-              <TableHead>کد پیگیری</TableHead>
-              <TableHead>رسید</TableHead>
-              <TableHead>تاریخ</TableHead>
-              <TableHead>وضعیت</TableHead>
-              {filter === "pending" && <TableHead>اقدام</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.map((request) => (
-              <TableRow key={request.id}>
-                <TableCell>
-                  <p className="font-medium text-foreground">{fullName(request.first_name, request.last_name)}</p>
-                  {request.phone && (
-                    <p dir="ltr" className="text-end text-xs text-muted-foreground">
-                      {request.phone}
-                    </p>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {request.plan_name}
-                  <p className="text-xs">{formatToman(request.amount_toman)} تومان</p>
-                  {!!request.discount_toman && request.discount_toman > 0 && (
-                    <p className="text-xs">
-                      {request.list_price_toman != null && (
-                        <span className="line-through">{formatToman(request.list_price_toman)}</span>
-                      )}{" "}
-                      کد <span dir="ltr" className="font-mono">{request.discount_code ?? "—"}</span>
-                      {" · "}
-                      {formatToman(request.discount_toman)} تخفیف
-                    </p>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {request.tracking_code === "DISCOUNT" ? (
-                    <Badge variant="secondary">تخفیف کامل، بدون پرداخت</Badge>
-                  ) : (
-                  <div className="space-y-1">
-                    <p dir="ltr" className="text-end font-mono text-xs text-foreground">
-                      {request.tracking_code}
-                    </p>
-                    <p className="text-xs">
-                      کارت ••••{" "}
-                      <span dir="ltr" className="font-mono">
-                        {request.card_last4}
-                      </span>
-                    </p>
-                    {request.paid_at && (
-                      <p className="text-xs">واریز: {formatPersianDate(parseDate(request.paid_at))}</p>
-                    )}
-                    {request.duplicate_tracking && <Badge variant="warning">کد پیگیری تکراری</Badge>}
-                  </div>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {request.has_receipt ? (
-                    <ReceiptViewer
-                      requestId={request.id}
-                      kind="trainer-payment"
-                      isPdf={request.receipt_is_pdf}
-                      expiresAt={request.receipt_expires_at}
-                      canDelete
-                    />
-                  ) : request.receipt_purged_at ? (
-                    <span className="text-xs">حذف شده</span>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatPersianDate(parseDate(request.created_at))}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANT[request.status]}>{STATUS_LABEL[request.status]}</Badge>
-                </TableCell>
-                {filter === "pending" && (
-                  <TableCell>
-                    <ReviewActions requestId={request.id} />
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </Card>
-  );
-}
-
-function ReviewActions({ requestId }: { requestId: string }) {
-  const queryClient = useQueryClient();
-  const [mode, setMode] = useState<"approve" | "reject" | null>(null);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  function close() {
-    setMode(null);
-    setNote("");
-  }
-
-  async function confirm() {
-    setBusy(true);
-    try {
-      if (mode === "approve") {
-        await approveTrainerRequest(requestId, note.trim() || undefined);
-        toast.success("پرداخت تأیید و اشتراک مربی فعال شد.");
-      } else {
-        await rejectTrainerRequest(requestId, note.trim() || undefined);
-        toast.success("پرداخت رد شد.");
-      }
-      close();
-      void queryClient.invalidateQueries({ queryKey: ["admin"] });
-    } catch (error) {
-      toast.error(getErrorMessage(error, "ثبت تصمیم با خطا مواجه شد."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <div className="flex items-center gap-2">
-        <Button size="sm" onClick={() => setMode("approve")}>
-          <Check />
-          تایید
-        </Button>
-        <Button size="sm" variant="destructive" onClick={() => setMode("reject")}>
-          <X />
-          رد
-        </Button>
-      </div>
-      <Dialog open={mode !== null} onOpenChange={(open) => !open && close()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{mode === "approve" ? "تایید پرداخت مربی" : "رد پرداخت مربی"}</DialogTitle>
-            <DialogDescription>
-              {mode === "approve"
-                ? "اول مطمئن شوید واریزی با این کد پیگیری به حساب شما نشسته است. اشتراک از همین الان شروع یا تمدید می‌شود."
-                : "مربی دلیل شما را در اعلان می‌بیند و می‌تواند دوباره پرداخت را ثبت کند."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="trainer-request-note">یادداشت (اختیاری)</Label>
-            <Input
-              id="trainer-request-note"
-              maxLength={500}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={mode === "approve" ? "مثلاً شمارهٔ تراکنش بانکی" : "دلیل رد درخواست"}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={close} disabled={busy}>
-              انصراف
-            </Button>
-            <Button variant={mode === "reject" ? "destructive" : "default"} onClick={confirm} disabled={busy}>
-              {busy && <Loader2 className="animate-spin" />}
-              {mode === "approve" ? "تایید و فعال‌سازی" : "رد درخواست"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 

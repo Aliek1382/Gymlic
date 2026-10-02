@@ -73,7 +73,7 @@ final class AdminStatsController
             'signups'       => self::signups($pdo, $today, $firstDay, $weekStart, $firstWeek),
             'active'        => self::active($pdo, $today, $firstDay, $weekStart, $firstWeek),
             'inactive'      => self::inactive($pdo, $inactiveDays),
-            'subscriptions' => AdminAccess::can($admin, 'finance') ? self::subscriptions($pdo) : null,
+            'subscriptions' => AdminAccess::canAny($admin, ['finance.plans', 'finance.reports']) ? self::subscriptions($pdo) : null,
             'usage'         => self::usage($pdo),
         ]);
     }

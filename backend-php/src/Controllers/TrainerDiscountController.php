@@ -26,7 +26,7 @@ final class TrainerDiscountController
     /** GET /admin/trainer-discounts */
     public static function list(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!TrainerBilling::ready()) {
             Response::ok(['ready' => false, 'items' => [], 'plans' => []]);
             return;
@@ -66,7 +66,7 @@ final class TrainerDiscountController
     /** POST /admin/trainer-discounts */
     public static function create(): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -90,7 +90,7 @@ final class TrainerDiscountController
     /** PATCH /admin/trainer-discounts/{id} */
     public static function update(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -116,7 +116,7 @@ final class TrainerDiscountController
     /** DELETE /admin/trainer-discounts/{id}: only a code nobody has used. */
     public static function delete(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }

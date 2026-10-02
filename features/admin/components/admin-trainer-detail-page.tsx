@@ -20,6 +20,7 @@ import { useSearchParams } from "next/navigation";
 
 import { NotFoundNotice } from "@/components/not-found-notice";
 import { RouteLoading } from "@/components/layout/route-loading";
+import { TrainerFinanceSection } from "./account-finance-section";
 import { AdminProfileEditForm } from "./admin-profile-edit-form";
 import { SuspendToggle } from "./suspend-toggle";
 
@@ -99,6 +100,8 @@ export function AdminTrainerDetailPage() {
           </div>
         </Card>
       </div>
+
+      <TrainerFinanceSection trainerId={trainer.id} name={name} />
 
       <AdminProfileEditForm
         userId={trainer.id}

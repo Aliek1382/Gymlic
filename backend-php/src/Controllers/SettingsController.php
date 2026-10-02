@@ -30,11 +30,22 @@ final class SettingsController
         'features'      => 'settings',
         'limits'        => 'settings',
         'points_levels' => 'content',
-        'billing'       => 'finance',
+        'billing'       => 'finance.plans',
         'templates'     => 'notifications',
         'branding'      => 'settings',
-        'reports'       => 'settings',
-        'tiers'         => 'finance',
+        'reports'       => 'finance.reports',
+        'tiers'         => 'finance.plans',
+    ];
+
+    /**
+     * Fields that say where money or data goes: a role may save the rest of
+     * their group, but changing these is a super admin's (a staff account
+     * pointing clubs' payments at its own card, or the weekly report at its
+     * own inbox).
+     */
+    private const SUPER_FIELDS = [
+        'billing' => ['card_number', 'sheba', 'account_holder', 'bank_name'],
+        'reports' => ['recipients'],
     ];
 
     /**
@@ -60,7 +71,9 @@ final class SettingsController
 
     public static function adminGet(): void
     {
-        $admin = Auth::requireAdmin('settings');
+        // Any role with some group here (billing for finance, the texts for
+        // notifications...) reads its own groups and nothing else.
+        $admin = Auth::requireAdmin(array_values(array_unique(self::KEY_PERMISSION)));
 
         // A limited role never even sees the masked SMS/email credentials.
         $settings = [];
@@ -96,7 +109,7 @@ final class SettingsController
     /** Replaces one settings group. Body: {"value": {...}}. */
     public static function adminUpdate(array $params): void
     {
-        $admin = Auth::requireAdmin(['settings', 'content', 'finance', 'notifications']);
+        $admin = Auth::requireAdmin(array_values(array_unique(self::KEY_PERMISSION)));
         $key = $params['key'];
 
         if (!in_array($key, Settings::KEYS, true)) {
@@ -109,6 +122,23 @@ final class SettingsController
         if (!array_key_exists('value', $body) || !is_array($body['value'])) {
             Response::error(400, 'missing_fields', 'Missing required field(s): value');
             return;
+        }
+
+        if (isset(self::SUPER_FIELDS[$key]) && !AdminAccess::can($admin, AdminAccess::SUPER)) {
+            $current = Settings::get($key);
+            $wanted = Settings::normalize($key, $body['value']);
+            foreach (self::SUPER_FIELDS[$key] as $field) {
+                if ($wanted[$field] !== $current[$field]) {
+                    Response::error(
+                        403,
+                        'permission_denied',
+                        $key === 'billing'
+                            ? 'تغییر شمارهٔ کارت، شبا، نام صاحب حساب و بانک فقط از عهدهٔ مدیر کل برمی‌آید.'
+                            : 'تغییر گیرنده‌های گزارش هفتگی فقط از عهدهٔ مدیر کل برمی‌آید.'
+                    );
+                    return;
+                }
+            }
         }
 
         if ($key === 'support' && ($body['value']['email'] ?? '') !== ''

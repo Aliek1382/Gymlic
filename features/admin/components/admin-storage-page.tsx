@@ -28,6 +28,7 @@ import { SectionHeader } from "@/features/dashboard/components/shared/section-he
 import { StatisticCard } from "@/features/dashboard/components/shared/statistic-card";
 import { StatisticsGrid } from "@/features/dashboard/components/shared/statistics-grid";
 import type { AccountType } from "@/types/database.types";
+import { useIsSuperAdmin } from "../hooks/use-admin-access";
 import { cleanStorage, getStorage, type StorageFolder } from "../services/admin-ops-service";
 import { formatBytes, parseSqlDate } from "../utils/format";
 
@@ -37,6 +38,8 @@ export function AdminStoragePage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ["admin", "storage"], queryFn: getStorage });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<"selected" | "all" | null>(null);
+  // Seeing is the system permission's; removing (for good) is a super admin's.
+  const canClean = useIsSuperAdmin();
 
   const accounts = data?.folders.filter((f) => f.kind === "user") ?? [];
   const toggle = (path: string) =>
@@ -94,6 +97,9 @@ export function AdminStoragePage() {
                 <SectionHeader
                   title="فایل‌های بی‌استفاده"
                   action={
+                    !canClean ? (
+                      <span className="text-xs text-muted-foreground">پاک‌کردن فایل‌ها فقط با مدیر کل است.</span>
+                    ) : (
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="outline" disabled={selected.size === 0} onClick={() => setConfirm("selected")}>
                         <Trash2 />
@@ -104,6 +110,7 @@ export function AdminStoragePage() {
                         پاک‌کردن همه
                       </Button>
                     </div>
+                    )
                   }
                 />
                 <div className="px-6">
@@ -113,7 +120,7 @@ export function AdminStoragePage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-10" />
+                          {canClean && <TableHead className="w-10" />}
                           <TableHead>فایل</TableHead>
                           <TableHead>حجم</TableHead>
                           <TableHead>آخرین تغییر</TableHead>
@@ -122,6 +129,7 @@ export function AdminStoragePage() {
                       <TableBody>
                         {data.orphans.items.map((file) => (
                           <TableRow key={file.path}>
+                            {canClean && (
                             <TableCell>
                               <input
                                 type="checkbox"
@@ -131,6 +139,7 @@ export function AdminStoragePage() {
                                 onChange={() => toggle(file.path)}
                               />
                             </TableCell>
+                            )}
                             <TableCell className="font-mono text-xs" dir="ltr">
                               <div className="text-right">{file.path}</div>
                             </TableCell>
