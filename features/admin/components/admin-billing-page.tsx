@@ -39,7 +39,9 @@ export function AdminBillingPage() {
       <div>
         <h1 className="text-xl font-bold text-foreground">اطلاعات پرداخت</h1>
         <p className="text-sm text-muted-foreground">
-          شماره کارت و شبایی که باشگاه‌ها هنگام ثبت درخواست پرداخت اشتراک می‌بینند.
+          شماره کارت و شبایی که باشگاه‌ها و مربی‌ها هنگام خرید اشتراک می‌بینند: با کلیک روی «خرید» یا
+          «ثبت درخواست پرداخت» این اطلاعات نمایش داده می‌شود، به همین کارت واریز می‌کنند و بعد کد
+          پیگیری و رسید را ثبت می‌کنند.
         </p>
       </div>
 
@@ -121,8 +123,8 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
         <div className="space-y-1 px-6">
           <CardTitle className="text-base">حساب دریافت</CardTitle>
           <CardDescription>
-            شماره کارت و شبا پیش از ذخیره بررسی می‌شوند تا اشتباه تایپی پول باشگاه‌ها را جای دیگری
-            نفرستد.
+            شماره کارت و شبا پیش از ذخیره بررسی می‌شوند تا اشتباه تایپی پول باشگاه‌ها و مربی‌ها را
+            جای دیگری نفرستد.
           </CardDescription>
         </div>
         <div className="space-y-4 px-6">
@@ -178,7 +180,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
           </div>
           <div className="space-y-2">
             <Label htmlFor="billing-instructions">
-              توضیحات برای باشگاه <span className="text-muted-foreground">(اختیاری)</span>
+              توضیحات برای باشگاه و مربی <span className="text-muted-foreground">(اختیاری)</span>
             </Label>
             <textarea
               id="billing-instructions"
@@ -240,7 +242,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
           <div className="space-y-1">
             <CardTitle className="text-base">رسید پرداخت</CardTitle>
             <CardDescription>
-              باشگاه هنگام ثبت درخواست، کد پیگیری و چهار رقم آخر کارتش را همیشه وارد می‌کند. تصویر
+              باشگاه یا مربی هنگام ثبت پرداخت، کد پیگیری و چهار رقم آخر کارتش را همیشه وارد می‌کند. تصویر
               رسید در مرورگر کوچک و در سرور دوباره فشرده می‌شود و پس از بررسی درخواست، خودکار حذف
               می‌شود. درخواست‌های در انتظار، رسیدشان را تا زمان بررسی نگه می‌دارند. همین تنظیمات برای
               رسیدی که ورزشکار برای پرداخت به مربی می‌فرستد هم اعمال می‌شود.
@@ -250,7 +252,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
             <div>
               <Label htmlFor="billing-receipt-required">پیوست رسید الزامی باشد</Label>
               <p className="text-xs text-muted-foreground">
-                اگر خاموش باشد، باشگاه می‌تواند بدون تصویر رسید هم درخواست ثبت کند.
+                اگر خاموش باشد، باشگاه یا مربی می‌تواند بدون تصویر رسید هم پرداخت را ثبت کند.
               </p>
             </div>
             <Switch
@@ -331,12 +333,13 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
       </Card>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-foreground">پیش‌نمایش برای باشگاه</p>
+        <p className="text-sm font-medium text-foreground">پیش‌نمایش برای باشگاه و مربی</p>
         {value.card_number || value.sheba || value.instructions ? (
           <PaymentInfoCard info={value} />
         ) : (
           <p className="rounded-xl border border-dashed border-border p-4 text-xs leading-5 text-muted-foreground">
-            چیزی وارد نشده؛ باشگاه‌ها فقط فرم درخواست پرداخت را می‌بینند.
+            چیزی وارد نشده؛ باشگاه‌ها و مربی‌ها فقط فرم ثبت پرداخت را می‌بینند و جایی برای دیدن شمارهٔ
+            کارت ندارند.
           </p>
         )}
       </div>

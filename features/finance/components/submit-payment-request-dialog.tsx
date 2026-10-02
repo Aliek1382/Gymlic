@@ -39,7 +39,7 @@ import {
   type PaymentRequestFormInput,
   type PaymentRequestFormValues,
 } from "../validators/finance-schemas";
-import { PaymentInfoCard } from "./payment-info-card";
+import { hasPaymentInfo, PaymentInfoCard, PaymentInfoMissing } from "./payment-info-card";
 
 interface Plan {
   id: string;
@@ -258,7 +258,11 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
             </div>
           )}
 
-          <PaymentInfoCard info={billing?.payment} />
+          {billing && !hasPaymentInfo(billing.payment) ? (
+            <PaymentInfoMissing />
+          ) : (
+            <PaymentInfoCard info={billing?.payment} />
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="payment-amount">مبلغ واریزی (تومان)</Label>
