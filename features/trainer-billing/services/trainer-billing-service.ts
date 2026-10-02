@@ -90,6 +90,12 @@ export interface TrainerLimits {
    * together) against the plan's caps; max null = unlimited. via_club: the
    * trainer's club has a plan running, which lifts both caps.
    */
+  /**
+   * Finished plans assigned before cutoff are hidden from the trainer
+   * (history_months of the plan in effect); null = none. hidden: how many,
+   * in the admin's list only.
+   */
+  history?: { months: number | null; cutoff: string | null; hidden?: number };
   content: {
     via_club: boolean;
     exercises: ContentUsage;

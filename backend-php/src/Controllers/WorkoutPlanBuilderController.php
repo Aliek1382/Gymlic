@@ -32,6 +32,8 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
 
+        // The trainer's own old finished plan may be hidden by their plan's history limit.
+        Limits::requirePlanVisible($assignment, $user['id']);
         if ($assignment['trainer_id'] !== $user['id']) {
             Acl::require(Acl::canViewPlan($user, $assignment));
             if ($assignment['athlete_id'] === $user['id']) {
@@ -48,6 +50,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
 
         $data = Validate::required(Validate::body(), ['day_number']);
         $pdo = Database::connection();
@@ -83,6 +86,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         $data = Validate::body();
@@ -115,6 +119,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         Database::connection()
@@ -130,6 +135,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         $data = Validate::required(Validate::body(), ['exercise_id']);
@@ -171,6 +177,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $day = self::dayOr404($params['id'], $params['dayId']);
         $exercise = self::exerciseOr404($day['id'], $params['exId']);
 
@@ -208,6 +215,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $day = self::dayOr404($params['id'], $params['dayId']);
         $exercise = self::exerciseOr404($day['id'], $params['exId']);
 
@@ -225,6 +233,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         $data = Validate::required(Validate::body(), ['day_number']);
@@ -262,6 +271,7 @@ final class WorkoutPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
 
         $data = Validate::required(Validate::body(), ['target_week_number']);
         $sourceWeek = (int) $params['weekNumber'];

@@ -37,12 +37,18 @@ final class PlanController
         }
 
         $column = $athleteId !== null ? 'athlete_id' : 'invitation_id';
-        $stmt = Database::connection()->prepare(
+        $pdo = Database::connection();
+        // Finished plans older than the trainer's plan allows are left out
+        // (Limits, history_months); nothing is deleted.
+        $cutoff = Limits::historyCutoff($pdo, $user['id']);
+        $stmt = $pdo->prepare(
             "SELECT " . self::columns($params['kind']) . " FROM {$table}
-             WHERE trainer_id = :trainer_id AND {$column} = :target AND is_template = 0
+             WHERE trainer_id = :trainer_id AND {$column} = :target AND is_template = 0"
+            . Limits::historyVisibleSql($cutoff) . "
              ORDER BY assigned_at DESC"
         );
-        $stmt->execute(['trainer_id' => $user['id'], 'target' => $athleteId ?? $invitationId]);
+        $stmt->execute(['trainer_id' => $user['id'], 'target' => $athleteId ?? $invitationId]
+            + ($cutoff !== null ? ['history_cutoff' => $cutoff] : []));
 
         // The trainer always sees the full plan; a pending invoice only adds
         // the locked flag so their screen can badge it.
@@ -56,7 +62,25 @@ final class PlanController
         }
         unset($item);
 
-        Response::ok(['items' => $items]);
+        Response::ok([
+            'items'  => $items,
+            // For "N plans are hidden; older than M months show on a higher plan".
+            'hidden' => $cutoff === null ? null : [
+                'count'  => self::hiddenCount($pdo, $params['kind'], $user['id'], $cutoff, $column, $athleteId ?? $invitationId),
+                'months' => Limits::forTrainer($pdo, $user['id'])['history']['months'],
+            ],
+        ]);
+    }
+
+    private static function hiddenCount(\PDO $pdo, string $kind, string $trainerId, string $cutoff, string $column, string $target): int
+    {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM ' . self::table($kind) . "
+             WHERE trainer_id = :trainer AND {$column} = :target AND is_template = 0
+               AND status IN (" . Limits::FINISHED_STATUSES . ') AND assigned_at < :history_cutoff'
+        );
+        $stmt->execute(['trainer' => $trainerId, 'target' => $target, 'history_cutoff' => $cutoff]);
+        return (int) $stmt->fetchColumn();
     }
 
     /** The athlete's own plans. Drafts stay hidden — the trainer hasn't sent them. */
@@ -87,6 +111,8 @@ final class PlanController
             Response::error(404, 'not_found', 'Plan not found.');
             return;
         }
+        // An old finished plan, opened by its trainer from a link or an id.
+        Limits::requirePlanVisible($plan, $user['id']);
 
         // Only the plan's own athlete is locked out — its trainer, a club
         // manager and platform admins always see the whole plan.
@@ -145,6 +171,7 @@ final class PlanController
         if (!empty($data['id'])) {
             $existing = self::planOr404($kind, (string) $data['id']);
             Acl::require($existing['trainer_id'] === $user['id'], 'Only the plan\'s trainer can edit it.');
+            Limits::requirePlanVisible($existing, $user['id']);
 
             $pdo->prepare(
                 "UPDATE {$table} SET title = :title, description = :description, status = :status WHERE id = :id"
@@ -285,6 +312,8 @@ final class PlanController
         if ($sourceId !== null) {
             $source = self::planOr404($params['kind'], $sourceId);
             Acl::require($source['trainer_id'] === $user['id'], 'Only the plan\'s trainer can save it as a template.');
+            // Saving it would show what the history limit hides.
+            Limits::requirePlanVisible($source, $user['id']);
         }
 
         $pdo = Database::connection();

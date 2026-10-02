@@ -424,5 +424,92 @@ call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => false, 
 check(exercise($c2, 'بدون محدودیت')[0] === 201 && template($c2, 'بدون محدودیت')[0] === 201, 'a free trainer makes a 6th exercise and a template');
 call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => true, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
 
+// ---- Phase 3: plan history ------------------------------------------------
+
+/** A workout plan for $athlete, then aged to $months ago with $status. */
+function agedPlan(string $token, string $athlete, string $title, float $months, string $status): string
+{
+    global $pdo;
+    [, $plan] = call('POST', '/plans/workout', ['title' => $title, 'athlete_id' => $athlete], $token);
+    $pdo->prepare('UPDATE workout_assignments SET status = :s, assigned_at = :at WHERE id = :id')->execute([
+        's' => $status, 'at' => date('Y-m-d H:i:s', (int) strtotime('-' . (int) round($months * 30) . ' days')), 'id' => $plan['id'],
+    ]);
+    return $plan['id'];
+}
+
+/** Titles of the trainer's plans for this athlete, and the hidden summary. */
+function planList(string $token, string $athlete): array
+{
+    [, $data] = call('GET', "/plans/workout?athlete_id={$athlete}", null, $token);
+    return [array_column($data['items'] ?? [], 'title'), $data['hidden'] ?? null];
+}
+
+echo "\nPhase 3: a free trainer sees 3 months of finished plans\n";
+[$h1, $h1Id] = account('history1', 'trainer');
+[, $inv] = invite($h1);
+[, , $hAthlete, $hAthleteToken] = accept($inv['code'], 'history-athlete');
+$p2 = agedPlan($h1, $hAthlete, 'دوماهه', 2, 'completed');
+$p4 = agedPlan($h1, $hAthlete, 'چهارماهه', 4, 'completed');
+$p6 = agedPlan($h1, $hAthlete, 'فعلی ششماهه', 6, 'active');
+$p11 = agedPlan($h1, $hAthlete, 'یازده‌ماهه', 11, 'cancelled');
+$p13 = agedPlan($h1, $hAthlete, 'سیزده‌ماهه', 13, 'completed');
+[$titles, $hidden] = planList($h1, $hAthlete);
+check(in_array('دوماهه', $titles, true) && !in_array('چهارماهه', $titles, true), 'the 2-month plan shows, the 4-month one does not', $titles);
+check(in_array('فعلی ششماهه', $titles, true), "an athlete's current plan made 6 months ago still shows");
+check(($hidden['count'] ?? 0) === 3 && ($hidden['months'] ?? 0) === 3, 'the list says 3 plans are hidden, beyond 3 months', $hidden);
+[$status, $data] = call('GET', "/plans/workout/{$p4}", null, $h1);
+check($status === 403 && ($data['error']['code'] ?? '') === 'history_hidden', 'opening a hidden plan by id is refused with the upgrade message', [$status, $data]);
+check(call('GET', "/plans/workout/{$p4}/days", null, $h1)[0] === 403, 'and so is its structure');
+check(call('POST', '/plans/workout', ['id' => $p4, 'title' => 'ویرایش'], $h1)[0] === 403, 'and editing it');
+[, $comp] = call('GET', "/athletes/{$hAthlete}/completed-plans", null, $h1);
+check(!in_array('چهارماهه', array_column($comp['items'] ?? [], 'title'), true) && in_array('دوماهه', array_column($comp['items'] ?? [], 'title'), true), 'the completed-plans list hides it too');
+[, $conv] = call('GET', "/messages/conversation/{$hAthlete}", null, $h1);
+$convIds = array_column($conv['plans'] ?? [], 'id');
+check(!in_array($p4, $convIds, true) && in_array($p2, $convIds, true), 'and the plans offered in messages');
+check(call('GET', "/plans/workout/{$p4}/comments", null, $h1)[0] === 403, "and the hidden plan's comment thread");
+
+echo "\nThe athlete always sees their whole history\n";
+[, $mine] = call('GET', '/plans/workout/mine', null, $hAthleteToken);
+check(count(array_intersect([$p2, $p4, $p6, $p11, $p13], array_column($mine['items'] ?? [], 'id'))) === 5, 'all five plans', array_column($mine['items'] ?? [], 'title'));
+check(call('GET', "/plans/workout/{$p4}", null, $hAthleteToken)[0] === 200, 'and can open the old one');
+
+echo "\nSilver: 12 months; gold and diamond: all\n";
+[$status, $data] = call('POST', '/trainer-billing/requests', ['plan_id' => $tPlan['نقره‌ای'], 'tracking_code' => 'HIS' . $run, 'card_last4' => '1111'], $h1);
+call('POST', '/admin/trainer-billing/requests/' . ($data['id'] ?? '') . '/approve', [], $adminToken);
+[$titles, $hidden] = planList($h1, $hAthlete);
+check(in_array('یازده‌ماهه', $titles, true) && !in_array('سیزده‌ماهه', $titles, true), 'silver: the 11-month plan shows, the 13-month one does not', $titles);
+check(($hidden['count'] ?? 0) === 1 && ($hidden['months'] ?? 0) === 12, 'one hidden, beyond 12 months', $hidden);
+check(call('GET', "/plans/workout/{$p4}", null, $h1)[0] === 200, 'right after the payment, the 4-month plan opens again');
+admin('trainer', $h1Id, ['action' => 'activate', 'plan_id' => $tPlan['طلایی'], 'expires_at' => $day(30)]);
+[$titles, $hidden] = planList($h1, $hAthlete);
+check(count($titles) === 5 && $hidden === null, 'gold: all five, nothing hidden', [$titles, $hidden]);
+admin('trainer', $h1Id, ['action' => 'activate', 'plan_id' => $tPlan['الماسی'], 'expires_at' => $day(30)]);
+check(count(planList($h1, $hAthlete)[0]) === 5, 'diamond: all five');
+
+echo "\nGrace days: still the paid plan's history; after them, the free plan's\n";
+admin('trainer', $h1Id, ['action' => 'activate', 'plan_id' => $tPlan['نقره‌ای'], 'started_at' => $day(-40), 'expires_at' => $day(-1)]);
+check(in_array('چهارماهه', planList($h1, $hAthlete)[0], true), 'in the grace days: the 4-month plan still shows');
+admin('trainer', $h1Id, ['action' => 'dates', 'started_at' => $day(-40), 'expires_at' => $day(-8)]);
+check(!in_array('چهارماهه', planList($h1, $hAthlete)[0], true), 'after them: back to 3 months');
+admin('trainer', $h1Id, ['action' => 'extend', 'days' => 30]);
+check(in_array('چهارماهه', planList($h1, $hAthlete)[0], true), 'a renewal brings it back at once');
+$left = $pdo->prepare('SELECT COUNT(*) FROM workout_assignments WHERE trainer_id = :t');
+$left->execute(['t' => $h1Id]);
+check((int) $left->fetchColumn() === 5, 'nothing was deleted');
+
+echo "\nAdmin list, enforcement off, club trainers\n";
+admin('trainer', $h1Id, ['action' => 'dates', 'started_at' => $day(-60), 'expires_at' => $day(-20)]);
+[, $accounts] = call('GET', '/admin/plan-accounts', null, $adminToken);
+$row = array_values(array_filter($accounts['trainers'] ?? [], fn ($t) => $t['id'] === $h1Id))[0] ?? null;
+check(($row['limits']['history']['hidden'] ?? 0) === 3, 'the admin list shows 3 hidden plans for the trainer', $row['limits']['history'] ?? null);
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => false, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+check(count(planList($h1, $hAthlete)[0]) === 5, 'with enforcement off, nothing is hidden');
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => true, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+admin('club', $clubId, ['action' => 'activate', 'plan_id' => $cPlan['نقره‌ای'], 'expires_at' => $day(30)]);
+[, $inv] = invite($c3);
+[, , $clubAthlete] = accept($inv['code'], 'history-club-athlete');
+agedPlan($c3, $clubAthlete, 'قدیمی باشگاهی', 20, 'completed');
+check(in_array('قدیمی باشگاهی', planList($c3, $clubAthlete)[0], true), "a club trainer sees all (the club's plan runs)");
+
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);

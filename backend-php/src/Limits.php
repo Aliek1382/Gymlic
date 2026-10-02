@@ -186,7 +186,88 @@ final class Limits
             'suspend_after_grace' => $atRisk,
             'club'         => $club,
             'content'      => $contentShape,
+            'history'      => self::historyShape($plan, $content, $enforcing),
         ];
+    }
+
+    // ---- Plan history (phase 3) ------------------------------------------
+
+    /** Statuses of a plan that is over: only these are ever hidden by age. */
+    public const FINISHED_STATUSES = "'completed','cancelled'";
+
+    /**
+     * How far back the trainer sees their finished plans: history_months of
+     * the plan in effect (the free plan's once a paid one has ended), none
+     * while the trainer's club has a plan running or enforcement is off.
+     * cutoff: finished plans assigned before it are hidden from the trainer.
+     *
+     * @param array<string, mixed> $plan
+     * @param array{club_running: bool}|null $content
+     * @return array{months: ?int, cutoff: ?string}
+     */
+    private static function historyShape(array $plan, ?array $content, bool $enforcing): array
+    {
+        $months = ($content === null || $content['club_running']) ? null : ($plan['history_months'] ?? null);
+        return [
+            'months' => $months,
+            'cutoff' => $enforcing && $months !== null ? date('Y-m-d H:i:s', (int) strtotime("-{$months} months")) : null,
+        ];
+    }
+
+    /**
+     * The trainer's history cutoff (see historyShape), null = sees all. Only
+     * for what the trainer looks at: athletes always see all their plans, and
+     * a full export of the trainer's data (phase 5) skips this.
+     */
+    public static function historyCutoff(PDO $pdo, string $trainerId): ?string
+    {
+        return self::ready() ? (self::forTrainer($pdo, $trainerId)['history']['cutoff'] ?? null) : null;
+    }
+
+    /**
+     * " AND <plan is not hidden>" for a workout/nutrition assignment query,
+     * bound to :history_cutoff; '' when $cutoff is null. Hidden = finished
+     * (completed / cancelled) and assigned before the cutoff; active plans
+     * and drafts always show. Nothing is deleted: a renewal moves the cutoff
+     * and they show again.
+     */
+    public static function historyVisibleSql(?string $cutoff, string $alias = ''): string
+    {
+        return $cutoff === null
+            ? ''
+            : " AND NOT ({$alias}status IN (" . self::FINISHED_STATUSES . ") AND {$alias}assigned_at < :history_cutoff)";
+    }
+
+    /** @param array<string, mixed> $plan a row with status and assigned_at */
+    public static function planHidden(array $plan, ?string $cutoff): bool
+    {
+        return $cutoff !== null
+            && in_array($plan['status'] ?? '', ['completed', 'cancelled'], true)
+            && (string) ($plan['assigned_at'] ?? '') < $cutoff;
+    }
+
+    /**
+     * Ends the request when the caller is this plan's trainer and the plan
+     * is hidden from them by the history limit (a link or id to an old plan).
+     *
+     * @param array<string, mixed> $plan
+     */
+    public static function requirePlanVisible(array $plan, string $userId): void
+    {
+        if (($plan['trainer_id'] ?? null) !== $userId || (int) ($plan['is_template'] ?? 0) === 1) {
+            return;
+        }
+        $pdo = Database::connection();
+        if (!self::planHidden($plan, self::historyCutoff($pdo, $userId))) {
+            return;
+        }
+        $months = self::forTrainer($pdo, $userId)['history']['months'];
+        Response::error(
+            403,
+            'history_hidden',
+            'این برنامه قدیمی‌تر از ' . self::fa((int) $months) . ' ماه است و در پلن فعلی شما نمایش داده نمی‌شود. برای دیدن برنامه‌های قدیمی‌تر، پلن خود را ارتقا دهید.'
+        );
+        exit;
     }
 
     // ---- Custom exercises and templates (phase 2) ------------------------
@@ -738,6 +819,7 @@ final class Limits
             'suspend_after_grace' => 0,
             'club'         => self::trainerClub($pdo, $trainerId),
             'content'      => null,
+            'history'      => ['months' => null, 'cutoff' => null],
         ];
     }
 

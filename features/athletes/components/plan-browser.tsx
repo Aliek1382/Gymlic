@@ -49,6 +49,7 @@ import { useAthletes } from "../hooks/use-athletes";
 import { useCompletePlan } from "../hooks/use-complete-plan";
 import { usePlanPrint } from "../hooks/use-plan-print";
 import { usePlans } from "../hooks/use-plans";
+import { HiddenPlansNote } from "./hidden-plans-note";
 import { useSavePlan } from "../hooks/use-save-plan";
 import { nutritionPlanMealsKey } from "../hooks/use-nutrition-plan-meals";
 import { workoutPlanDaysKey } from "../hooks/use-workout-plan-days";
@@ -298,6 +299,9 @@ export function PlanBrowser({
                   </span>
                 </div>
               ))
+            )}
+            {selectedAthlete && (
+              <HiddenPlansNote kind={kind} target={{ athleteId: selectedAthlete.id }} />
             )}
           </div>
         </Card>

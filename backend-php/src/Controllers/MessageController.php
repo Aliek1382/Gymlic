@@ -135,16 +135,24 @@ final class MessageController
 
         $plans = [];
 
+        // The viewer's own old finished plans (as trainer) may be hidden by
+        // their plan's history limit: not offered, and messages about them
+        // show no title.
+        $cutoff = Limits::historyCutoff($pdo, $user['id']);
         foreach (['workout', 'nutrition'] as $kind) {
             $table = Acl::planTable($kind);
             $stmt = $pdo->prepare(
-                "SELECT id, title, assigned_at FROM {$table}
+                "SELECT id, title, assigned_at, status, trainer_id FROM {$table}
                  WHERE is_template = 0 AND status <> 'draft'
                    AND ((trainer_id = :a AND athlete_id = :b) OR (trainer_id = :b2 AND athlete_id = :a2))
                  ORDER BY assigned_at DESC"
             );
             $stmt->execute(['a' => $user['id'], 'b' => $counterpartId, 'a2' => $user['id'], 'b2' => $counterpartId]);
             foreach ($stmt->fetchAll() as $plan) {
+                if ($plan['trainer_id'] === $user['id'] && Limits::planHidden($plan, $cutoff)) {
+                    continue;
+                }
+                unset($plan['status'], $plan['trainer_id']);
                 $plans[] = $plan + ['kind' => $kind];
             }
         }
@@ -188,6 +196,7 @@ final class MessageController
         $user = Auth::requireUser();
         $plan = self::planOr404($params['kind'], $params['id']);
         Acl::require(Acl::canViewPlan($user, $plan));
+        Limits::requirePlanVisible($plan, $user['id']);
 
         $stmt = Database::connection()->prepare(
             'SELECT m.id, m.sender_id, m.body, m.type, m.created_at,
@@ -221,6 +230,7 @@ final class MessageController
         $user = Auth::requireUser();
         $kind = $params['kind'];
         $plan = self::planOr404($kind, $params['id']);
+        Limits::requirePlanVisible($plan, $user['id']);
         $data = Validate::required(Validate::body(), ['body']);
 
         if ($plan['athlete_id'] === null) {
@@ -312,6 +322,7 @@ final class MessageController
                 Acl::planBelongsToPair($planKind, $planId, $user['id'], $recipientId),
                 'That plan does not belong to this conversation.'
             );
+            Limits::requirePlanVisible(self::planOr404($planKind, $planId), $user['id']);
         }
 
         self::insertMessage($user, $recipientId, $type, $body, $mediaUrl, $mediaName, $planKind, $planId);

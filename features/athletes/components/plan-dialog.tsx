@@ -32,6 +32,7 @@ import { PLAN_DESCRIPTION_PLACEHOLDER } from "../constants/athletes";
 import { useDeleteTemplate } from "../hooks/use-delete-template";
 import { nutritionPlanMealsKey } from "../hooks/use-nutrition-plan-meals";
 import { usePlans } from "../hooks/use-plans";
+import { HiddenPlansNote } from "./hidden-plans-note";
 import { useSavePlan } from "../hooks/use-save-plan";
 import { useApplyTemplate } from "../hooks/use-apply-template";
 import { useSaveTemplate } from "../hooks/use-save-template";
@@ -492,6 +493,7 @@ export function PlanDialog({
               هنوز برنامه‌ای ثبت نشده است.
             </p>
           )}
+          <HiddenPlansNote kind={kind} target={target} enabled={open} />
         </div>
       </DialogContent>
     </Dialog>
