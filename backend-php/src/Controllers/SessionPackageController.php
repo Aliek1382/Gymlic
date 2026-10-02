@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -36,6 +37,7 @@ final class SessionPackageController
 
         $athleteId = (string) $data['athlete_id'];
         Acl::require(Acl::isTrainerOf($user['id'], $athleteId), 'This athlete is not on your roster.');
+        Limits::requireWritable($user['id'], $athleteId);
 
         $title = trim((string) $data['title']);
         if ($title === '' || mb_strlen($title) > 255) {

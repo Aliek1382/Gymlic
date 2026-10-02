@@ -24,6 +24,7 @@ final class Migrations
      *   ['table', name] | ['column', table, column] | ['scale', table, column, decimals]
      *   | ['preset', table, name_en] (a shared-library row with that English name exists)
      *   | ['described', table, name_en] (that row has a non-empty description)
+     *   | ['row', table, id] (a row with that id exists)
      *
      * @var list<array{id: string, file: string, title: string, check: list<array>}>
      */
@@ -262,6 +263,20 @@ final class Migrations
                 ['column', 'trainer_subscriptions', 'tier'],
             ],
         ],
+        [
+            'id'    => 'plan-limits',
+            'file'  => 'plan-limits-update.sql',
+            'title' => 'پلن‌ها و محدودیت مربی و باشگاه (پلن رایگان، مهلت پس از انقضا، سقف مربی)',
+            'check' => [
+                ['column', 'plans', 'max_trainers'],
+                ['column', 'trainer_plans', 'is_free'],
+                ['column', 'subscriptions', 'override_on'],
+                ['column', 'trainer_subscriptions', 'downgrade_applied_at'],
+                ['column', 'trainer_athletes', 'suspended_by_plan'],
+                ['row', 'trainer_plans', '7a000000-0000-4000-8000-000000000001'],
+                ['row', 'plans', '7c000000-0000-4000-8000-000000000004'],
+            ],
+        ],
     ];
 
     /**
@@ -415,6 +430,7 @@ final class Migrations
                 'scale'  => (int) (self::columnInfo($pdo, $check[1], $check[2])['NUMERIC_SCALE'] ?? -1) === $check[3],
                 'preset' => self::presetExists($pdo, $check[1], $check[2]),
                 'described' => self::presetExists($pdo, $check[1], $check[2], true),
+                'row'    => self::rowExists($pdo, $check[1], $check[2]),
                 default  => false,
             };
             if (!$ok) {
@@ -439,6 +455,16 @@ final class Migrations
         $filled = $described ? " AND description IS NOT NULL AND description <> ''" : '';
         $stmt = $pdo->prepare("SELECT 1 FROM {$table} WHERE name_en = :n AND created_by IS NULL{$filled} LIMIT 1");
         $stmt->execute(['n' => $nameEn]);
+        return $stmt->fetch() !== false;
+    }
+
+    private static function rowExists(PDO $pdo, string $table, string $id): bool
+    {
+        if (!self::tableExists($pdo, $table)) {
+            return false;
+        }
+        $stmt = $pdo->prepare("SELECT 1 FROM {$table} WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => $id]);
         return $stmt->fetch() !== false;
     }
 

@@ -4,12 +4,14 @@ import type { SubscriptionStatus } from "@/types/database.types";
 export const SUBSCRIPTION_STATUS_LABEL: Record<SubscriptionStatus, string> = {
   active: "فعال",
   expiring: "رو به اتمام",
+  grace: "در مهلت",
   expired: "منقضی",
 };
 
 const VARIANT: Record<SubscriptionStatus, "success" | "warning" | "destructive"> = {
   active: "success",
   expiring: "warning",
+  grace: "warning",
   expired: "destructive",
 };
 

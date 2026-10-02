@@ -149,7 +149,7 @@ final class Tiers
             $stmt = $pdo->prepare('SELECT tier, expires_at FROM trainer_subscriptions WHERE trainer_id = :id');
             $stmt->execute(['id' => $trainerId]);
             $row = $stmt->fetch();
-            if ($row !== false && strtotime((string) $row['expires_at']) > time()) {
+            if ($row !== false && self::running($row['expires_at'])) {
                 return self::valid($row['tier']) ? $row['tier'] : null;
             }
         }
@@ -193,7 +193,7 @@ final class Tiers
         $stmt = $pdo->prepare('SELECT tier, expires_at FROM subscriptions WHERE club_id = :id ORDER BY expires_at DESC LIMIT 1');
         $stmt->execute(['id' => $clubId]);
         $row = $stmt->fetch();
-        if ($row === false || strtotime((string) $row['expires_at']) <= time()) {
+        if ($row === false || !self::running($row['expires_at'])) {
             return 'free';
         }
         return self::valid($row['tier']) ? $row['tier'] : null;
@@ -205,6 +205,16 @@ final class Tiers
         $stmt = $pdo->prepare('SELECT MAX(expires_at) FROM subscriptions WHERE club_id = :id');
         $stmt->execute(['id' => $clubId]);
         $expires = $stmt->fetchColumn();
-        return $expires !== false && $expires !== null && strtotime((string) $expires) > time();
+        return $expires !== false && $expires !== null && self::running((string) $expires);
+    }
+
+    /**
+     * Whether a paid subscription still counts: until its end, and through
+     * the grace days after it (Subscriptions::status), when everything works
+     * as before. A row with no end is the free trainer plan, not a paid one.
+     */
+    private static function running(?string $expiresAt): bool
+    {
+        return in_array(Subscriptions::status($expiresAt), ['active', 'expiring', 'grace'], true);
     }
 }

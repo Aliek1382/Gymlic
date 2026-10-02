@@ -9,6 +9,7 @@ use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
+use Gymlic\Limits;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
@@ -50,9 +51,10 @@ final class TrainerBillingController
         $billing = Settings::get('billing');
         TrainerBilling::remindIfDue($pdo);
 
+        // The free plan is what a trainer has without paying: never on sale.
         $plans = $pdo->query(
-            'SELECT id, name, price_toman, duration_days, max_athletes FROM trainer_plans
-             WHERE is_active = 1 ORDER BY price_toman ASC'
+            'SELECT id, name, price_toman, duration_days, max_athletes' . (Limits::ready() ? ', max_custom_exercises, max_templates, history_months, report_level' : '') . '
+             FROM trainer_plans WHERE is_active = 1' . (Limits::ready() ? ' AND is_free = 0' : '') . ' ORDER BY price_toman ASC'
         )->fetchAll();
 
         $discounts = TrainerDiscounts::ready();
@@ -74,7 +76,8 @@ final class TrainerBillingController
             'in_club'      => TrainerBilling::inClub($pdo, $user['id']),
             'subscription' => TrainerBilling::subscription($pdo, $user['id']),
             'athletes'     => TrainerBilling::athleteCounts($pdo, $user['id']),
-            'plans'        => Cast::rows($plans, [], ['price_toman', 'duration_days', 'max_athletes']),
+            'limits'       => Limits::forTrainer($pdo, $user['id']),
+            'plans'        => Cast::rows($plans, [], ['price_toman', 'duration_days', 'max_athletes', 'max_custom_exercises', 'max_templates', 'history_months']),
             'discounts_enabled' => $discounts,
             'requests'     => Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf']),
             'receipts'     => [
@@ -104,7 +107,7 @@ final class TrainerBillingController
         $data = Validate::required($multipart ? $_POST : Validate::body(), ['plan_id']);
 
         $pdo = Database::connection();
-        $plan = $pdo->prepare('SELECT id, name, price_toman FROM trainer_plans WHERE id = :id AND is_active = 1');
+        $plan = $pdo->prepare('SELECT id, name, price_toman FROM trainer_plans WHERE id = :id AND is_active = 1' . self::notFree());
         $plan->execute(['id' => (string) $data['plan_id']]);
         $plan = $plan->fetch();
         if ($plan === false) {
@@ -247,7 +250,7 @@ final class TrainerBillingController
         }
 
         $pdo = Database::connection();
-        $plan = $pdo->prepare('SELECT id, name, price_toman FROM trainer_plans WHERE id = :id AND is_active = 1');
+        $plan = $pdo->prepare('SELECT id, name, price_toman FROM trainer_plans WHERE id = :id AND is_active = 1' . self::notFree());
         $plan->execute(['id' => (string) $data['plan_id']]);
         $plan = $plan->fetch();
         if ($plan === false) {
@@ -295,6 +298,89 @@ final class TrainerBillingController
         header('Cache-Control: private, no-store');
         header('X-Content-Type-Options: nosniff');
         readfile($path);
+    }
+
+    /**
+     * GET /trainer-billing/athletes: the athletes the trainer coaches outside
+     * a club, for choosing which stay active on the free plan.
+     */
+    public static function athletes(): void
+    {
+        $user = self::requireTrainer();
+        if (!Limits::ready()) {
+            Response::ok(['ready' => false, 'items' => []]);
+            return;
+        }
+
+        $pdo = Database::connection();
+        $limits = Limits::forTrainer($pdo, $user['id']);
+        $stmt = $pdo->prepare(
+            "SELECT ta.athlete_id AS id, p.first_name, p.last_name, p.avatar_url, p.last_seen_at,
+                    ta.suspended_by_plan, ta.keep_on_downgrade, ta.created_at
+             FROM trainer_athletes ta JOIN profiles p ON p.id = ta.athlete_id
+             WHERE ta.trainer_id = :id AND ta.club_id IS NULL AND ta.status = 'active'
+             ORDER BY ta.keep_on_downgrade DESC, p.last_seen_at IS NULL, p.last_seen_at DESC, ta.created_at DESC"
+        );
+        $stmt->execute(['id' => $user['id']]);
+
+        Response::ok([
+            'ready'  => true,
+            'limits' => $limits,
+            'items'  => Cast::rows($stmt->fetchAll(), [], [], ['suspended_by_plan', 'keep_on_downgrade']),
+        ]);
+    }
+
+    /**
+     * POST /trainer-billing/athletes {keep: [athlete ids]}: who stays active
+     * on the free plan (up to its cap). Saved for later while a paid plan or
+     * its grace days run; applied at once when already on the free plan.
+     */
+    public static function saveKeepList(): void
+    {
+        $user = self::requireTrainer();
+        if (!Limits::ready()) {
+            Response::error(409, 'limits_unavailable', 'به‌روزرسانی دیتابیس برای پلن‌ها هنوز اجرا نشده است.');
+            return;
+        }
+        $keep = Validate::body()['keep'] ?? null;
+        if (!is_array($keep)) {
+            Response::error(400, 'invalid_body', 'keep must be a list of athlete ids.');
+            return;
+        }
+        $keep = array_values(array_unique(array_map('strval', $keep)));
+
+        $pdo = Database::connection();
+        $cap = Limits::freePlan($pdo)['max_athletes'];
+        if ($cap !== null && count($keep) > $cap) {
+            Response::error(400, 'too_many', 'در پلن رایگان حداکثر ' . $cap . ' ورزشکار فعال می‌ماند.');
+            return;
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('UPDATE trainer_athletes SET keep_on_downgrade = 0 WHERE trainer_id = :id')
+                ->execute(['id' => $user['id']]);
+            $mark = $pdo->prepare(
+                "UPDATE trainer_athletes SET keep_on_downgrade = 1
+                 WHERE trainer_id = :id AND athlete_id = :athlete AND club_id IS NULL AND status = 'active'"
+            );
+            foreach ($keep as $athleteId) {
+                $mark->execute(['id' => $user['id'], 'athlete' => $athleteId]);
+            }
+
+            $limits = Limits::forTrainer($pdo, $user['id']);
+            if ($limits['status'] === 'expired' && ($limits['subscription']['downgraded'] ?? false)) {
+                Limits::applyKeepList($pdo, $user['id']);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        Response::ok(['ok' => true]);
     }
 
     // ---- Admin: payment requests -----------------------------------------
@@ -365,18 +451,31 @@ final class TrainerBillingController
                 return;
             }
 
+            // The same plan extends the current period; another plan starts
+            // now with its full period (TrainerBilling::extend).
+            $before = Limits::forTrainer($pdo, $request['trainer_id']);
             $expiresAt = TrainerBilling::extend(
                 $pdo,
                 $request['trainer_id'],
                 (int) $request['duration_days'],
                 $request['plan_name'],
-                $request['max_athletes'] === null ? null : (int) $request['max_athletes']
+                $request['max_athletes'] === null ? null : (int) $request['max_athletes'],
+                $request['plan_id']
             );
             Tiers::setTrainerTier($pdo, $request['trainer_id'], Tiers::planTier($pdo, 'trainer_plans', $request['plan_id']));
             $pdo->prepare(
                 "UPDATE trainer_payment_requests
                  SET status = 'approved', admin_note = :note, reviewed_by = :admin, reviewed_at = NOW() WHERE id = :id"
             )->execute(['note' => $note, 'admin' => $admin['id'], 'id' => $request['id']]);
+
+            AdminController::logActivity($pdo, null, $admin['id'], $request['trainer_id'], 'trainer_payment_approved', [
+                'request_id' => $request['id'],
+                'plan'       => $request['plan_name'],
+                'amount'     => (int) $request['amount_toman'],
+                'before'     => PlanAccountsController::snapshot($before),
+                'expires_at' => $expiresAt,
+                'note'       => $note,
+            ]);
 
             Templates::notify(
                 $pdo,
@@ -421,6 +520,10 @@ final class TrainerBillingController
         $trainer = $pdo->prepare('SELECT trainer_id FROM trainer_payment_requests WHERE id = :id');
         $trainer->execute(['id' => $params['id']]);
         $trainerId = $trainer->fetchColumn();
+        AdminController::logActivity($pdo, null, $admin['id'], $trainerId === false ? null : (string) $trainerId, 'trainer_payment_rejected', [
+            'request_id' => $params['id'],
+            'note'       => $note,
+        ]);
         if ($trainerId !== false) {
             Templates::notify(
                 $pdo,
@@ -471,11 +574,24 @@ final class TrainerBillingController
             return;
         }
 
+        $limits = Limits::ready();
         $rows = Database::connection()->query(
-            'SELECT id, name, price_toman, duration_days, max_athletes, is_active FROM trainer_plans ORDER BY price_toman ASC'
+            'SELECT id, name, price_toman, duration_days, max_athletes, is_active'
+            . ($limits ? ', is_free, max_custom_exercises, max_templates, history_months, report_level,
+                (SELECT COUNT(*) FROM trainer_subscriptions s WHERE s.plan_id = trainer_plans.id) AS subscriber_count' : '') . '
+             FROM trainer_plans ORDER BY is_active DESC, price_toman ASC'
         )->fetchAll();
 
-        Response::ok(['ready' => true, 'items' => Cast::rows($rows, [], ['price_toman', 'duration_days', 'max_athletes'], ['is_active'])]);
+        Response::ok([
+            'ready'  => true,
+            'limits' => $limits,
+            'items'  => Cast::rows(
+                $rows,
+                [],
+                ['price_toman', 'duration_days', 'max_athletes', 'max_custom_exercises', 'max_templates', 'history_months', 'subscriber_count'],
+                ['is_active', 'is_free']
+            ),
+        ]);
     }
 
     /** POST /admin/trainer-plans */
@@ -490,18 +606,12 @@ final class TrainerBillingController
             return;
         }
 
-        $id = Uuid::v4();
+        $row = ['id' => Uuid::v4(), 'is_active' => 1] + $plan;
         Database::connection()->prepare(
-            'INSERT INTO trainer_plans (id, name, price_toman, duration_days, max_athletes, is_active)
-             VALUES (:id, :name, :price, :days, :cap, :active)'
-        )->execute([
-            'id'     => $id,
-            'name'   => $plan['name'],
-            'price'  => $plan['price_toman'],
-            'days'   => $plan['duration_days'],
-            'cap'    => $plan['max_athletes'],
-            'active' => $plan['is_active'] ?? 1,
-        ]);
+            'INSERT INTO trainer_plans (' . implode(', ', array_keys($row)) . ')
+             VALUES (:' . implode(', :', array_keys($row)) . ')'
+        )->execute($row);
+        $id = $row['id'];
 
         Response::ok(['id' => $id], 201);
     }
@@ -522,16 +632,25 @@ final class TrainerBillingController
             return;
         }
 
-        $columns = ['name' => 'name', 'price_toman' => 'price_toman', 'duration_days' => 'duration_days',
-                    'max_athletes' => 'max_athletes', 'is_active' => 'is_active'];
+        $pdo = Database::connection();
+        if (Limits::ready()) {
+            $free = $pdo->prepare('SELECT is_free FROM trainer_plans WHERE id = :id');
+            $free->execute(['id' => $params['id']]);
+            // The free plan is everyone's fallback: always on, always free.
+            if ((int) $free->fetchColumn() === 1
+                && ((isset($plan['is_active']) && $plan['is_active'] === 0) || (isset($plan['price_toman']) && $plan['price_toman'] !== 0))) {
+                Response::error(409, 'free_plan_locked', 'پلن رایگان همیشه فعال و رایگان می‌ماند؛ فقط نام و محدودیت‌هایش قابل تغییر است.');
+                return;
+            }
+        }
+
         $sets = [];
         $bind = ['id' => $params['id']];
         foreach ($plan as $key => $value) {
-            $sets[] = "{$columns[$key]} = :{$key}";
+            $sets[] = "{$key} = :{$key}";
             $bind[$key] = $value;
         }
-        $stmt = Database::connection()->prepare('UPDATE trainer_plans SET ' . implode(', ', $sets) . ' WHERE id = :id');
-        $stmt->execute($bind);
+        $pdo->prepare('UPDATE trainer_plans SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($bind);
 
         Response::ok(['ok' => true]);
     }
@@ -596,7 +715,7 @@ final class TrainerBillingController
         $cap = null;
         $planId = Validate::nullableString($data['plan_id'] ?? null);
         if ($planId !== null) {
-            $plan = $pdo->prepare('SELECT name, max_athletes FROM trainer_plans WHERE id = :id');
+            $plan = $pdo->prepare('SELECT name, max_athletes FROM trainer_plans WHERE id = :id' . self::notFree());
             $plan->execute(['id' => $planId]);
             $plan = $plan->fetch();
             if ($plan === false) {
@@ -606,8 +725,13 @@ final class TrainerBillingController
             $planName = $plan['name'];
             $cap = $plan['max_athletes'] === null ? null : (int) $plan['max_athletes'];
         } else {
-            // Free days keep whatever plan the trainer already has.
+            // Free days keep whatever plan the trainer already has; a trainer
+            // on the free plan has no period to lengthen.
             $current = TrainerBilling::subscription($pdo, $params['trainerId']);
+            if (Limits::ready() && ($current === null || $current['expires_at'] === null)) {
+                Response::error(400, 'plan_required', 'این مربی پلن پولی ندارد؛ برای روز هدیه یک پلن انتخاب کنید.');
+                return;
+            }
             if ($current !== null) {
                 $planName = $current['plan_name'];
                 $cap = $current['max_athletes'];
@@ -616,7 +740,14 @@ final class TrainerBillingController
 
         $pdo->beginTransaction();
         try {
-            $expiresAt = TrainerBilling::extend($pdo, $params['trainerId'], $days, $planName, $cap);
+            $before = Limits::forTrainer($pdo, $params['trainerId']);
+            $expiresAt = TrainerBilling::extend($pdo, $params['trainerId'], $days, $planName, $cap, $planId);
+            AdminController::logActivity($pdo, null, $admin['id'], $params['trainerId'], 'trainer_subscription_granted', [
+                'days'       => $days,
+                'plan'       => $planName,
+                'before'     => PlanAccountsController::snapshot($before),
+                'expires_at' => $expiresAt,
+            ]);
             // A plan brings its tier; free days keep the tier there is.
             if ($planId !== null) {
                 Tiers::setTrainerTier($pdo, $params['trainerId'], Tiers::planTier($pdo, 'trainer_plans', $planId));
@@ -712,8 +843,22 @@ final class TrainerBillingController
         if (array_key_exists('is_active', $data)) {
             $out['is_active'] = filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
         }
+        if (Limits::ready()) {
+            $features = PlanAccountsController::featureFields($data);
+            if (isset($features['error'])) {
+                Response::error(400, $features['error'][0], $features['error'][1]);
+                return null;
+            }
+            $out += $features;
+        }
 
         return $out;
+    }
+
+    /** " AND the plan isn't the free one", once the database knows which that is. */
+    private static function notFree(): string
+    {
+        return Limits::ready() ? ' AND is_free = 0' : '';
     }
 
     private static function text(mixed $value, int $max): ?string

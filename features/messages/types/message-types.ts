@@ -68,4 +68,6 @@ export interface ConversationMessage {
 export interface Conversation {
   plans: ConversationPlan[];
   messages: ConversationMessage[];
+  /** The athlete is on hold by their trainer's plan: history only, no sending. */
+  readOnly: boolean;
 }

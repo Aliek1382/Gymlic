@@ -131,7 +131,7 @@ final class AdminBillingController
         }
         $amount = (int) $amount;
 
-        $expiresAt = Subscriptions::extend($pdo, $club['id'], (int) $plan['duration_days'], $plan['name']);
+        $expiresAt = Subscriptions::extend($pdo, $club['id'], (int) $plan['duration_days'], $plan['name'], $plan['id']);
         Tiers::setClubTier($pdo, $club['id'], Tiers::planTier($pdo, 'plans', $plan['id']));
 
         // The plan's member cap, as approving a payment for it would. A

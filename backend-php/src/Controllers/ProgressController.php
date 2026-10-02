@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -133,6 +134,7 @@ final class ProgressController
         $athleteId = $params['athleteId'];
 
         Acl::require(Acl::isTrainerOf($user['id'], $athleteId));
+        Limits::requireWritable($user['id'], $athleteId);
 
         $data = Validate::body();
         $weeks = $data['interval_weeks'] ?? 4;

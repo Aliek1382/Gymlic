@@ -10,6 +10,7 @@ use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
+use Gymlic\Limits;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Security;
@@ -168,13 +169,21 @@ final class AdminController
     {
         Auth::requireUser();
 
+        $limits = Limits::ready();
         $stmt = Database::connection()->query(
-            'SELECT id, name, price_toman, duration_days, max_members, is_active
-             FROM plans ORDER BY price_toman ASC'
+            'SELECT id, name, price_toman, duration_days, max_members, is_active'
+            . ($limits ? ', max_trainers, max_custom_exercises, max_templates, history_months, report_level,
+                (SELECT COUNT(*) FROM subscriptions s WHERE s.plan_id = plans.id) AS subscriber_count' : '') . '
+             FROM plans ORDER BY is_active DESC, price_toman ASC'
         );
 
         Response::ok([
-            'items' => Cast::rows($stmt->fetchAll(), [], ['price_toman', 'duration_days', 'max_members'], ['is_active']),
+            'items' => Cast::rows(
+                $stmt->fetchAll(),
+                [],
+                ['price_toman', 'duration_days', 'max_members', 'max_trainers', 'max_custom_exercises', 'max_templates', 'history_months', 'subscriber_count'],
+                ['is_active']
+            ),
         ]);
     }
 
@@ -276,9 +285,11 @@ final class AdminController
                 throw new \RuntimeException('request_not_pending');
             }
 
-            // Counted from the current expiry while it is still running, so
-            // approving early doesn't cost the club its remaining days.
-            $expiresAt = Subscriptions::extend($pdo, $request['club_id'], (int) $request['duration_days'], $request['plan_name']);
+            // The same plan counts from the current expiry while it is still
+            // running, so approving early doesn't cost the club its remaining
+            // days; another plan starts today with its full period.
+            $before = Limits::forClub($pdo, $request['club_id']);
+            $expiresAt = Subscriptions::extend($pdo, $request['club_id'], (int) $request['duration_days'], $request['plan_name'], $request['plan_id']);
             Tiers::setClubTier($pdo, $request['club_id'], Tiers::planTier($pdo, 'plans', $request['plan_id']));
 
             $pdo->prepare("UPDATE clubs SET member_capacity = :cap, status = 'active' WHERE id = :id")
@@ -297,6 +308,9 @@ final class AdminController
             self::logActivity($pdo, $request['club_id'], $admin['id'], $request['submitted_by'], 'payment_request_approved', [
                 'request_id' => $params['id'],
                 'plan'       => $request['plan_name'],
+                'amount'     => (int) $request['amount_toman'],
+                'before'     => PlanAccountsController::snapshot($before),
+                'expires_at' => $expiresAt,
             ]);
 
             Templates::notify(
@@ -520,10 +534,7 @@ final class AdminController
         $data = Validate::required(Validate::body(), ['name', 'price_toman', 'duration_days']);
 
         $id = Uuid::v4();
-        Database::connection()->prepare(
-            'INSERT INTO plans (id, name, price_toman, duration_days, max_members, is_active)
-             VALUES (:id, :name, :price_toman, :duration_days, :max_members, :is_active)'
-        )->execute([
+        $row = [
             'id'            => $id,
             'name'          => (string) $data['name'],
             'price_toman'   => (int) $data['price_toman'],
@@ -531,7 +542,17 @@ final class AdminController
             'max_members'   => isset($data['max_members']) && $data['max_members'] !== null
                 ? (int) $data['max_members'] : null,
             'is_active'     => array_key_exists('is_active', $data) ? (int) (bool) $data['is_active'] : 1,
-        ]);
+        ];
+        if (Limits::ready()) {
+            $extra = self::clubPlanLimits($data);
+            if ($extra === null) {
+                return;
+            }
+            $row += $extra;
+        }
+        Database::connection()->prepare(
+            'INSERT INTO plans (' . implode(', ', array_keys($row)) . ') VALUES (:' . implode(', :', array_keys($row)) . ')'
+        )->execute($row);
 
         Response::ok(['id' => $id], 201);
     }
@@ -550,6 +571,16 @@ final class AdminController
                 $bind[$key] = $data[$key];
             }
         }
+        if (Limits::ready()) {
+            $extra = self::clubPlanLimits($data);
+            if ($extra === null) {
+                return;
+            }
+            foreach ($extra as $key => $value) {
+                $fields[] = "{$key} = :{$key}";
+                $bind[$key] = $value;
+            }
+        }
 
         if ($fields === []) {
             Response::error(400, 'no_fields', 'Nothing to update.');
@@ -561,6 +592,36 @@ final class AdminController
             ->execute($bind);
 
         Response::ok(['ok' => true]);
+    }
+
+    /**
+     * A club plan's trainer cap and later-phase limits from the form (only
+     * the keys sent). Ends the request with 400 and returns null on a bad value.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function clubPlanLimits(array $data): ?array
+    {
+        $out = [];
+        if (array_key_exists('max_trainers', $data)) {
+            $cap = $data['max_trainers'];
+            if ($cap === null || $cap === '') {
+                $out['max_trainers'] = null;
+            } else {
+                $cap = filter_var($cap, FILTER_VALIDATE_INT);
+                if ($cap === false || $cap < 0 || $cap > 100000) {
+                    Response::error(400, 'invalid_capacity', 'سقف مربی باید عددی نامنفی باشد، یا خالی برای بدون محدودیت.');
+                    return null;
+                }
+                $out['max_trainers'] = $cap;
+            }
+        }
+        $features = PlanAccountsController::featureFields($data);
+        if (isset($features['error'])) {
+            Response::error(400, $features['error'][0], $features['error'][1]);
+            return null;
+        }
+        return $out + $features;
     }
 
     /** The counters and subscription breakdown on the admin landing page. */
@@ -594,7 +655,7 @@ final class AdminController
 
         // Counted from the expiry dates: the stored status column is never
         // moved on as time passes (see Subscriptions).
-        $counts += ['active_subs' => 0, 'expiring_subs' => 0, 'expired_subs' => 0];
+        $counts += ['active_subs' => 0, 'expiring_subs' => 0, 'grace_subs' => 0, 'expired_subs' => 0];
         foreach ($pdo->query('SELECT expires_at FROM subscriptions')->fetchAll(PDO::FETCH_COLUMN) as $expiresAt) {
             $counts[Subscriptions::status((string) $expiresAt) . '_subs']++;
         }

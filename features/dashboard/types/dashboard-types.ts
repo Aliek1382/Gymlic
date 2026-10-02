@@ -51,7 +51,7 @@ export interface RecentActivityItem {
 
 export interface SubscriptionInfo {
   planName: string;
-  status: "active" | "expiring" | "expired";
+  status: "active" | "expiring" | "grace" | "expired";
   expiresAt: string;
   remainingDays: number;
 }
@@ -122,4 +122,6 @@ export interface AthletePlanSummary {
 export interface AthleteDashboardData {
   todaysWorkout: AthletePlanSummary | null;
   nutritionPlan: AthletePlanSummary | null;
+  /** Trainers whose ended plan has put this athlete on hold. */
+  suspendedTrainers: string[];
 }

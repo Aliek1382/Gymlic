@@ -72,6 +72,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
     card_number: digitsOnly(draft.card_number),
     sheba: digitsOnly(draft.sheba) ? `IR${digitsOnly(draft.sheba)}` : "",
     expiring_days: Number(digitsOnly(String(draft.expiring_days))) || 7,
+    grace_days: Number(digitsOnly(String(draft.grace_days ?? 7))),
     receipt_max_mb: Number(digitsOnly(String(draft.receipt_max_mb))) || 0,
     receipt_retention_days: Number(digitsOnly(String(draft.receipt_retention_days))) || 0,
   };
@@ -87,6 +88,10 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
     }
     if (value.expiring_days < 1 || value.expiring_days > 60) {
       toast.error("تعداد روز «رو به اتمام» باید بین ۱ و ۶۰ باشد.");
+      return;
+    }
+    if (value.grace_days < 0 || value.grace_days > 60) {
+      toast.error("مهلت پس از انقضا باید بین ۰ و ۶۰ روز باشد.");
       return;
     }
     if (value.receipt_max_mb < 1 || value.receipt_max_mb > 10) {
@@ -190,23 +195,44 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
 
         <div className="space-y-4 border-t border-border px-6 pt-5">
           <div className="space-y-1">
-            <CardTitle className="text-base">اشتراک رو به اتمام</CardTitle>
+            <CardTitle className="text-base">پیش و پس از انقضا</CardTitle>
             <CardDescription>
-              از چند روز مانده به انقضا، اشتراک «رو به اتمام» نشان داده شود — هم در صفحهٔ اشتراک‌ها و
-              هم برای خود باشگاه.
+              از چند روز مانده به انقضا، اشتراک «رو به اتمام» نشان داده شود (برای باشگاه‌ها و مربی‌ها)؛ و
+              چند روز پس از انقضا همه‌چیز مثل قبل کار کند و فقط بنر «اشتراک تمام شده» دیده شود. پس از
+              این مهلت، مربی به پلن رایگان برمی‌گردد و باشگاه دیگر نمی‌تواند عضو یا مربی تازه دعوت کند.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <Input
-              id="billing-expiring"
-              dir="ltr"
-              inputMode="numeric"
-              disabled={locked}
-              className="w-24"
-              value={String(draft.expiring_days)}
-              onChange={(e) => patch({ expiring_days: Number(digitsOnly(e.target.value).slice(0, 2)) || 0 })}
-            />
-            <span className="text-sm text-muted-foreground">روز</span>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="billing-expiring">رو به اتمام، از چند روز مانده</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="billing-expiring"
+                  dir="ltr"
+                  inputMode="numeric"
+                  disabled={locked}
+                  className="w-24"
+                  value={String(draft.expiring_days)}
+                  onChange={(e) => patch({ expiring_days: Number(digitsOnly(e.target.value).slice(0, 2)) || 0 })}
+                />
+                <span className="text-sm text-muted-foreground">روز</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="billing-grace">مهلت پس از انقضا</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="billing-grace"
+                  dir="ltr"
+                  inputMode="numeric"
+                  disabled={locked}
+                  className="w-24"
+                  value={String(draft.grace_days ?? 7)}
+                  onChange={(e) => patch({ grace_days: Number(digitsOnly(e.target.value).slice(0, 2)) || 0 })}
+                />
+                <span className="text-sm text-muted-foreground">روز</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -270,18 +296,21 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
 
         <div className="space-y-4 border-t border-border px-6 pt-5">
           <div className="space-y-1">
-            <CardTitle className="text-base">اشتراک مربیان</CardTitle>
+            <CardTitle className="text-base">اعمال محدودیت پلن‌ها</CardTitle>
             <CardDescription>
               مربیان با همین کارت و همین قواعد رسید، اشتراک می‌خرند (پلن‌ها در «اشتراک مربیان»). تا
-              وقتی این گزینه خاموش است، هیچ مربی‌ای محدود نمی‌شود و اشتراک فقط ثبت می‌شود.
+              وقتی این گزینه خاموش است، سقف‌ها فقط نمایش داده می‌شوند و کسی محدود نمی‌شود؛ تا روز
+              شروع فروش خاموش بماند.
             </CardDescription>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
             <div>
-              <Label htmlFor="billing-trainer-enforce">الزام اشتراک مربی</Label>
+              <Label htmlFor="billing-trainer-enforce">اعمال محدودیت پلن‌های مربی و باشگاه</Label>
               <p className="text-xs leading-5 text-muted-foreground">
-                وقتی روشن باشد، مربیِ بدون باشگاه فقط با اشتراک فعال و در سقف ورزشکار پلنش می‌تواند
-                ورزشکار تازه دعوت کند. ورزشکاران فعلی هیچ‌وقت حذف نمی‌شوند و مربیِ عضو باشگاه مشمول نیست.
+                وقتی روشن باشد: دعوت و پذیرش دعوت فقط در سقف پلن ممکن است (مربی بدون پلن پولی روی پلن
+                رایگان است)؛ باشگاه بدون اشتراک فعال عضو و مربی تازه دعوت نمی‌کند؛ و پس از پایان اشتراک
+                مربی و مهلت آن، ورزشکاران بیش از سقف پلن رایگان غیرفعال می‌شوند (حذف نمی‌شوند و با تمدید
+                برمی‌گردند). ورزشکارانی که مربیِ عضو باشگاه از طرف باشگاه دعوت می‌کند، تابع پلن باشگاه‌اند.
               </p>
             </div>
             <Switch

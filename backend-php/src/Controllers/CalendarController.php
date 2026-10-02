@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Recurrence;
 use Gymlic\Response;
 use Gymlic\Uuid;
@@ -396,6 +397,7 @@ final class CalendarController
         if ($athleteId !== null && $athleteId !== $currentAthleteId) {
             Acl::require(Acl::isTrainerOf($trainerId, $athleteId), 'This athlete is not on your roster.');
         }
+        Limits::requireWritable($trainerId, $athleteId);
 
         $rule = null;
         $until = null;

@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
@@ -65,6 +66,7 @@ final class TicketController
             return;
         }
         Acl::require(Acl::isTrainerOf($trainerId, $user['id']), 'That person is not your trainer.');
+        Limits::requireWritable($trainerId, $user['id']);
 
         $pdo = Database::connection();
         $ticketId = Uuid::v4();

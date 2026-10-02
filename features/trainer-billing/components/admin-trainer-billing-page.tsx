@@ -366,7 +366,15 @@ function PlanActiveSwitch({ plan }: { plan: TrainerPlan }) {
     }
   }
 
-  return <Switch checked={plan.is_active ?? true} disabled={busy} onCheckedChange={toggle} aria-label={`فعال بودن ${plan.name}`} />;
+  return (
+    <Switch
+      checked={plan.is_active ?? true}
+      // The free plan is every trainer's fallback: always on.
+      disabled={busy || plan.is_free}
+      onCheckedChange={toggle}
+      aria-label={`فعال بودن ${plan.name}`}
+    />
+  );
 }
 
 function PlansTab() {
@@ -377,8 +385,8 @@ function PlansTab() {
     <Card className="gap-4 py-5">
       <div className="flex items-center justify-between gap-3 px-6">
         <p className="text-sm text-muted-foreground">
-          پلن‌های مخصوص مربی؛ جدا از پلن‌های باشگاه. سقف ورزشکار فقط وقتی اعمال می‌شود که «الزام اشتراک
-          مربی» را در «اطلاعات پرداخت» روشن کرده باشید.
+          پلن‌های مخصوص مربی؛ جدا از پلن‌های باشگاه. هر مربیِ بدون پلن پولی روی پلن رایگان است. سقف‌ها
+          فقط وقتی اعمال می‌شوند که «اعمال محدودیت پلن‌ها» را در «اطلاعات پرداخت» روشن کرده باشید.
         </p>
         <TrainerPlanDialog />
       </div>
@@ -396,6 +404,7 @@ function PlansTab() {
               <TableHead>قیمت</TableHead>
               <TableHead>مدت</TableHead>
               <TableHead>سقف ورزشکار</TableHead>
+              {data?.limits && <TableHead>مربی‌ها</TableHead>}
               <TableHead>فعال</TableHead>
               <TableHead />
             </TableRow>
@@ -403,12 +412,26 @@ function PlansTab() {
           <TableBody>
             {rows.map((plan) => (
               <TableRow key={plan.id}>
-                <TableCell className="font-medium text-foreground">{plan.name}</TableCell>
+                <TableCell className="font-medium text-foreground">
+                  {plan.name}
+                  {plan.is_free && (
+                    <Badge variant="secondary" className="ms-2">
+                      پیش‌فرض همه
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-muted-foreground">{formatToman(plan.price_toman)} تومان</TableCell>
-                <TableCell className="text-muted-foreground">{formatNumber(plan.duration_days)} روز</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {plan.is_free ? "بی‌مهلت" : `${formatNumber(plan.duration_days)} روز`}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   {plan.max_athletes != null ? `${formatNumber(plan.max_athletes)} نفر` : "بدون محدودیت"}
                 </TableCell>
+                {data?.limits && (
+                  <TableCell className="text-muted-foreground">
+                    {plan.is_free ? "—" : formatNumber(plan.subscriber_count ?? 0)}
+                  </TableCell>
+                )}
                 <TableCell>
                   <PlanActiveSwitch plan={plan} />
                 </TableCell>
@@ -452,11 +475,17 @@ function SubscriptionsTab() {
       <div className="flex flex-col gap-3 px-6 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           {data?.enforcing
-            ? "الزام اشتراک روشن است: مربی بدون اشتراک فعال نمی‌تواند ورزشکار تازه دعوت کند."
-            : "الزام اشتراک خاموش است: هنوز هیچ مربی‌ای محدود نمی‌شود. از «اطلاعات پرداخت» روشنش کنید."}{" "}
+            ? "اعمال محدودیت پلن‌ها روشن است."
+            : "اعمال محدودیت پلن‌ها خاموش است: هنوز هیچ مربی‌ای محدود نمی‌شود."}{" "}
           <Link href="/admin/billing" className="text-primary underline-offset-4 hover:underline">
             اطلاعات پرداخت
           </Link>
+          {" · "}
+          فعال‌سازی پلن با تاریخ دلخواه، تغییر تاریخ‌ها، سقف دستی و تاریخچه در{" "}
+          <Link href="/admin/subscriptions" className="text-primary underline-offset-4 hover:underline">
+            اشتراک‌ها و پلن‌ها
+          </Link>
+          .
         </p>
         <Input
           className="sm:w-64"

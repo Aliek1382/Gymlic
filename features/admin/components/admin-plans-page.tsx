@@ -36,7 +36,7 @@ export function AdminPlansPage() {
             کاتالوگ رسمی پلن‌های اشتراک که باشگاه‌ها می‌توانند برای آن‌ها پرداخت کنند.
           </p>
         </div>
-        <PlanFormDialog />
+        <PlanFormDialog withTrainerCap={rows.some((p) => p.max_trainers !== undefined)} />
       </div>
 
       <Card className="gap-4 py-5">
@@ -62,6 +62,7 @@ export function AdminPlansPage() {
                 <TableHead>قیمت</TableHead>
                 <TableHead>مدت</TableHead>
                 <TableHead>سقف عضو</TableHead>
+                <TableHead>سقف مربی</TableHead>
                 <TableHead>فعال</TableHead>
                 <TableHead />
               </TableRow>
@@ -81,6 +82,13 @@ export function AdminPlansPage() {
                       ? `${formatNumber(plan.max_members)} نفر`
                       : "بدون محدودیت"}
                   </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {plan.max_trainers === undefined
+                      ? "—"
+                      : plan.max_trainers != null
+                        ? `${formatNumber(plan.max_trainers)} نفر`
+                        : "بدون محدودیت"}
+                  </TableCell>
                   <TableCell>
                     <PlanActiveToggle planId={plan.id} isActive={plan.is_active} />
                   </TableCell>
@@ -92,7 +100,9 @@ export function AdminPlansPage() {
                         priceToman: plan.price_toman,
                         durationDays: plan.duration_days,
                         maxMembers: plan.max_members,
+                        maxTrainers: plan.max_trainers,
                       }}
+                      withTrainerCap={plan.max_trainers !== undefined}
                     />
                   </TableCell>
                 </TableRow>

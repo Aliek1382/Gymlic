@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Templates;
 use Gymlic\Tiers;
@@ -90,18 +91,19 @@ final class MemberController
         $pdo->beginTransaction();
 
         try {
-            $club = $pdo->prepare('SELECT member_capacity FROM clubs WHERE id = :id FOR UPDATE');
+            $club = $pdo->prepare('SELECT id FROM clubs WHERE id = :id FOR UPDATE');
             $club->execute(['id' => $clubId]);
-            $row = $club->fetch();
-
-            if ($row === false) {
+            if ($club->fetch() === false) {
                 throw new \RuntimeException('club_not_found');
             }
 
-            $snapshot = self::capacitySnapshot($pdo, $clubId);
-            if ($snapshot['capacity'] !== null
-                && $snapshot['active_members'] + $snapshot['pending_invites'] >= $snapshot['capacity']) {
-                throw new \RuntimeException('capacity_full');
+            // The member cap (the plan's, or the admin's override), and an
+            // ended subscription once the plan limits are enforced.
+            $limit = Limits::clubMemberInviteBlock($pdo, $clubId);
+            if ($limit !== null) {
+                $pdo->rollBack();
+                Response::error(...$limit);
+                return;
             }
 
             $code = Uuid::v4();
@@ -128,10 +130,6 @@ final class MemberController
         } catch (Throwable $e) {
             $pdo->rollBack();
 
-            if ($e->getMessage() === 'capacity_full') {
-                Response::error(409, 'capacity_full', 'The club has reached its plan member limit.');
-                return;
-            }
             if ($e->getMessage() === 'club_not_found') {
                 Response::error(404, 'not_found', 'Club not found.');
                 return;
@@ -328,20 +326,10 @@ final class MemberController
         );
         $pending->execute(['club_id' => $clubId]);
 
-        $club = $pdo->prepare('SELECT member_capacity FROM clubs WHERE id = :id');
-        $club->execute(['id' => $clubId]);
-        $capacity = $club->fetch()['member_capacity'] ?? null;
-
-        // With no plan running, the free tier's cap (Tiers) when the admin set one.
-        $freeCap = Tiers::freeCap('max_members');
-        if ($freeCap !== null && !Tiers::clubHasRunning($pdo, $clubId)) {
-            $capacity = $capacity === null ? $freeCap : min((int) $capacity, $freeCap);
-        }
-
         return [
             'active_members'  => (int) $active->fetch()['c'],
             'pending_invites' => (int) $pending->fetch()['c'],
-            'capacity'        => $capacity === null ? null : (int) $capacity,
+            'capacity'        => Limits::forClub($pdo, $clubId)['max_members'],
         ];
     }
 

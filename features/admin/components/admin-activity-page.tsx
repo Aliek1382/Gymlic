@@ -15,6 +15,7 @@ import { formatNumber, formatPersianDate, formatRelativeTime, formatToman, toPer
 import { useQuery } from "@tanstack/react-query";
 
 import { listAdminActivity } from "../services/admin-service";
+import { PLAN_ACTION_LABEL } from "./plan-account-dialog";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 
 const ADMIN_ACTIONS = [
@@ -77,9 +78,20 @@ const ADMIN_ACTIONS = [
   "content_saved",
   "content_deleted",
   "exercise_media_changed",
+  // Plans and limits (PlanAccountsController, trainer billing).
+  "plan_activate",
+  "plan_dates",
+  "plan_extend",
+  "plan_override",
+  "plan_reactivate",
+  "plan_revoke_invites",
+  "trainer_payment_approved",
+  "trainer_payment_rejected",
+  "trainer_subscription_granted",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
+  ...PLAN_ACTION_LABEL,
   subscription_activated: "فعال‌سازی اشتراک باشگاه",
   payment_request_rejected: "رد درخواست پرداخت",
   club_status_changed: "تغییر وضعیت باشگاه",

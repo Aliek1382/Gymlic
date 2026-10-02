@@ -37,6 +37,14 @@ export const planFormSchema = z.object({
     .refine((value) => !value || /^[0-9]+$/.test(value), {
       message: "سقف اعضا باید یک عدد صحیح باشد.",
     }),
+  // Same shape as maxMembers: empty = no trainer cap.
+  maxTrainers: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || /^[0-9]+$/.test(value), {
+      message: "سقف مربی باید یک عدد صحیح باشد.",
+    }),
 });
 
 // Two shapes: the raw pre-coercion form input (numeric fields typed

@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\TrainerBilling;
 use Gymlic\Uuid;
@@ -74,6 +75,7 @@ final class AthleteController
     {
         $user = Auth::requireUser();
         Acl::require(Acl::isTrainerOf($user['id'], $params['id']), 'This athlete is not on your roster.');
+        Limits::requireWritable($user['id'], $params['id']);
 
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT * FROM profiles WHERE id = :id');
@@ -172,42 +174,60 @@ final class AthleteController
     /**
      * The invite carries the trainer's club so accept_athlete_invitation can
      * create the club membership alongside the coaching link; a trainer
-     * working independently has none, which stays supported.
+     * working independently has none, which stays supported. An invite with
+     * a club counts against the club's member cap, one without against the
+     * trainer's own plan (Limits); both checked with the row locked.
      */
     public static function createInvite(): void
     {
         $user = Auth::requireUser();
         $data = Validate::body();
+        $pdo = Database::connection();
 
-        // Only once the admin has switched trainer subscriptions on (and only
-        // for a trainer outside a club); see TrainerBilling::inviteBlock.
-        $blocked = TrainerBilling::inviteBlock(Database::connection(), $user['id']);
+        // The rule from before plan-limits-update.sql, until it has run.
+        $blocked = TrainerBilling::inviteBlock($pdo, $user['id']);
         if ($blocked !== null) {
             Response::error(402, 'trainer_plan_required', $blocked);
             return;
         }
 
-        $club = self::trainerClub($user['id']);
+        $club = Limits::trainerClub($pdo, $user['id']);
         $code = Uuid::v4();
 
-        Database::connection()->prepare(
-            "INSERT INTO invitations (id, code, trainer_id, club_id, invited_role, created_by,
-                                      first_name, last_name, phone, height_cm, weight_kg, expires_at)
-             VALUES (:id, :code, :trainer_id, :club_id, 'athlete', :created_by,
-                     :first_name, :last_name, :phone, :height_cm, :weight_kg, :expires_at)"
-        )->execute([
-            'id'         => Uuid::v4(),
-            'code'       => $code,
-            'trainer_id' => $user['id'],
-            'club_id'    => $club['club_id'] ?? null,
-            'created_by' => $user['id'],
-            'first_name' => Validate::nullableString($data['first_name'] ?? null),
-            'last_name'  => Validate::nullableString($data['last_name'] ?? null),
-            'phone'      => Validate::nullableString($data['phone'] ?? null),
-            'height_cm'  => $data['height_cm'] ?? null,
-            'weight_kg'  => $data['weight_kg'] ?? null,
-            'expires_at' => date('Y-m-d H:i:s', strtotime('+' . self::INVITE_EXPIRES_DAYS . ' days')),
-        ]);
+        $pdo->beginTransaction();
+        try {
+            $limit = Limits::athleteInviteBlock($pdo, $user['id'], $club['club_id'] ?? null);
+            if ($limit !== null) {
+                $pdo->rollBack();
+                Response::error(...$limit);
+                return;
+            }
+
+            $pdo->prepare(
+                "INSERT INTO invitations (id, code, trainer_id, club_id, invited_role, created_by,
+                                          first_name, last_name, phone, height_cm, weight_kg, expires_at)
+                 VALUES (:id, :code, :trainer_id, :club_id, 'athlete', :created_by,
+                         :first_name, :last_name, :phone, :height_cm, :weight_kg, :expires_at)"
+            )->execute([
+                'id'         => Uuid::v4(),
+                'code'       => $code,
+                'trainer_id' => $user['id'],
+                'club_id'    => $club['club_id'] ?? null,
+                'created_by' => $user['id'],
+                'first_name' => Validate::nullableString($data['first_name'] ?? null),
+                'last_name'  => Validate::nullableString($data['last_name'] ?? null),
+                'phone'      => Validate::nullableString($data['phone'] ?? null),
+                'height_cm'  => $data['height_cm'] ?? null,
+                'weight_kg'  => $data['weight_kg'] ?? null,
+                'expires_at' => date('Y-m-d H:i:s', strtotime('+' . self::INVITE_EXPIRES_DAYS . ' days')),
+            ]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
 
         Response::ok(['code' => $code], 201);
     }
@@ -232,22 +252,8 @@ final class AthleteController
     public static function club(): void
     {
         $user = Auth::requireUser();
-        $club = self::trainerClub($user['id']);
+        $club = Limits::trainerClub(Database::connection(), $user['id']);
 
         Response::ok(['club' => $club ?: null]);
-    }
-
-    private static function trainerClub(string $trainerId): ?array
-    {
-        $stmt = Database::connection()->prepare(
-            "SELECT m.club_id, c.name
-             FROM memberships m
-             JOIN clubs c ON c.id = m.club_id
-             WHERE m.user_id = :user_id AND m.role = 'trainer' AND m.status = 'active'
-             ORDER BY m.joined_at ASC LIMIT 1"
-        );
-        $stmt->execute(['user_id' => $trainerId]);
-
-        return $stmt->fetch() ?: null;
     }
 }

@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -54,6 +55,7 @@ final class SupplementController
 
         $athleteId = (string) $data['athlete_id'];
         Acl::require(Acl::isTrainerOf($user['id'], $athleteId), 'This athlete is not on your roster.');
+        Limits::requireWritable($user['id'], $athleteId);
 
         $title = self::title($data['title']);
         $items = self::items($data['items'], $user['id']);

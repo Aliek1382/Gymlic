@@ -181,6 +181,9 @@ final class Settings
                 'bank_name'      => self::text($v['bank_name'] ?? null, 60),
                 'instructions'   => self::text($v['instructions'] ?? null, 1000),
                 'expiring_days'  => self::int($v['expiring_days'] ?? null, 7, 1, 60),
+                // Days after a paid plan ends during which everything still
+                // works (only a banner says so); see Subscriptions::status.
+                'grace_days'     => self::int($v['grace_days'] ?? null, 7, 0, 60),
                 // Payment receipts (see Receipts): whether the image/PDF is
                 // mandatory, the size ceiling after the browser has shrunk
                 // it, and how many days after review the file is deleted
@@ -189,10 +192,11 @@ final class Settings
                 'receipt_required'       => self::bool($v['receipt_required'] ?? null, true),
                 'receipt_max_mb'         => self::int($v['receipt_max_mb'] ?? null, 3, 1, 10),
                 'receipt_retention_days' => self::int($v['receipt_retention_days'] ?? null, 7, 0, 365),
-                // Trainer subscriptions (TrainerBilling): when on, a trainer
-                // working outside a club needs an active plan, within its
-                // athlete cap, to invite new athletes. Off until the admin
-                // has set the plans up.
+                // Plan limits (Limits): when on, every cap of the trainer and
+                // club plans is enforced: invites and their acceptance, the
+                // free plan for a trainer without a paid one, and suspending
+                // the athletes above it once a paid plan has ended. Off until
+                // the day selling starts.
                 'trainer_enforce'        => self::bool($v['trainer_enforce'] ?? null, false),
             ],
             // Notification texts; see Templates.

@@ -73,7 +73,7 @@ export const ADMIN_SIDEBAR_GROUPS: AdminNavGroup[] = [
     title: "مالی",
     items: [
       { label: "درخواست‌های پرداخت", href: "/admin/payments", icon: ReceiptText, permission: "finance" },
-      { label: "اشتراک باشگاه‌ها", href: "/admin/subscriptions", icon: CalendarClock, permission: "finance" },
+      { label: "اشتراک‌ها و پلن‌ها", href: "/admin/subscriptions", icon: CalendarClock, permission: "finance" },
       { label: "پلن‌ها", href: "/admin/plans", icon: Tags, permission: "finance" },
       { label: "اشتراک مربیان", href: "/admin/trainer-billing", icon: UserCheck, permission: "finance" },
       { label: "سطح پلن‌ها", href: "/admin/tiers", icon: Layers, permission: "finance" },

@@ -217,7 +217,9 @@ answer `ready: false` / 409 and the pages hide the feature.
   invite (`TrainerBilling::inviteBlock`, HTTP 402 from `POST /athlete-invites`).
   Existing athletes are never removed, and a trainer who is an active member of
   a club is never asked to pay. Set the plans up and let trainers subscribe
-  before switching it on.
+  before switching it on. Once `plan-limits-update.sql` has run, the switch is
+  called "اعمال محدودیت پلن‌ها" and `Limits` replaces this rule (see "Plans
+  and limits" below).
 - Discount codes, reminders and the revenue report are part 2, below.
 
 ### Trainer subscriptions, part 2: discount codes, reminders, revenue
@@ -253,6 +255,60 @@ simply off.
   (`AdminBillingController::revenueSummary`: totals, by month, by plan, with
   the club/trainer split), its CSV, the overview's total revenue and pending
   count, and a new CSV `GET /admin/export/trainer-payments`.
+
+### Plans and limits for trainers and clubs (phase 1)
+
+The database step is `schema/plan-limits-update.sql` (after the two trainer
+billing files). `src/Limits.php` is the one place that says what a plan
+allows; every cap is checked on the server.
+
+- **Plans.** Trainers: رایگان (free, 3 athletes, never expires), نقره‌ای,
+  طلایی, الماسی in `trainer_plans`; clubs: نقره‌ای, طلایی, الماسی in `plans`
+  (members and trainers). The plans sold before are switched off, not
+  deleted. Each plan also carries the limits of the later phases (custom
+  exercises, templates, history months, report level), stored but not yet
+  checked. NULL = unlimited.
+- **Every trainer has a plan.** Without a paid one it is the free plan; no row
+  is needed. Subscriptions now point at their plan (`plan_id`), so editing a
+  plan's caps reaches everyone on it at once (the plan dialogs preview who
+  ends up above the new cap).
+- **States**, worked out from `expires_at` on every read, no cron: active →
+  expiring (`billing.expiring_days` before the end) → grace
+  (`billing.grace_days` after it, everything still works, a banner says so)
+  → expired. An expired trainer is on the free plan again: the athletes above
+  its cap are put on hold (`trainer_athletes.suspended_by_plan`) on the first
+  request that looks at the trainer after the grace days, the trainer's pick
+  (`/subscription/athletes`) first, then the most recently seen. On hold =
+  plans and data read-only, no new plans, no messages either way; nothing is
+  deleted. Any renewal brings everyone back. An expired club can't invite
+  anyone new; nobody is put on hold.
+- **Mid-period purchases:** the same plan extends from the current end; a
+  different plan starts on approval with its full period (no carry-over).
+- **Club trainers:** an invite from a trainer who belongs to a club carries
+  the club and counts against the club's member cap; only athletes coached
+  outside a club count against the trainer's own plan.
+- **Caps are checked when an invite is created and again when it is accepted**
+  (with the trainer's or club's row locked). An invite that no longer fits is
+  revoked and its sender notified.
+- **Admin** (`/admin/subscriptions`, finance permission): every trainer and
+  club with plan, state, dates and usage; filters, search, CSV. Per account:
+  activate a plan from a start date (today or earlier) to any end date, with
+  an optional payment received outside the site; change the dates (an end
+  today or earlier starts the grace days); extend; a cap override on that
+  subscription (cleared by a plan change, ignored after the grace days);
+  bring a trainer's athletes back; revoke open invites. Each change can be
+  previewed and is logged with before/after and a note (the history tab).
+- **Nothing is enforced** until "اعمال محدودیت پلن‌ها" (`billing.trainer_enforce`)
+  is on in `/admin/billing`; until then caps are only shown. The one check
+  that predates this, a club manager's invite against the member cap, runs
+  either way.
+- **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
+  plan opens; the seven plans carry their tier (free/silver/gold/diamond),
+  and a plan counts as running for tiers through its grace days too. The
+  free tier's caps from /admin/tiers apply only while enforcement is off;
+  with it on, the plans' caps (`Limits`) decide.
+- `tests/plan-limits-scenarios.php` runs the scenarios against a local API and
+  a `*_dev` database (never the live site).
 
 ## Athlete → club card-to-card membership payments
 

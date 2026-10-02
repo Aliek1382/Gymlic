@@ -62,6 +62,7 @@ interface ConversationResponse {
     last_name: string | null;
     avatar_url: string | null;
   }[];
+  read_only?: boolean;
 }
 
 /**
@@ -97,7 +98,7 @@ export async function getConversation(counterpartId: string): Promise<Conversati
     createdAt: row.created_at,
   }));
 
-  return { plans, messages };
+  return { plans, messages, readOnly: data.read_only ?? false };
 }
 
 export type OutgoingMessage =

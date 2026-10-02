@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy, Loader2, UserPlus } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import { Label } from "@/components/ui/label";
-import { getErrorMessage } from "@/lib/get-error-message";
+import { showPlanLimitError } from "@/features/trainer-billing/utils/plan-limit-toast";
 import { useCreateTrainerInvite } from "../hooks/use-create-trainer-invite";
 import {
   addTrainerSchema,
@@ -36,6 +36,7 @@ export function AddTrainerDialog({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [invitedPhone, setInvitedPhone] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
   const createInvite = useCreateTrainerInvite();
 
   const form = useForm<AddTrainerFormValues>({
@@ -54,7 +55,7 @@ export function AddTrainerDialog({
       setInviteLink(`${window.location.origin}/join/${code}`);
       setInvitedPhone(values.phone ? values.phone : null);
     } catch (error) {
-      toast.error(getErrorMessage(error, "دعوت مربی با خطا مواجه شد."));
+      showPlanLimitError(error, "دعوت مربی با خطا مواجه شد.", { href: "/finance", navigate: router.push });
     }
   }
 

@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -69,22 +70,40 @@ final class TrainerController
 
         $data = Validate::body();
         $code = Uuid::v4();
+        $pdo = Database::connection();
 
-        Database::connection()->prepare(
-            "INSERT INTO invitations (id, code, club_id, invited_role, created_by,
-                                      first_name, last_name, phone, expires_at)
-             VALUES (:id, :code, :club_id, 'trainer', :created_by,
-                     :first_name, :last_name, :phone, :expires_at)"
-        )->execute([
-            'id'         => Uuid::v4(),
-            'code'       => $code,
-            'club_id'    => $clubId,
-            'created_by' => $user['id'],
-            'first_name' => Validate::nullableString($data['first_name'] ?? null),
-            'last_name'  => Validate::nullableString($data['last_name'] ?? null),
-            'phone'      => Validate::nullableString($data['phone'] ?? null),
-            'expires_at' => date('Y-m-d H:i:s', strtotime('+' . self::INVITE_EXPIRES_DAYS . ' days')),
-        ]);
+        $pdo->beginTransaction();
+        try {
+            // The plan's trainer cap, once the plan limits are enforced.
+            $limit = Limits::clubTrainerInviteBlock($pdo, $clubId);
+            if ($limit !== null) {
+                $pdo->rollBack();
+                Response::error(...$limit);
+                return;
+            }
+
+            $pdo->prepare(
+                "INSERT INTO invitations (id, code, club_id, invited_role, created_by,
+                                          first_name, last_name, phone, expires_at)
+                 VALUES (:id, :code, :club_id, 'trainer', :created_by,
+                         :first_name, :last_name, :phone, :expires_at)"
+            )->execute([
+                'id'         => Uuid::v4(),
+                'code'       => $code,
+                'club_id'    => $clubId,
+                'created_by' => $user['id'],
+                'first_name' => Validate::nullableString($data['first_name'] ?? null),
+                'last_name'  => Validate::nullableString($data['last_name'] ?? null),
+                'phone'      => Validate::nullableString($data['phone'] ?? null),
+                'expires_at' => date('Y-m-d H:i:s', strtotime('+' . self::INVITE_EXPIRES_DAYS . ' days')),
+            ]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
 
         Response::ok(['code' => $code], 201);
     }

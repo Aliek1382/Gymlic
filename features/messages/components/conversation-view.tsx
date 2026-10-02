@@ -209,7 +209,11 @@ export function ConversationView({
         )}
       </div>
 
-      {conversation.isLoading ? null : (
+      {conversation.isLoading ? null : conversation.data?.readOnly ? (
+        <p className="border-t border-border px-4 py-3 text-center text-xs text-muted-foreground">
+          این گفت‌وگو به‌خاطر پایان اشتراک مربی فعلاً فقط‌خواندنی است؛ با تمدید اشتراک دوباره باز می‌شود.
+        </p>
+      ) : (
         <MessageComposer
           plans={plans}
           isPending={sendMessage.isPending}

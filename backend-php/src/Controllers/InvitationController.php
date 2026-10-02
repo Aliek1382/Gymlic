@@ -5,6 +5,7 @@ namespace Gymlic\Controllers;
 
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
@@ -44,6 +45,14 @@ final class InvitationController
             }
             if ($user['account_type'] !== null && $user['account_type'] !== 'athlete') {
                 throw new \RuntimeException('account_type_mismatch');
+            }
+
+            // The trainer's or club's cap may have shrunk since the invite
+            // was sent (Limits). A refused invite is used up.
+            $limit = Limits::acceptAthleteBlock($pdo, $invite, $user['id']);
+            if ($limit !== null) {
+                self::refuseForLimit($pdo, $invite, $limit);
+                return;
             }
 
             // Set account type + names, copy phone only if the account doesn't have one yet.
@@ -195,6 +204,12 @@ final class InvitationController
                 throw new \RuntimeException('already_member');
             }
 
+            $limit = Limits::acceptTrainerBlock($pdo, $invite['club_id']);
+            if ($limit !== null) {
+                self::refuseForLimit($pdo, $invite, $limit);
+                return;
+            }
+
             $pdo->prepare(
                 'UPDATE profiles SET account_type = :account_type,
                    first_name = COALESCE(first_name, :first_name),
@@ -267,6 +282,34 @@ final class InvitationController
             $pdo->rollBack();
             self::respondForException($e);
         }
+    }
+
+    /**
+     * Ends an invite that no longer fits the plan: it is revoked, whoever
+     * sent it is told, and the person accepting gets the reason.
+     *
+     * @param array<string, mixed> $invite
+     * @param array{0: int, 1: string, 2: string} $limit
+     */
+    private static function refuseForLimit(PDO $pdo, array $invite, array $limit): void
+    {
+        $pdo->prepare("UPDATE invitations SET status = 'revoked' WHERE id = :id")->execute(['id' => $invite['id']]);
+        Templates::notify(
+            $pdo,
+            'invitation_limit_reached',
+            $invite['created_by'],
+            null,
+            'broadcast',
+            ['name' => trim(($invite['first_name'] ?? '') . ' ' . ($invite['last_name'] ?? '')) ?: 'دعوت‌شده'],
+            match (true) {
+                $invite['invited_role'] === 'trainer'        => '/trainers',
+                $invite['club_id'] === null                  => '/subscription',
+                $invite['trainer_id'] === $invite['created_by'] => '/athletes',
+                default                                      => '/members',
+            }
+        );
+        $pdo->commit();
+        Response::error(...$limit);
     }
 
     private static function respondForException(Throwable $e): void

@@ -8,6 +8,7 @@ use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\TrainerBilling;
 use Gymlic\TrainerDiscounts;
@@ -25,12 +26,13 @@ final class ExportController
         'payments'      => 'finance',
         'trainer-payments' => 'finance',
         'subscriptions' => 'finance',
+        'trainer-subscriptions' => 'finance',
         'revenue'       => 'finance',
     ];
 
     private const ACCOUNT_TYPES = ['club' => 'باشگاه', 'trainer' => 'مربی', 'athlete' => 'ورزشکار'];
     private const REQUEST_STATUS = ['pending' => 'در انتظار', 'approved' => 'تأییدشده', 'rejected' => 'ردشده'];
-    private const SUB_STATUS = ['active' => 'فعال', 'expiring' => 'رو به اتمام', 'expired' => 'منقضی'];
+    private const SUB_STATUS = ['active' => 'فعال', 'expiring' => 'رو به اتمام', 'grace' => 'در مهلت', 'expired' => 'منقضی'];
     private const CLUB_STATUS = ['active' => 'فعال', 'suspended' => 'تعلیق', 'pending' => 'در انتظار تأیید'];
 
     public static function download(array $params): void
@@ -47,6 +49,7 @@ final class ExportController
             'payments'      => self::payments(),
             'trainer-payments' => self::trainerPayments(),
             'subscriptions' => self::subscriptions(),
+            'trainer-subscriptions' => self::trainerSubscriptions(),
             'revenue'       => self::revenue(),
         };
 
@@ -181,6 +184,35 @@ final class ExportController
                 $r['subscription_remaining_days'],
                 $r['member_count'],
                 $r['member_capacity'] ?? 'بدون محدودیت',
+            ];
+        }
+        return $rows;
+    }
+
+    /** Every trainer's plan and usage (see Limits). @return list<list<mixed>> */
+    private static function trainerSubscriptions(): array
+    {
+        $rows = [['مربی', 'موبایل', 'باشگاه', 'پلن', 'وضعیت', 'شروع', 'پایان', 'پایان مهلت', 'ورزشکار فعال', 'دعوت در انتظار', 'غیرفعال به‌خاطر پلن', 'سقف ورزشکار', 'سقف دستی']];
+        if (!Limits::ready()) {
+            return $rows;
+        }
+        foreach (PlanAccountsController::trainerRows(Database::connection()) as $r) {
+            $l = $r['limits'];
+            $sub = $l['subscription'];
+            $rows[] = [
+                $r['name'],
+                $r['phone'],
+                $r['club_name'],
+                $l['plan']['name'],
+                self::SUB_STATUS[$l['status']] ?? $l['status'],
+                Jalali::format($sub['started_at'] ?? null),
+                Jalali::format($sub['expires_at'] ?? null),
+                Jalali::format($sub['grace_ends_at'] ?? null),
+                $l['usage']['active'],
+                $l['usage']['pending_invites'],
+                $l['usage']['suspended'],
+                $l['max_athletes'] ?? 'بدون محدودیت',
+                $l['override'] ? 'بله' : '',
             ];
         }
         return $rows;

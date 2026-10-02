@@ -11,11 +11,10 @@ use PDO;
  * admin (TrainerBillingController). Clubs have the equivalent in
  * Subscriptions; the expiry arithmetic is shared with it.
  *
- * Nothing here blocks anyone until the admin switches enforcement on
- * (billing settings, trainer_enforce). Then a trainer working outside a club
- * needs an active plan, within its athlete cap, to invite new athletes;
- * athletes they already have are never taken away. A trainer who belongs to a
- * club is covered by the club's subscription and is never asked to pay.
+ * What a plan allows, and what happens when it ends, is Limits; nothing
+ * blocks anyone until the admin switches enforcement on (billing settings,
+ * trainer_enforce). A trainer who belongs to a club is covered by the club's
+ * subscription for the athletes they coach there.
  */
 final class TrainerBilling
 {
@@ -31,7 +30,7 @@ final class TrainerBilling
             && Database::hasTable('trainer_payment_requests');
     }
 
-    /** @return array{plan_name: string, max_athletes: ?int, started_at: string, expires_at: string, status: string, remaining_days: int}|null */
+    /** @return array{plan_name: string, max_athletes: ?int, started_at: string, expires_at: ?string, status: string, remaining_days: ?int}|null */
     public static function subscription(PDO $pdo, string $trainerId): ?array
     {
         $stmt = $pdo->prepare(
@@ -48,36 +47,53 @@ final class TrainerBilling
             'max_athletes'   => $row['max_athletes'] === null ? null : (int) $row['max_athletes'],
             'started_at'     => $row['started_at'],
             'expires_at'     => $row['expires_at'],
-            'status'         => (string) Subscriptions::status($row['expires_at']),
-            'remaining_days' => (int) Subscriptions::remainingDays($row['expires_at']),
+            // No expiry: the free plan, which is always running.
+            'status'         => Subscriptions::status($row['expires_at']) ?? 'active',
+            'remaining_days' => Subscriptions::remainingDays($row['expires_at']),
         ];
     }
 
     /**
-     * Adds $days to the trainer's subscription, counted from the current
-     * expiry while it is still running (renewing early costs nothing), else
-     * from now, and takes the plan's name and athlete cap. Returns the new
-     * expiry. Call inside a transaction.
+     * Adds $days to the trainer's subscription and returns the new expiry.
+     * The same plan counts from the current expiry while it is still
+     * running (renewing early costs nothing); a different plan starts now
+     * with its full period, the old plan's remaining days not carried over.
+     * $planId null keeps the trainer's plan (gift days). A plan change drops
+     * an admin's override; any renewal brings back athletes suspended when
+     * the last plan ended. Call inside a transaction.
      */
-    public static function extend(PDO $pdo, string $trainerId, int $days, string $planName, ?int $maxAthletes): string
+    public static function extend(PDO $pdo, string $trainerId, int $days, string $planName, ?int $maxAthletes, ?string $planId = null): string
     {
-        $stmt = $pdo->prepare('SELECT expires_at FROM trainer_subscriptions WHERE trainer_id = :id FOR UPDATE');
+        $ready = Limits::ready();
+        $stmt = $pdo->prepare(
+            'SELECT expires_at, ' . ($ready ? 'plan_id' : 'NULL AS plan_id') . ' FROM trainer_subscriptions WHERE trainer_id = :id FOR UPDATE'
+        );
         $stmt->execute(['id' => $trainerId]);
-        $current = $stmt->fetchColumn();
+        $current = $stmt->fetch();
 
-        $running = $current !== false && strtotime((string) $current) > time();
-        $base = $running ? (int) strtotime((string) $current) : time();
+        $running = $current !== false && $current['expires_at'] !== null && strtotime((string) $current['expires_at']) > time();
+        $samePlan = $planId === null || ($current !== false && $current['plan_id'] === $planId);
+        $continue = $running && $samePlan;
+        $base = $continue ? (int) strtotime((string) $current['expires_at']) : time();
         $expiresAt = date('Y-m-d H:i:s', (int) strtotime('+' . $days . ' days', $base));
 
         $pdo->prepare(
-            'INSERT INTO trainer_subscriptions (trainer_id, plan_name, max_athletes, started_at, expires_at)
-             VALUES (:id, :plan, :cap, NOW(), :expires)
+            'INSERT INTO trainer_subscriptions (trainer_id, ' . ($ready ? 'plan_id, ' : '') . 'plan_name, max_athletes, started_at, expires_at)
+             VALUES (:id, ' . ($ready ? ':plan_id, ' : '') . ':plan, :cap, NOW(), :expires)
              ON DUPLICATE KEY UPDATE plan_name = VALUES(plan_name), max_athletes = VALUES(max_athletes),
                                      expires_at = VALUES(expires_at)'
-            . ($running ? '' : ', started_at = NOW()')
+            . ($continue ? '' : ', started_at = NOW()')
+            . ($ready && $planId !== null ? ', plan_id = VALUES(plan_id)' : '')
+            . ($ready && !$samePlan ? ', override_on = 0, override_max_athletes = NULL' : '')
             // A new expiry earns its own reminders.
             . (self::remindersReady() ? ', reminder_stage = 0' : '')
-        )->execute(['id' => $trainerId, 'plan' => $planName, 'cap' => $maxAthletes, 'expires' => $expiresAt]);
+        )->execute(['id' => $trainerId, 'plan' => $planName, 'cap' => $maxAthletes, 'expires' => $expiresAt]
+            + ($ready ? ['plan_id' => $planId ?? ($current['plan_id'] ?? null)] : []));
+
+        if ($ready) {
+            Limits::restore($pdo, $trainerId);
+            Limits::resync($pdo, $trainerId);
+        }
 
         return $expiresAt;
     }
@@ -136,6 +152,7 @@ final class TrainerBilling
                 [
                     'date' => Jalali::format($row['expires_at'], true),
                     'days' => (string) max(1, (int) ceil((strtotime($row['expires_at']) - time()) / 86400)),
+                    'grace_date' => Jalali::format((string) Subscriptions::graceEndsAt($row['expires_at']), true),
                 ],
                 '/subscription'
             );
@@ -199,6 +216,10 @@ final class TrainerBilling
     /**
      * Why this trainer may not invite another athlete right now, in words for
      * the trainer; null when they may (including whenever enforcement is off).
+     * The free tier's cap (Tiers) applies while enforcement is off. With it on,
+     * once plan-limits-update.sql has run, the caps are Limits' job; the rule
+     * at the end is the one from before it, for the days between the backend
+     * upload and running the database update.
      */
     public static function inviteBlock(PDO $pdo, string $trainerId): ?string
     {
@@ -219,7 +240,8 @@ final class TrainerBilling
             }
         }
 
-        if (!Settings::get('billing')['trainer_enforce'] || !self::ready()) {
+        // Once plan-limits-update.sql has run, Limits decides the rest.
+        if (Limits::ready() || !Settings::get('billing')['trainer_enforce'] || !self::ready()) {
             return null;
         }
 
