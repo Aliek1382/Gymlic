@@ -309,8 +309,9 @@ final class Limits
      *
      * @param array<string, mixed> $user
      * @param string $section the section's name in the message, e.g. «پایبندی هفتگی»
+     * @param string $verb what the trainer would do with it: «دیدن», «دریافت»
      */
-    public static function requireReport(array $user, string $need, string $section): void
+    public static function requireReport(array $user, string $need, string $section, string $verb = 'دیدن'): void
     {
         if (($user['account_type'] ?? null) !== 'trainer' || !self::enforcing()) {
             return;
@@ -324,7 +325,7 @@ final class Limits
             402,
             'report_locked',
             $section . ($plan !== null ? ' از پلن «' . $plan . '» فعال است' : ' در پلن فعلی شما نیست')
-                . '. برای دیدن آن، پلن خود را ارتقا دهید.'
+                . '. برای ' . $verb . ' آن، پلن خود را ارتقا دهید.'
         );
         exit;
     }

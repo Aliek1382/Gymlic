@@ -333,7 +333,14 @@ allows; every cap is checked on the server.
   `report_locked`): any level gets the athlete count and the dashboard
   counters; `basic` this (Jalali) month's plans, completion rates and athlete
   progress with its completed-plans list; `full` weekly adherence;
-  `full_excel` the Excel export. NULL is unlimited. Grace days keep the paid
+  `full_excel` the Excel export (`GET /reports/trainer/excel`,
+  `ReportExportController`: three right-to-left sheets, Jalali dates, only
+  the trainer's own athletes, each download logged as `report_excel_export`).
+  The .xlsx is written by `Xlsx` (no library: a few XML files zipped by
+  hand); the adherence counting is ported to `TrainingWeek`, and
+  `tests/training-week-parity.mjs` checks it against the panel's. This is
+  not the full data export of phase 5, which stays a separate endpoint.
+  NULL is unlimited. Grace days keep the paid
   level, then the free plan's `count`; no limit while enforcement is off or
   the trainer's club has a plan running. Never limited: progress
   measurements, earnings and its summary, streaks, birthdays, anything an

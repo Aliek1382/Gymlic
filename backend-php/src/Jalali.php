@@ -55,12 +55,21 @@ final class Jalali
             : $text;
     }
 
-    /** 'Y-m-d' of the first day of the Jalali month that $timestamp (default now) falls in. */
-    public static function monthStart(?int $timestamp = null): string
+    public const MONTH_NAMES = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+
+    /** 'Y-m-d' of the first day of the Jalali month $date ('Y-m-d', default today in Tehran) falls in. */
+    public static function monthStart(?string $date = null): string
     {
-        $timestamp ??= time();
-        [, , $jd] = self::fromGregorian((int) date('Y', $timestamp), (int) date('n', $timestamp), (int) date('j', $timestamp));
-        return date('Y-m-d', strtotime('-' . ($jd - 1) . ' days', strtotime(date('Y-m-d', $timestamp))));
+        $day = new \DateTimeImmutable(($date ?? (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Tehran')))->format('Y-m-d')) . ' 12:00:00');
+        [, , $jd] = self::fromGregorian((int) $day->format('Y'), (int) $day->format('n'), (int) $day->format('j'));
+        return $day->modify('-' . ($jd - 1) . ' days')->format('Y-m-d');
+    }
+
+    /** «مهر 1405» for a 'Y-m-d' date. */
+    public static function monthLabel(string $date): string
+    {
+        [$jy, $jm] = self::fromGregorian((int) substr($date, 0, 4), (int) substr($date, 5, 2), (int) substr($date, 8, 2));
+        return self::MONTH_NAMES[$jm - 1] . ' ' . $jy;
     }
 
     public static function isLeapYear(int $jy): bool

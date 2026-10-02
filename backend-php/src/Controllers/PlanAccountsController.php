@@ -51,6 +51,7 @@ final class PlanAccountsController
         'plan_activate', 'plan_dates', 'plan_extend', 'plan_override', 'plan_reactivate', 'plan_revoke_invites',
         'trainer_payment_approved', 'trainer_payment_rejected', 'trainer_subscription_granted',
         'payment_request_approved', 'subscription_renewed', 'subscription_gifted', 'subscription_set',
+        'report_excel_export',
     ];
 
     // ---- Reading ---------------------------------------------------------

@@ -16,18 +16,23 @@ export function reportIncludes(have: ReportLevel, need: ReportLevel): boolean {
 /**
  * Which report sections the trainer's plan opens (server: Limits reports).
  * The server refuses a locked section on its own; this only saves the page
- * from asking for it. Shares the subscription page's query.
+ * from asking for it. Shares the subscription page's query, but always asks
+ * again on opening the page: queries are kept across visits, and a plan
+ * that changed since would show the wrong sections.
  */
 export function useReportAccess() {
-  const { data, isLoading } = useQuery({
+  const { data, isFetchedAfterMount } = useQuery({
     queryKey: ["trainer-billing"],
     queryFn: getTrainerBilling,
+    staleTime: 0,
   });
   const effective: ReportLevel = data?.limits?.reports?.effective ?? "full_excel";
   const plans = data?.plans ?? [];
 
   return {
-    loading: isLoading,
+    // A failed request counts as fetched too: the page then falls back to
+    // the server's own refusal rather than waiting forever.
+    loading: !isFetchedAfterMount,
     allows: (need: ReportLevel) => reportIncludes(effective, need),
     /** The cheapest plan on sale that opens `need`, for "from plan X". */
     planFor: (need: ReportLevel) =>

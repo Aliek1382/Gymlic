@@ -3,6 +3,7 @@ import {
   TrainerCompletionRates,
   TrainerMonthlyStats,
   TrainerWeeklyAdherence,
+  ReportExcelButton,
   ReportSection,
 } from "@/features/reports";
 import { RoleGate } from "@/features/authentication/components/role-gate";
@@ -13,11 +14,14 @@ export default function ReportsPage() {
   return (
     <RoleGate allow={["trainer"]}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">گزارش‌ها</h1>
-          <p className="text-sm text-muted-foreground">
-            آمار کلی فعالیت شما و روند پیشرفت ورزشکاران را اینجا ببینید.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">گزارش‌ها</h1>
+            <p className="text-sm text-muted-foreground">
+              آمار کلی فعالیت شما و روند پیشرفت ورزشکاران را اینجا ببینید.
+            </p>
+          </div>
+          <ReportExcelButton />
         </div>
 
         <TrainerMonthlyStats />

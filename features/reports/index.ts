@@ -3,6 +3,7 @@ export * from "./components/trainer-completion-rates";
 export * from "./components/athlete-progress-list";
 export * from "./components/trainer-weekly-adherence";
 export * from "./components/report-locked-card";
+export * from "./components/report-excel-button";
 
 export * from "./hooks/use-trainer-monthly-stats";
 export * from "./hooks/use-trainer-completion-rates";
