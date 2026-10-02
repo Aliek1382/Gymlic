@@ -12,6 +12,8 @@ export function useDeleteTemplate(kind: PlanKind) {
     mutationFn: (templateId: string) => deleteTemplate(kind, templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["athletes", "templates", kind] });
+      // A deleted template frees a place under the plan's cap.
+      queryClient.invalidateQueries({ queryKey: ["trainer-billing"] });
     },
   });
 }

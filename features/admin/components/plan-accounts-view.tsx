@@ -314,6 +314,26 @@ function AccountRow({ account, onManage }: { account: PlanAccount; onManage: () 
             {account.limits.usage.suspended > 0 && (
               <p className="text-xs text-warning">{formatNumber(account.limits.usage.suspended)} غیرفعال</p>
             )}
+            {account.limits.content && (
+              <p className="text-xs">
+                {account.limits.content.via_club ? (
+                  <>
+                    {formatNumber(account.limits.content.exercises.used)} حرکت ·{" "}
+                    {formatNumber(account.limits.content.templates.used)} قالب (باشگاه)
+                  </>
+                ) : (
+                  <>
+                    <span className={account.limits.content.exercises.over ? "text-destructive" : undefined}>
+                      {formatNumber(account.limits.content.exercises.used)} / {showCap(account.limits.content.exercises.max)} حرکت
+                    </span>
+                    {" · "}
+                    <span className={account.limits.content.templates.over ? "text-destructive" : undefined}>
+                      {formatNumber(account.limits.content.templates.used)} / {showCap(account.limits.content.templates.max)} قالب
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
           </>
         ) : (
           <>

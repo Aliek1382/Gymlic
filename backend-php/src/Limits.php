@@ -93,11 +93,13 @@ final class Limits
         $stmt->execute(['id' => $trainerId]);
         $row = $stmt->fetch();
 
+        $club = self::trainerClub($pdo, $trainerId);
         return self::trainerShape(
             $pdo,
             $row === false ? null : $row,
             self::trainerUsage($pdo, $trainerId),
-            self::trainerClub($pdo, $trainerId)
+            $club,
+            self::contentUsage($pdo, $trainerId) + ['club_running' => $club !== null && self::clubRunning($pdo, $club['club_id'])]
         );
     }
 
@@ -116,9 +118,12 @@ final class Limits
      * @param array<string, mixed>|null $row
      * @param array{active: int, pending_invites: int, suspended: int} $usage
      * @param array{club_id: string, name: string}|null $club
+     * @param array{exercises: int, templates: int, club_running: bool}|null $content
+     *        the trainer's own custom exercises and templates, and whether
+     *        their club's plan is running (which lifts both caps)
      * @return array<string, mixed>
      */
-    public static function trainerShape(PDO $pdo, ?array $row, array $usage, ?array $club): array
+    public static function trainerShape(PDO $pdo, ?array $row, array $usage, ?array $club, ?array $content = null): array
     {
         $free = self::freePlan($pdo);
         $plan = $free;
@@ -157,6 +162,7 @@ final class Limits
 
         $cap = $override ? $subscription['override_max_athletes'] : $plan['max_athletes'];
         $enforcing = self::enforcing();
+        $contentShape = $content === null ? null : self::contentShape($plan, $content);
         // While a paid plan (or its grace days) still runs: how many would
         // be suspended once it ends, at today's numbers.
         $atRisk = 0;
@@ -174,10 +180,104 @@ final class Limits
             'max_athletes' => $cap,
             'free_max_athletes' => $free['max_athletes'],
             'usage'        => $usage,
-            'over_cap'     => $cap !== null && $usage['active'] > $cap,
+            // Above any cap: athletes, or (phase 2) custom exercises / templates.
+            'over_cap'     => ($cap !== null && $usage['active'] > $cap)
+                || ($contentShape['exercises']['over'] ?? false) || ($contentShape['templates']['over'] ?? false),
             'suspend_after_grace' => $atRisk,
             'club'         => $club,
+            'content'      => $contentShape,
         ];
+    }
+
+    // ---- Custom exercises and templates (phase 2) ------------------------
+
+    /**
+     * Used and allowed of the trainer's own custom exercises and templates
+     * (workout and nutrition together). The caps are the plan in effect's,
+     * so the free plan's once a paid one has ended; none while the trainer's
+     * club has a plan running (club plans don't cap these). What a trainer
+     * already has above a cap stays usable: only making more is refused.
+     *
+     * @param array<string, mixed> $plan
+     * @param array{exercises: int, templates: int, club_running: bool} $content
+     * @return array<string, mixed>
+     */
+    private static function contentShape(array $plan, array $content): array
+    {
+        $viaClub = $content['club_running'];
+        $out = ['via_club' => $viaClub];
+        foreach (['exercises' => 'max_custom_exercises', 'templates' => 'max_templates'] as $key => $column) {
+            $max = $viaClub ? null : ($plan[$column] ?? null);
+            $out[$key] = ['used' => $content[$key], 'max' => $max, 'over' => $max !== null && $content[$key] > $max];
+        }
+        return $out;
+    }
+
+    /** @return array{exercises: int, templates: int} */
+    public static function contentUsage(PDO $pdo, string $trainerId): array
+    {
+        $own = ContentLibrary::ownOnly();
+        $stmt = $pdo->prepare(
+            "SELECT
+               (SELECT COUNT(*) FROM exercises WHERE created_by = :t1) AS exercises,
+               (SELECT COUNT(*) FROM workout_assignments WHERE trainer_id = :t2 AND is_template = 1{$own})
+               + (SELECT COUNT(*) FROM nutrition_assignments WHERE trainer_id = :t3 AND is_template = 1{$own}) AS templates"
+        );
+        $stmt->execute(['t1' => $trainerId, 't2' => $trainerId, 't3' => $trainerId]);
+        return array_map('intval', $stmt->fetch());
+    }
+
+    /** Whether the club's subscription is running, grace days included. */
+    public static function clubRunning(PDO $pdo, string $clubId): bool
+    {
+        $stmt = $pdo->prepare('SELECT MAX(expires_at) FROM subscriptions WHERE club_id = :id');
+        $stmt->execute(['id' => $clubId]);
+        $expires = $stmt->fetchColumn();
+        return in_array(Subscriptions::status($expires === false ? null : $expires), ['active', 'expiring', 'grace'], true);
+    }
+
+    /**
+     * Whether the trainer may make one more custom exercise ($kind
+     * 'exercises') or template ('templates'); null when they may (always,
+     * while enforcement is off). Call inside the transaction that inserts:
+     * the trainer's profile row is locked, so two requests can't both take
+     * the last place.
+     *
+     * @return array{0: int, 1: string, 2: string}|null
+     */
+    public static function contentBlock(PDO $pdo, string $trainerId, string $kind): ?array
+    {
+        if (!self::enforcing()) {
+            return null;
+        }
+        self::lock($pdo, 'profiles', $trainerId);
+        $limits = self::forTrainer($pdo, $trainerId);
+        $content = $limits['content'][$kind] ?? null;
+        if ($content === null || $content['max'] === null || $content['used'] < $content['max']) {
+            return null;
+        }
+
+        if ($kind === 'templates') {
+            if ($content['max'] === 0) {
+                $plan = self::cheapestWith($pdo, 'max_templates');
+                return [402, 'template_limit', 'قالب شخصی در پلن فعلی شما نیست' . ($plan !== null ? '؛ از پلن «' . $plan . '» فعال است' : '')
+                    . '. برای ساخت قالب، پلن خود را ارتقا دهید.'];
+            }
+            return [402, 'template_limit', 'به سقف قالب پلن خود رسیده‌اید (' . self::fa($content['max'])
+                . ' قالب). برای قالب تازه، یکی را حذف کنید یا پلن خود را ارتقا دهید.'];
+        }
+        return [402, 'exercise_limit', 'به سقف حرکت سفارشی پلن خود رسیده‌اید (' . self::fa($content['max'])
+            . ' حرکت). برای حرکت تازه، یکی را حذف کنید یا پلن خود را ارتقا دهید.'];
+    }
+
+    /** The cheapest plan on sale that allows some of $column (NULL = unlimited counts), by name. */
+    private static function cheapestWith(PDO $pdo, string $column): ?string
+    {
+        $name = $pdo->query(
+            "SELECT name FROM trainer_plans WHERE is_active = 1 AND is_free = 0 AND ({$column} IS NULL OR {$column} > 0)
+             ORDER BY price_toman ASC LIMIT 1"
+        )->fetchColumn();
+        return $name === false ? null : (string) $name;
     }
 
     /** The free trainer plan (the first one, should the admin ever add another). @return array<string, mixed> */
@@ -637,6 +737,7 @@ final class Limits
             'over_cap'     => false,
             'suspend_after_grace' => 0,
             'club'         => self::trainerClub($pdo, $trainerId),
+            'content'      => null,
         ];
     }
 

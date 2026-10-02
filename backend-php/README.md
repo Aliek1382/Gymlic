@@ -302,6 +302,18 @@ allows; every cap is checked on the server.
   is on in `/admin/billing`; until then caps are only shown. The one check
   that predates this, a club manager's invite against the member cap, runs
   either way.
+- **Custom exercises and templates (phase 2).** A trainer's own custom
+  exercises (`max_custom_exercises`) and templates, workout and nutrition
+  together (`max_templates`), are capped by the plan in effect; no caps while
+  the trainer's club has a plan running. Checked with the trainer's row
+  locked on every path that makes one: `POST /library/exercises`, saving or
+  copying a template (`POST /plans/{kind}/templates`, with or without
+  `source_id`) and copying from the content library; 402 `exercise_limit` /
+  `template_limit`. What a trainer already has above the cap (after a paid
+  plan ended) stays usable and editable; only making more is refused.
+  Trainers can now edit their own exercises (`PATCH /library/exercises/{id}`)
+  and delete one no plan uses (`DELETE`, 409 `in_use` otherwise), which frees
+  a place. Food and supplement libraries have no cap.
 - **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
   plan opens; the seven plans carry their tier (free/silver/gold/diamond),
   and a plan counts as running for tiers through its grace days too. The

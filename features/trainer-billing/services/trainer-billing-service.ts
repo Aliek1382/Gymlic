@@ -85,6 +85,23 @@ export interface TrainerLimits {
   /** While a paid plan or its grace days run: athletes that would be suspended when it ends. */
   suspend_after_grace: number;
   club: { club_id: string; name: string } | null;
+  /**
+   * The trainer's own custom exercises and templates (workout and nutrition
+   * together) against the plan's caps; max null = unlimited. via_club: the
+   * trainer's club has a plan running, which lifts both caps.
+   */
+  content: {
+    via_club: boolean;
+    exercises: ContentUsage;
+    templates: ContentUsage;
+  } | null;
+}
+
+export interface ContentUsage {
+  used: number;
+  max: number | null;
+  /** Above the cap (after a paid plan ended): kept and usable, only new ones are refused. */
+  over: boolean;
 }
 
 export interface TrainerPaymentRequest {

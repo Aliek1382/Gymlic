@@ -10,6 +10,8 @@ const PLAN_LIMIT_CODES = new Set([
   "capacity_full",
   "trainer_capacity_full",
   "club_plan_required",
+  "exercise_limit",
+  "template_limit",
 ]);
 
 /**

@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Apple, Bookmark, Dumbbell, Loader2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPersianDate } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { showPlanLimitError } from "@/features/trainer-billing/utils/plan-limit-toast";
 import { cn } from "@/lib/utils";
 import { SupplementPlansPanel } from "@/features/supplements";
 import { useFeatureEnabled } from "@/features/site-settings";
@@ -78,6 +80,7 @@ export function PlanDialog({
   const plans = usePlans(kind, target, open);
   const savePlan = useSavePlan(kind, target);
   const templates = useTemplates(kind, open);
+  const router = useRouter();
   const saveTemplate = useSaveTemplate(kind);
   const applyTemplate = useApplyTemplate(kind, target);
   const deleteTemplate = useDeleteTemplate(kind);
@@ -206,7 +209,7 @@ export function PlanDialog({
       });
       toast.success("به‌عنوان قالب ذخیره شد.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "ذخیره قالب با خطا مواجه شد."));
+      showPlanLimitError(error, "ذخیره قالب با خطا مواجه شد.", { href: "/subscription", navigate: router.push });
     }
   }
 

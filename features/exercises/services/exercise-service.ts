@@ -49,6 +49,24 @@ export async function recordExerciseUsage(exerciseId: string): Promise<void> {
   await api.post(`/library/exercises/${exerciseId}/usage`);
 }
 
+/** The trainer's own custom exercise. */
+export async function updateExercise(
+  id: string,
+  input: { name: string; nameEn: string | null; description: string | null; muscleGroup: string }
+): Promise<void> {
+  await api.patch(`/library/exercises/${id}`, {
+    name: input.name,
+    name_en: input.nameEn,
+    description: input.description,
+    muscle_group: input.muscleGroup,
+  });
+}
+
+/** Refused (409 in_use) while a plan or template uses it. */
+export async function deleteExercise(id: string): Promise<void> {
+  await api.delete(`/library/exercises/${id}`);
+}
+
 export async function createExercise(input: {
   name: string;
   nameEn: string | null;

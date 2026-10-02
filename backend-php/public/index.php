@@ -269,6 +269,8 @@ $router->delete('/workout-day-logs/{id}', fn (array $p) => WorkoutLogController:
 $router->get('/library/{kind}', fn (array $p) => LibraryController::list($p));
 $router->get('/library/{kind}/picker', fn (array $p) => LibraryController::picker($p));
 $router->post('/library/{kind}', fn (array $p) => LibraryController::create($p));
+$router->patch('/library/{kind}/{id}', fn (array $p) => LibraryController::updateOwn($p));
+$router->delete('/library/{kind}/{id}', fn (array $p) => LibraryController::deleteOwn($p));
 $router->post('/library/{kind}/{id}/usage', fn (array $p) => LibraryController::recordUsage($p));
 
 $router->get('/content-library', fn () => ContentLibraryController::list());

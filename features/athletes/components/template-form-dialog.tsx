@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
@@ -16,7 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getErrorMessage } from "@/lib/get-error-message";
+import {
+  TemplatesUpgradeDialog,
+  useTemplatesClosed,
+} from "@/features/trainer-billing/components/content-usage";
+import { showPlanLimitError } from "@/features/trainer-billing/utils/plan-limit-toast";
 import { NutritionFormatHint } from "./nutrition-format-hint";
 import { PlanFormatHint } from "./plan-format-hint";
 import { PLAN_DESCRIPTION_PLACEHOLDER } from "../constants/athletes";
@@ -46,7 +51,10 @@ const KIND_COPY: Record<
 };
 
 export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const templates = useTemplatesClosed();
   const saveTemplate = useSaveTemplate(kind);
   const copy = KIND_COPY[kind];
 
@@ -72,7 +80,7 @@ export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
       toast.success("قالب جدید ذخیره شد.");
       handleOpenChange(false);
     } catch (error) {
-      toast.error(getErrorMessage(error, "ذخیره قالب با خطا مواجه شد."));
+      showPlanLimitError(error, "ذخیره قالب با خطا مواجه شد.", { href: "/subscription", navigate: router.push });
     }
   }
 
@@ -83,10 +91,12 @@ export function TemplateFormDialog({ kind }: { kind: PlanKind }) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <Button onClick={() => setOpen(true)}>
+      {/* Open on the free plan too: the click says where templates come from. */}
+      <Button onClick={() => (templates.closed ? setUpgradeOpen(true) : setOpen(true))}>
         <Plus />
         {copy.trigger}
       </Button>
+      <TemplatesUpgradeDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} planName={templates.planName} />
 
       <DialogContent>
         <DialogHeader>

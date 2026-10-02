@@ -8,9 +8,11 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { TableCardSkeleton } from "@/features/dashboard/components/shared/dashboard-skeleton";
+import { ContentUsageLine } from "@/features/trainer-billing/components/content-usage";
 import { useExercises } from "../hooks/use-exercises";
 import { getMuscleGroupBadgeVariant } from "../utils/muscle-group-color";
 import type { ExerciseSummary } from "../types/exercise-types";
+import { CustomExerciseActions } from "./custom-exercise-actions";
 import { ExerciseMediaButton } from "./exercise-media";
 
 function groupByMuscle(exercises: ExerciseSummary[]) {
@@ -72,6 +74,7 @@ export function ExerciseList() {
 
   return (
     <div className="space-y-4">
+      <ContentUsageLine kind="exercises" />
       <div className="relative">
         <Search className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -129,6 +132,7 @@ export function ExerciseList() {
                       media={exercise}
                       description={exercise.description}
                     />
+                    {exercise.isCustom && <CustomExerciseActions exercise={exercise} />}
                   </div>
                 </div>
               ))}

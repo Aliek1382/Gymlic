@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -117,17 +118,36 @@ final class LibraryController
         $id = Uuid::v4();
 
         if ($kindName === 'exercises') {
-            Database::connection()->prepare(
-                'INSERT INTO exercises (id, name, name_en, description, muscle_group, created_by)
-                 VALUES (:id, :name, :name_en, :description, :muscle_group, :created_by)'
-            )->execute([
-                'id'           => $id,
-                'name'         => (string) $data['name'],
-                'name_en'      => Validate::nullableString($data['name_en'] ?? null),
-                'description'  => Validate::nullableString($data['description'] ?? null),
-                'muscle_group' => (string) $data['muscle_group'],
-                'created_by'   => $user['id'],
-            ]);
+            // A trainer's custom exercises are capped by their plan (Limits),
+            // checked with their row locked so two requests can't both take
+            // the last place.
+            $pdo = Database::connection();
+            $pdo->beginTransaction();
+            try {
+                $limit = $user['account_type'] === 'trainer' ? Limits::contentBlock($pdo, $user['id'], 'exercises') : null;
+                if ($limit !== null) {
+                    $pdo->rollBack();
+                    Response::error(...$limit);
+                    return;
+                }
+                $pdo->prepare(
+                    'INSERT INTO exercises (id, name, name_en, description, muscle_group, created_by)
+                     VALUES (:id, :name, :name_en, :description, :muscle_group, :created_by)'
+                )->execute([
+                    'id'           => $id,
+                    'name'         => (string) $data['name'],
+                    'name_en'      => Validate::nullableString($data['name_en'] ?? null),
+                    'description'  => Validate::nullableString($data['description'] ?? null),
+                    'muscle_group' => (string) $data['muscle_group'],
+                    'created_by'   => $user['id'],
+                ]);
+                $pdo->commit();
+            } catch (\Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
         } elseif ($kindName === 'supplements') {
             Database::connection()->prepare(
                 'INSERT INTO supplements (id, name, name_en, description, created_by)
@@ -163,6 +183,102 @@ final class LibraryController
         }
 
         Response::ok(['id' => $id], 201);
+    }
+
+    /**
+     * PATCH /library/exercises/{id}: the trainer's own custom exercise
+     * (name, English name, description, muscle group). Allowed above the
+     * plan's cap too: only making new ones is capped.
+     */
+    public static function updateOwn(array $params): void
+    {
+        $user = Auth::requireUser();
+        if ($params['kind'] !== 'exercises') {
+            Response::error(404, 'not_found', 'Unknown library.');
+            return;
+        }
+        $entry = self::ownExercise($user['id'], $params['id']);
+        if ($entry === null) {
+            return;
+        }
+
+        $data = Validate::body();
+        $sets = [];
+        $bind = ['id' => $params['id']];
+        foreach (['name', 'muscle_group'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $value = trim((string) $data[$key]);
+                if ($value === '' || mb_strlen($value) > 255) {
+                    Response::error(400, 'invalid_' . $key, $key === 'name' ? 'نام حرکت را وارد کنید.' : 'گروه عضلانی را انتخاب کنید.');
+                    return;
+                }
+                $sets[] = "{$key} = :{$key}";
+                $bind[$key] = $value;
+            }
+        }
+        foreach (['name_en', 'description'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $sets[] = "{$key} = :{$key}";
+                $bind[$key] = Validate::nullableString($data[$key]);
+            }
+        }
+        if ($sets === []) {
+            Response::error(400, 'no_fields', 'Nothing to update.');
+            return;
+        }
+
+        Database::connection()->prepare('UPDATE exercises SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($bind);
+        Response::ok(['ok' => true]);
+    }
+
+    /**
+     * DELETE /library/exercises/{id}: the trainer's own custom exercise, when
+     * no plan uses it (plans point at it, so removing it would break them);
+     * frees a place under the plan's cap.
+     */
+    public static function deleteOwn(array $params): void
+    {
+        $user = Auth::requireUser();
+        if ($params['kind'] !== 'exercises') {
+            Response::error(404, 'not_found', 'Unknown library.');
+            return;
+        }
+        if (self::ownExercise($user['id'], $params['id']) === null) {
+            return;
+        }
+
+        $pdo = Database::connection();
+        $used = $pdo->prepare('SELECT COUNT(DISTINCT d.assignment_id) FROM workout_plan_exercises e
+                               JOIN workout_plan_days d ON d.id = e.day_id WHERE e.exercise_id = :id');
+        $used->execute(['id' => $params['id']]);
+        $plans = (int) $used->fetchColumn();
+        if ($plans > 0) {
+            Response::error(409, 'in_use', "این حرکت در {$plans} برنامه یا قالب استفاده شده و حذف نمی‌شود. اول آن را از برنامه‌ها بردارید.");
+            return;
+        }
+
+        try {
+            $pdo->prepare('DELETE FROM exercises WHERE id = :id AND created_by = :user')
+                ->execute(['id' => $params['id'], 'user' => $user['id']]);
+        } catch (\PDOException $e) {
+            // A plan picked it up between the check and the delete.
+            Response::error(409, 'in_use', 'این حرکت همین حالا در برنامه‌ای استفاده شد و حذف نمی‌شود.');
+            return;
+        }
+        Response::ok(['ok' => true]);
+    }
+
+    /** The caller's own custom exercise, or null after a 404. @return array<string, mixed>|null */
+    private static function ownExercise(string $userId, string $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT id, name FROM exercises WHERE id = :id AND created_by = :user');
+        $stmt->execute(['id' => $id, 'user' => $userId]);
+        $row = $stmt->fetch();
+        if ($row === false) {
+            Response::error(404, 'not_found', 'این حرکت پیدا نشد یا متعلق به شما نیست.');
+            return null;
+        }
+        return $row;
     }
 
     /**

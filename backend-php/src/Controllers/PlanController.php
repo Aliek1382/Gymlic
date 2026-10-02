@@ -291,6 +291,16 @@ final class PlanController
         $id = Uuid::v4();
         $pdo->beginTransaction();
         try {
+            // Templates (workout and nutrition together) are capped by the
+            // trainer's plan; this is also the path for copying a template
+            // (source_id of a template) and saving a plan as one.
+            $limit = Limits::contentBlock($pdo, $user['id'], 'templates');
+            if ($limit !== null) {
+                $pdo->rollBack();
+                Response::error(...$limit);
+                return;
+            }
+
             $pdo->prepare(
                 "INSERT INTO {$table} (id, trainer_id, title, description, is_template)
                  VALUES (:id, :trainer_id, :title, :description, 1)"

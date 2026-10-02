@@ -13,6 +13,8 @@ export function useSaveTemplate(kind: PlanKind) {
       saveTemplate(kind, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["athletes", "templates", kind] });
+      // The "2 of 5 templates" line reads the trainer's limits.
+      queryClient.invalidateQueries({ queryKey: ["trainer-billing"] });
     },
   });
 }
