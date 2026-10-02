@@ -35,9 +35,16 @@ try {
     $supplements = 0;
     fwrite(STDERR, 'supplement reminders failed: ' . $e->getMessage() . "\n");
 }
+// Athletes' birthdays, once each per year, for their trainer (from 8 am).
+try {
+    $birthdays = Gymlic\Birthdays::sendDue(Gymlic\Database::connection());
+} catch (Throwable $e) {
+    $birthdays = 0;
+    fwrite(STDERR, 'birthday reminders failed: ' . $e->getMessage() . "\n");
+}
 // Every notification is also pushed to phones and desktops; this sweep delivers
 // the ones nothing pushed at creation time (admin broadcasts, or a push that never ran).
 $pushed = Gymlic\Controllers\PushController::deliverPending();
-$summary = "reminders sent: {$sent}, supplement reminders: {$supplements}, notifications pushed: {$pushed}";
+$summary = "reminders sent: {$sent}, supplement reminders: {$supplements}, birthdays: {$birthdays}, notifications pushed: {$pushed}";
 Gymlic\CronHeartbeat::record('calendar-reminders', $summary);
 echo date('Y-m-d H:i:s'), " {$summary}\n";

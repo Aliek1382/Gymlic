@@ -3,6 +3,7 @@ import type {
   TrainerActivityItem,
   TrainerDraftPlan,
   TrainerStatistics,
+  UpcomingBirthday,
 } from "../types/dashboard-types";
 
 interface TrainerDashboardResponse {
@@ -32,6 +33,15 @@ interface TrainerDashboardResponse {
     invite_last_name: string | null;
     kind: "workout" | "nutrition";
   }[];
+  /** Absent from a backend older than the birthday reminder. */
+  birthdays?: {
+    athlete_id: string;
+    first_name: string | null;
+    last_name: string | null;
+    date: string;
+    days_left: number;
+    age: number;
+  }[];
 }
 
 /** Counts, recent activity and unfinished drafts in one request. */
@@ -39,6 +49,7 @@ export async function getTrainerDashboard(): Promise<{
   statistics: TrainerStatistics;
   activity: TrainerActivityItem[];
   drafts: TrainerDraftPlan[];
+  birthdays: UpcomingBirthday[];
 }> {
   const data = await api.get<TrainerDashboardResponse>("/dashboard/trainer");
 
@@ -70,6 +81,13 @@ export async function getTrainerDashboard(): Promise<{
       description: null,
       type: row.kind,
       updatedAt: row.updated_at,
+    })),
+    birthdays: (data.birthdays ?? []).map((row) => ({
+      athleteId: row.athlete_id,
+      name: fullName(row.first_name, row.last_name, "ورزشکار"),
+      date: row.date,
+      daysLeft: row.days_left,
+      age: row.age,
     })),
   };
 }

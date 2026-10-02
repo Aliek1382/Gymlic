@@ -847,5 +847,106 @@ check($lvl->fetchColumn() === 'elite', "an athlete's level is kept");
 $lvl->execute(['u' => $after, 'c' => $clubId]);
 check($status === 200 && $lvl->fetchColumn() === 'basic', 'after the update: a club invite is made and accepted as before', $status);
 
+// ---- Birthday reminder ------------------------------------------------------
+
+/** A birth date $years ago whose Jalali month and day are $offset days from today (Tehran). */
+function birthDateFor(int $years, int $offset): string
+{
+    $target = new DateTimeImmutable("+{$offset} days", new DateTimeZone('Asia/Tehran'));
+    [, $tm, $td] = \Gymlic\Jalali::fromGregorian((int) $target->format('Y'), (int) $target->format('n'), (int) $target->format('j'));
+    $guess = $target->modify("-{$years} years");
+    for ($d = -3; $d <= 3; $d++) {
+        $c = $guess->modify("{$d} days");
+        [, $m, $dd] = \Gymlic\Jalali::fromGregorian((int) $c->format('Y'), (int) $c->format('n'), (int) $c->format('j'));
+        if ($m === $tm && $dd === $td) {
+            return $c->format('Y-m-d');
+        }
+    }
+    throw new RuntimeException('no matching birth date');
+}
+
+echo "\nBirthday reminder\n";
+[$b1, $b1Id] = account('birthday1', 'trainer');
+$bAthletes = [];
+foreach ([[30, 0], [25, 3], [40, 20]] as $i => [$years, $offset]) {
+    [, $inv] = invite($b1);
+    [, , $id] = accept($inv['code'], 'birthday-athlete' . ($i + 1));
+    $pdo->prepare('UPDATE profiles SET birth_date = :d WHERE id = :id')->execute(['d' => birthDateFor($years, $offset), 'id' => $id]);
+    $bAthletes[] = $id;
+}
+[$status, $dash] = call('GET', '/dashboard/trainer', null, $b1);
+$byId = array_column($dash['birthdays'] ?? [], null, 'athlete_id');
+check($status === 200 && ($byId[$bAthletes[0]]['days_left'] ?? null) === 0 && ($byId[$bAthletes[0]]['age'] ?? null) === 30,
+    "the dashboard lists today's birthday, with the age reached", $dash['birthdays'] ?? null);
+check(($byId[$bAthletes[1]]['days_left'] ?? null) === 3 && !isset($byId[$bAthletes[2]]), 'and one in 3 days, but not one in 20 days');
+$count = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE recipient_id = :t AND type = 'athlete_birthday'");
+$count->execute(['t' => $b1Id]);
+$sentNow = (int) $count->fetchColumn();
+$hour = (int) (new DateTimeImmutable('now', new DateTimeZone('Asia/Tehran')))->format('G');
+if ($hour >= 8) {
+    check($sentNow === 1, "the trainer is notified of today's birthday", $sentNow);
+    call('GET', '/dashboard/trainer', null, $b1);
+    $count->execute(['t' => $b1Id]);
+    check((int) $count->fetchColumn() === 1, 'only once');
+} else {
+    check($sentNow === 0, 'before 8 in the morning (Tehran) nobody is notified yet', $sentNow);
+}
+$pdo->prepare("UPDATE trainer_athletes SET status = 'suspended' WHERE trainer_id = :t AND athlete_id = :a")->execute(['t' => $b1Id, 'a' => $bAthletes[1]]);
+[, $dash] = call('GET', '/dashboard/trainer', null, $b1);
+check(!in_array($bAthletes[1], array_column($dash['birthdays'] ?? [], 'athlete_id'), true), 'a suspended athlete is left out');
+
+// ---- The trainer's logo and watermark on a printed plan --------------------
+
+/** POSTs an image as multipart field "file". */
+function uploadImage(string $path, string $file, string $token): array
+{
+    global $api;
+    $ch = curl_init($api . $path);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token, 'Origin: http://localhost:3000'],
+        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($file, 'image/png', 'logo.png')],
+    ]);
+    $raw = (string) curl_exec($ch);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $json = json_decode($raw, true);
+    return [$status, is_array($json) ? ($json['data'] ?? $json) : ['raw' => $raw]];
+}
+
+echo "\nPrint logo and watermark\n";
+[$status, $branding] = call('GET', '/trainer/print-branding', null, $b1);
+if (($branding['ready'] ?? false) === true) {
+    $pdo->exec('ALTER TABLE trainer_profiles DROP COLUMN print_logo_url, DROP COLUMN print_watermark');
+    [$status, $branding] = call('GET', '/trainer/print-branding', null, $b1);
+}
+check($status === 200 && $branding['ready'] === false, 'before its update: not ready, and the print keeps its defaults');
+check(call('PUT', '/trainer/print-branding', ['watermark' => 'x'], $b1)[0] === 503, 'saving says the update is needed');
+[$status, $result] = call('POST', '/admin/system/migrations/trainer-print-branding/run', null, $adminToken);
+check($status === 200 && ($result['ok'] ?? false), 'the update runs from the admin panel', $result);
+[$status, $branding] = call('PUT', '/trainer/print-branding', ['watermark' => '  باشگاه   بدنسازی تست '], $b1);
+check($status === 200 && $branding['watermark'] === 'باشگاه بدنسازی تست', 'the trainer saves a watermark', $branding);
+check(call('PUT', '/trainer/print-branding', ['watermark' => str_repeat('ب', 61)], $b1)[0] === 400, 'longer than 60 is refused');
+$png = tempnam(sys_get_temp_dir(), 'logo') . '.png';
+$img = imagecreatetruecolor(40, 20);
+imagesavealpha($img, true);
+imagefill($img, 0, 0, imagecolorallocatealpha($img, 0, 0, 0, 127));
+imagefilledrectangle($img, 10, 5, 30, 15, imagecolorallocate($img, 200, 0, 0));
+imagepng($img, $png);
+[$status, $branding] = uploadImage('/trainer/print-branding/logo', $png, $b1);
+check($status === 200 && str_contains((string) ($branding['logo_url'] ?? ''), 'print-logo.jpg'), 'the trainer uploads a logo', [$status, $branding]);
+$stored = @imagecreatefromjpeg(rtrim((string) (require __DIR__ . '/../config.php')['uploads']['dir'], '/') . "/{$b1Id}/print-logo.jpg");
+$corner = $stored ? imagecolorat($stored, 0, 0) : 0;
+check($stored !== false && (($corner >> 16) & 0xFF) > 240 && ($corner & 0xFF) > 240, 'a transparent background turns white, not black');
+[, $me] = call('GET', '/auth/me', null, $b1);
+check(($me['print']['watermark'] ?? null) === 'باشگاه بدنسازی تست' && str_contains((string) ($me['print']['logo_url'] ?? ''), 'print-logo'), "the trainer's session carries them for the print");
+$athleteToken = call('POST', '/auth/login', ['email' => $pdo->query("SELECT email FROM profiles WHERE id = '{$bAthletes[0]}'")->fetchColumn(), 'password' => 'password123'])[1]['token'] ?? '';
+[, $me] = call('GET', '/auth/me', null, $athleteToken);
+check(($me['print']['watermark'] ?? null) === 'باشگاه بدنسازی تست', "and the athlete's carries their trainer's");
+check(call('PUT', '/trainer/print-branding', ['watermark' => 'x'], $athleteToken)[0] === 403, 'an athlete cannot set them');
+[$status, $branding] = call('DELETE', '/trainer/print-branding/logo', null, $b1);
+check($status === 200 && $branding['logo_url'] === null, 'the logo can be removed (back to the photo)');
+
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);

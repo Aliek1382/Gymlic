@@ -259,6 +259,11 @@ final class Templates
             'group' => 'reminders', 'label' => 'یادآوری اندازه‌گیری دوره‌ای', 'to' => 'ورزشکار',
             'title' => 'یادآوری ثبت اندازه‌گیری', 'body' => 'وقتشه دوباره اندازه‌هاتو ثبت کنی.', 'vars' => [],
         ],
+        'athlete_birthday' => [
+            'group' => 'reminders', 'label' => 'تولد ورزشکار', 'to' => 'مربی',
+            'title' => 'امروز تولد {name} است', 'body' => '{name} امروز {age} ساله می‌شود. تبریک بگویید.',
+            'vars' => ['name' => 'نام ورزشکار', 'age' => 'سنی که امروز به آن می‌رسد'],
+        ],
         'supplement_reminder' => [
             'group' => 'reminders', 'label' => 'یادآوری مصرف مکمل', 'to' => 'ورزشکار',
             'title' => 'زمان مصرف مکمل', 'body' => '{details}', 'vars' => ['details' => 'فهرست مکمل‌ها و مقدار هرکدام'],

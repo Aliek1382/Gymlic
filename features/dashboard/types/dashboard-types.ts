@@ -94,6 +94,18 @@ export interface TrainerActivityItem {
   date: string;
 }
 
+/** An athlete's birthday in the coming week (Jalali month and day). */
+export interface UpcomingBirthday {
+  athleteId: string;
+  name: string;
+  /** "YYYY-MM-DD" of the day it falls on. */
+  date: string;
+  /** 0 = today. */
+  daysLeft: number;
+  /** The age reached on that day. */
+  age: number;
+}
+
 export interface TrainerDraftPlan {
   id: string;
   athleteName: string;

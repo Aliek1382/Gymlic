@@ -283,6 +283,12 @@ final class Migrations
             'title' => 'نام تازهٔ ستون سطح عضویت ورزشکار در باشگاه (membership_level)',
             'check' => [['column', 'memberships', 'membership_level'], ['column', 'invitations', 'membership_level']],
         ],
+        [
+            'id'    => 'trainer-print-branding',
+            'file'  => 'trainer-print-branding-update.sql',
+            'title' => 'لوگو و واترمارک مربی روی برنامه‌ی چاپی',
+            'check' => [['column', 'trainer_profiles', 'print_logo_url'], ['column', 'trainer_profiles', 'print_watermark']],
+        ],
     ];
 
     /**

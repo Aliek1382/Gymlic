@@ -61,6 +61,9 @@ export interface AuthContext {
   trainerVerified: boolean;
   /** The plan tier that decides which sections open; null = not limited. */
   tier: { key: TierKey; label: string } | null;
+  /** On a printed plan: the trainer's logo (null = their photo) and watermark (null = «جیم‌لیک — name»). */
+  printLogoUrl: string | null;
+  printWatermark: string | null;
 }
 
 interface MeResponse {
@@ -92,6 +95,11 @@ interface MeResponse {
   } | null;
   /** Absent from a backend older than plan tiers. */
   tier?: { key: TierKey; label: string } | null;
+  /**
+   * A printed plan's logo and watermark: the trainer's own, or an athlete's
+   * trainer's. Null before its database update; absent from an older backend.
+   */
+  print?: { logo_url: string | null; watermark: string | null } | null;
   /** Absent from a backend older than admin roles. */
   admin?: {
     level: "super" | "staff";
@@ -151,6 +159,8 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     trainerAvatarUrl: trainer?.avatar_url ?? null,
     trainerVerified: !!trainer?.is_verified,
     tier: data.tier ?? null,
+    printLogoUrl: data.print?.logo_url ?? null,
+    printWatermark: data.print?.watermark ?? null,
   };
 }
 

@@ -366,6 +366,19 @@ allows; every cap is checked on the server.
   platform's plans; it was called `plan_tier` until
   `membership-level-update.sql`. Until that SQL runs, the invitation code
   falls back to the old name (`InvitationController::levelColumn`).
+- **Birthday reminder** (`Birthdays`). An athlete's birthday is their Jalali
+  month and day (Esfand 30 falls on Esfand 29 in a common year). The
+  trainer's dashboard lists the coming week's; on the day, from 8 am Tehran,
+  the trainer gets the `athlete_birthday` notification once per athlete per
+  year: sent by `cron/calendar-reminders.php`, and also when the trainer
+  opens the dashboard, so it works on a host without that cron. Active
+  athletes only (not suspended).
+- **Print logo and watermark** (`PrintBrandingController`,
+  `trainer-print-branding-update.sql`): the trainer's own logo and watermark
+  text on a printed / PDF plan, theirs and their athletes'. /auth/me carries
+  them (`print`); until the SQL runs the print keeps the profile photo and
+  «جیم‌لیک — name». Uploaded images are laid on white before the JPEG
+  re-encode, so a transparent logo (or avatar) no longer turns black.
 - **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
   plan opens; the seven plans carry their tier (free/silver/gold/diamond),
   and a plan counts as running for tiers through its grace days too. The
