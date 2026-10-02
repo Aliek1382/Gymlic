@@ -129,7 +129,7 @@ final class AdminBillingController
         }
         $amount = (int) $amount;
 
-        $expiresAt = Subscriptions::extend($pdo, $club['id'], (int) $plan['duration_days'], $plan['name']);
+        $expiresAt = Subscriptions::extend($pdo, $club['id'], (int) $plan['duration_days'], $plan['name'], $plan['id']);
 
         // The plan's member cap, as approving a payment for it would. A
         // suspended club stays suspended: that was a separate decision.

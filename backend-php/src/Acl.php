@@ -106,6 +106,12 @@ final class Acl
 
         $pdo = Database::connection();
 
+        // An athlete suspended by their trainer's plan (Limits) can't message
+        // the trainer, nor the trainer them, whatever else they share.
+        if (Limits::pairSuspended($pdo, $userId, $otherId)) {
+            return false;
+        }
+
         $stmt = $pdo->prepare(
             "SELECT 1 FROM trainer_athletes
              WHERE status = 'active'

@@ -21,8 +21,14 @@ export interface BillingSettings {
   receipt_max_mb: number;
   /** Days after review that receipt files are deleted; 0 keeps them. */
   receipt_retention_days: number;
-  /** Whether a trainer outside a club needs an active plan to invite athletes. */
+  /**
+   * Whether the plan limits are enforced: invites within each plan's caps,
+   * the free plan for trainers without a paid one, and athletes above it put
+   * on hold once a paid plan's grace days are over.
+   */
   trainer_enforce: boolean;
+  /** Days after a paid plan ends during which everything still works. */
+  grace_days: number;
 }
 
 export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
@@ -36,6 +42,7 @@ export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
   receipt_max_mb: 3,
   receipt_retention_days: 7,
   trainer_enforce: false,
+  grace_days: 7,
 };
 
 export async function getBillingSettings(): Promise<{ settings: BillingSettings; storageReady: boolean }> {
@@ -216,7 +223,13 @@ export async function deleteDiscountCode(id: string) {
 // CSV exports
 // ---------------------------------------------------------------------------
 
-export type ExportKind = "users" | "payments" | "trainer-payments" | "subscriptions" | "revenue";
+export type ExportKind =
+  | "users"
+  | "payments"
+  | "trainer-payments"
+  | "subscriptions"
+  | "trainer-subscriptions"
+  | "revenue";
 
 /**
  * Like the database backup, a CSV is a file rather than JSON: fetched with

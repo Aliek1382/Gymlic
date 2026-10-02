@@ -10,12 +10,14 @@ import type { SubscriptionInfo } from "../../types/dashboard-types";
 const STATUS_LABEL: Record<SubscriptionInfo["status"], string> = {
   active: "فعال",
   expiring: "در حال اتمام",
+  grace: "در مهلت",
   expired: "منقضی شده",
 };
 
 const STATUS_VARIANT: Record<SubscriptionInfo["status"], "success" | "warning" | "destructive"> = {
   active: "success",
   expiring: "warning",
+  grace: "warning",
   expired: "destructive",
 };
 
@@ -69,8 +71,10 @@ export function SubscriptionCard({
               <div className="flex items-center gap-2 rounded-xl bg-warning-muted px-3 py-2 text-xs text-warning">
                 <TriangleAlert className="size-4 shrink-0" />
                 {subscription.status === "expired"
-                  ? "اشتراک باشگاه منقضی شده است. برای ادامه استفاده تمدید کنید."
-                  : "اشتراک باشگاه به‌زودی منقضی می‌شود."}
+                  ? "اشتراک باشگاه منقضی شده است. برای دعوت عضو یا مربی تازه، تمدید کنید."
+                  : subscription.status === "grace"
+                    ? "اشتراک باشگاه تمام شده؛ در مهلت چندروزه همه‌چیز عادی است، ولی بعد از آن دعوت عضو و مربی تازه بسته می‌شود. تمدید کنید."
+                    : "اشتراک باشگاه به‌زودی منقضی می‌شود."}
               </div>
             )}
           </div>

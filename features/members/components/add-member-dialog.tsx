@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy, Loader2, UserPlus } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getErrorMessage } from "@/lib/get-error-message";
+import { showPlanLimitError } from "@/features/trainer-billing/utils/plan-limit-toast";
 import { useMembershipPlans } from "@/features/club";
 import { NO_PLAN_VALUE } from "../constants/members";
 import { useClubTrainers } from "../hooks/use-club-trainers";
@@ -52,6 +52,7 @@ export function AddMemberDialog({
   const [copied, setCopied] = useState(false);
   const trainers = useClubTrainers(clubId);
   const plans = useMembershipPlans(clubId, { activeOnly: true });
+  const router = useRouter();
   const createInvite = useCreateMemberInvite();
 
   const form = useForm<AddMemberFormValues>({
@@ -84,7 +85,7 @@ export function AddMemberDialog({
       setInviteLink(`${window.location.origin}/join/${code}`);
       setInvitedPhone(values.phone ? values.phone : null);
     } catch (error) {
-      toast.error(getErrorMessage(error, "افزودن عضو با خطا مواجه شد."));
+      showPlanLimitError(error, "افزودن عضو با خطا مواجه شد.", { href: "/finance", navigate: router.push });
     }
   }
 

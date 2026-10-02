@@ -7,8 +7,10 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Subscriptions;
+use PDO;
 
 /**
  * Read-only aggregates. Each of these fired 8-13 parallel Supabase queries
@@ -33,6 +35,23 @@ final class DashboardController
             $stmt->execute(['athlete_id' => $user['id']]);
             $row = $stmt->fetch() ?: null;
             $payload[$key] = $row === null ? null : PlanController::lockForAthlete($kind, [$row])[0];
+        }
+
+        // Trainers whose plan has put this athlete on hold (Limits): the
+        // athlete sees their plans read-only and can't message them.
+        $payload['suspended_trainers'] = [];
+        if (Limits::ready()) {
+            $trainers = $pdo->prepare('SELECT trainer_id FROM trainer_athletes WHERE athlete_id = :id AND status = \'active\'');
+            $trainers->execute(['id' => $user['id']]);
+            foreach ($trainers->fetchAll(PDO::FETCH_COLUMN) as $trainerId) {
+                Limits::syncTrainer($pdo, (string) $trainerId);
+            }
+            $stmt = $pdo->prepare(
+                "SELECT p.id, p.first_name, p.last_name FROM trainer_athletes ta JOIN profiles p ON p.id = ta.trainer_id
+                 WHERE ta.athlete_id = :id AND ta.status = 'active' AND ta.suspended_by_plan = 1"
+            );
+            $stmt->execute(['id' => $user['id']]);
+            $payload['suspended_trainers'] = $stmt->fetchAll();
         }
 
         Response::ok($payload);
@@ -67,6 +86,8 @@ final class DashboardController
             ]),
             'activity' => self::trainerActivity($user['id'], (int) ($_GET['limit'] ?? 10)),
             'drafts'   => self::trainerDrafts($user['id'], 5),
+            // The plan card and the grace banner (Limits).
+            'plan'     => $user['account_type'] === 'trainer' ? Limits::forTrainer($pdo, $user['id']) : null,
         ]);
     }
 
@@ -183,6 +204,7 @@ final class DashboardController
         if ($subscriptionRow !== null) {
             $subscriptionRow['status'] = Subscriptions::status($subscriptionRow['expires_at']);
         }
+        $limits = Limits::forClub($pdo, $clubId);
 
         $recentMembers = $pdo->prepare(
             "SELECT m.id, m.user_id, m.status, m.joined_at,
@@ -214,8 +236,7 @@ final class DashboardController
                     'trainer_count', 'trainers_this_month', 'trainers_last_month',
                 ]
             ) + [
-                'member_capacity'          => $clubRow['member_capacity'] === null
-                    ? null : (int) $clubRow['member_capacity'],
+                'member_capacity'          => $limits['max_members'],
                 'attendance_this_month'    => $attendanceRates['this_month'],
                 'attendance_last_month'    => $attendanceRates['last_month'],
                 'revenue_sparkline'        => $sparkline,
@@ -223,6 +244,7 @@ final class DashboardController
             'revenue_series'    => Cast::rows($series->fetchAll(), ['total']),
             'plan_distribution' => Cast::rows($planDistribution->fetchAll(), [], ['member_count']),
             'subscription'      => $subscriptionRow,
+            'limits'            => $limits,
             'recent_members'    => $recentMembers->fetchAll(),
             'trainers'          => $trainers->fetchAll(),
         ]);

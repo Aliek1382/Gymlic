@@ -111,6 +111,10 @@ CREATE TABLE trainer_athletes (
   athlete_id CHAR(36) NOT NULL,
   club_id    CHAR(36) NULL,
   status     ENUM('active','pending','suspended') NOT NULL DEFAULT 'active',
+  -- Above the cap of a trainer whose paid plan ended (after the grace days):
+  -- their data is read-only, no new plans or messages. See Limits.
+  suspended_by_plan TINYINT(1) NOT NULL DEFAULT 0,
+  keep_on_downgrade TINYINT(1) NOT NULL DEFAULT 0,  -- the trainer's pick of who stays active
   note       TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_trainer_athlete (trainer_id, athlete_id),
@@ -161,6 +165,12 @@ CREATE TABLE plans (
   price_toman   BIGINT NOT NULL,
   duration_days INT NOT NULL,
   max_members   INT NULL,
+  max_trainers  INT NULL,
+  -- Read by later phases; NULL = unlimited, like the caps.
+  max_custom_exercises INT NULL,
+  max_templates        INT NULL,
+  history_months       INT NULL,
+  report_level         ENUM('count','basic','full','full_excel') NULL,
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -174,13 +184,20 @@ CREATE TABLE plans (
 CREATE TABLE subscriptions (
   id         CHAR(36) NOT NULL PRIMARY KEY,
   club_id    CHAR(36) NOT NULL,
+  plan_id    CHAR(36) NULL,
   plan_name  VARCHAR(255) NOT NULL,
-  status     ENUM('active','expiring','expired') NOT NULL DEFAULT 'active',
+  status     ENUM('active','expiring','grace','expired') NOT NULL DEFAULT 'active',
   started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NOT NULL,
+  -- An admin's caps for this subscription instead of the plan's (NULL = no
+  -- cap); cleared when the plan changes, ignored once the grace days end.
+  override_on           TINYINT(1) NOT NULL DEFAULT 0,
+  override_max_members  INT NULL,
+  override_max_trainers INT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_subscriptions_club (club_id),
-  CONSTRAINT fk_subscriptions_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+  CONSTRAINT fk_subscriptions_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_subscriptions_plan FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
@@ -714,6 +731,11 @@ CREATE TABLE trainer_plans (
   price_toman   BIGINT NOT NULL,
   duration_days INT NOT NULL,
   max_athletes  INT NULL,
+  is_free       TINYINT(1) NOT NULL DEFAULT 0,   -- the plan every trainer has without paying; never expires
+  max_custom_exercises INT NULL,
+  max_templates        INT NULL,
+  history_months       INT NULL,
+  report_level         ENUM('count','basic','full','full_excel') NULL,
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -723,14 +745,19 @@ CREATE TABLE trainer_plans (
 
 CREATE TABLE trainer_subscriptions (
   trainer_id   CHAR(36) NOT NULL PRIMARY KEY,
+  plan_id      CHAR(36) NULL,
   plan_name    VARCHAR(255) NOT NULL,
-  max_athletes INT NULL,
+  max_athletes INT NULL,                       -- the plan's cap when bought; the plan's own is what counts
   started_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at   DATETIME NOT NULL,
+  expires_at   DATETIME NULL,                  -- NULL on the free plan
   reminder_stage TINYINT NOT NULL DEFAULT 0,   -- 1 = "ending soon" sent, 2 = "expired" sent, for this expiry
+  override_on           TINYINT(1) NOT NULL DEFAULT 0,  -- see subscriptions
+  override_max_athletes INT NULL,
+  downgrade_applied_at  DATETIME NULL,         -- when the athletes above the free cap were suspended
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_tsub_expires (expires_at),
-  CONSTRAINT fk_tsub_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE
+  CONSTRAINT fk_tsub_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tsub_plan FOREIGN KEY (plan_id) REFERENCES trainer_plans(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE trainer_discount_codes (
@@ -1355,3 +1382,15 @@ INSERT INTO site_pages (slug, title, body, is_published, sort_order) VALUES
   ('privacy', 'حریم خصوصی', '', 0, 2),
   ('faq', 'سؤالات متداول', '', 0, 3),
   ('help', 'راهنما', '', 0, 4);
+
+-- The plans on sale (plan-limits-update.sql adds the same rows to an existing
+-- database). The free trainer plan never expires; its duration is unused.
+INSERT INTO trainer_plans (id, name, price_toman, duration_days, max_athletes, is_free, max_custom_exercises, max_templates, history_months, report_level) VALUES
+  ('7a000000-0000-4000-8000-000000000001', 'رایگان', 0, 30, 3, 1, 5, 0, 3, 'count'),
+  ('7a000000-0000-4000-8000-000000000002', 'نقره‌ای', 290000, 30, 15, 0, 30, 5, 12, 'basic'),
+  ('7a000000-0000-4000-8000-000000000003', 'طلایی', 590000, 30, 40, 0, NULL, 20, NULL, 'full'),
+  ('7a000000-0000-4000-8000-000000000004', 'الماسی', 990000, 30, NULL, 0, NULL, NULL, NULL, 'full_excel');
+INSERT INTO plans (id, name, price_toman, duration_days, max_members, max_trainers) VALUES
+  ('7c000000-0000-4000-8000-000000000002', 'نقره‌ای', 990000, 30, 100, 3),
+  ('7c000000-0000-4000-8000-000000000003', 'طلایی', 1800000, 30, 300, 8),
+  ('7c000000-0000-4000-8000-000000000004', 'الماسی', 2900000, 30, NULL, NULL);

@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Uuid;
@@ -126,9 +127,12 @@ final class MessageController
     {
         $user = Auth::requireUser();
         $counterpartId = $params['id'];
-        Acl::require(Acl::canMessage($user['id'], $counterpartId), 'You cannot message this person.');
-
         $pdo = Database::connection();
+        // An athlete suspended by their trainer's plan (Limits) still reads
+        // the old conversation; sending stays closed both ways.
+        $readOnly = Limits::pairSuspended($pdo, $user['id'], $counterpartId);
+        Acl::require($readOnly || Acl::canMessage($user['id'], $counterpartId), 'You cannot message this person.');
+
         $plans = [];
 
         foreach (['workout', 'nutrition'] as $kind) {
@@ -172,7 +176,7 @@ final class MessageController
             $messages[] = $row;
         }
 
-        Response::ok(['plans' => $plans, 'messages' => $messages]);
+        Response::ok(['plans' => $plans, 'messages' => $messages, 'read_only' => $readOnly]);
     }
 
     /**

@@ -167,7 +167,7 @@ final class MemberPaymentController
                 'plan_name'      => $row['plan_name'],
                 'expires_at'     => $expires,
                 // A DATE: the membership runs through the end of that day.
-                'status'         => Subscriptions::status($expires === null ? null : $expires . ' 23:59:59'),
+                'status'         => Subscriptions::status($expires === null ? null : $expires . ' 23:59:59', false),
                 'remaining_days' => Subscriptions::remainingDays($expires === null ? null : $expires . ' 23:59:59'),
                 'pay_to'         => $info === false ? null : array_map('strval', $info),
                 'plans'          => Cast::rows($plans->fetchAll(), [], ['price_toman', 'duration_days']),

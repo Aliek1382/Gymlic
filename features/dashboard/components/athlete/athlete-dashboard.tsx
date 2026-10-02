@@ -1,6 +1,6 @@
 "use client";
 
-import { Apple, Dumbbell } from "lucide-react";
+import { Apple, Dumbbell, PauseCircle } from "lucide-react";
 
 import { CoachMessageCard } from "@/features/messages";
 import { ProgressDashboardWidget } from "@/features/progress";
@@ -39,6 +39,16 @@ export function AthleteDashboard({
         subtitle="برنامه امروز و پیشرفت خودت را اینجا ببین."
         trainerName={trainerName}
       />
+
+      {dashboard.data.suspendedTrainers.length > 0 && (
+        <div className="flex gap-3 rounded-2xl border border-warning/30 bg-warning-muted p-4 text-sm">
+          <PauseCircle className="mt-0.5 size-5 shrink-0 text-warning" />
+          <p className="text-muted-foreground">
+            همکاری شما با {dashboard.data.suspendedTrainers.join("، ")} به‌خاطر پایان اشتراک مربی موقتاً متوقف
+            است. برنامه‌های قبلی را می‌بینید، ولی برنامه و پیام تازه تا تمدید اشتراک مربی ارسال نمی‌شود.
+          </p>
+        </div>
+      )}
 
       <StreakCard
         athleteId={athleteId}

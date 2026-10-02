@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
@@ -172,6 +173,7 @@ final class PlanController
         }
         if ($athleteId !== null) {
             Acl::require(Acl::isTrainerOf($user['id'], $athleteId), 'This athlete is not on your roster.');
+            Limits::requireWritable($user['id'], $athleteId);
         }
 
         $clubId = null;
@@ -339,6 +341,7 @@ final class PlanController
         }
         if ($athleteId !== null) {
             Acl::require(Acl::isTrainerOf($user['id'], $athleteId), 'This athlete is not on your roster.');
+            Limits::requireWritable($user['id'], $athleteId);
         }
 
         $title = trim((string) ($data['title'] ?? ''));

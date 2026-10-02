@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Subscriptions;
 use Gymlic\Uuid;
@@ -89,6 +90,8 @@ final class ClubController
         }
 
         $club['subscription_status'] = Subscriptions::status($club['subscription_expires_at']);
+        // The cap that is actually enforced: the plan's, or the admin's override.
+        $club['member_capacity'] = Limits::forClub($pdo, $club['id'])['max_members'];
         Response::ok(Cast::row($club, [], ['member_capacity']));
     }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, Loader2, Paperclip, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ import {
   type TrainerPlan,
   type TrainerRequestStatus,
 } from "../services/trainer-billing-service";
+import { PlanGraceBanner } from "./plan-grace-banner";
 
 const QUERY_KEY = ["trainer-billing"] as const;
 
@@ -93,64 +95,13 @@ export function TrainerSubscriptionPage() {
 }
 
 function Content({ data }: { data: TrainerBillingOverview }) {
-  const subscription = data.subscription ?? null;
   const requests = data.requests ?? [];
   const plans = data.plans ?? [];
   const waiting = requests.some((request) => request.status === "pending");
-  const athletes = data.athletes ?? { active: 0, pending_invites: 0 };
-  const used = athletes.active + athletes.pending_invites;
 
   return (
     <>
-      <Card className="gap-4 py-5">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-6">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <CalendarClock className="size-4" />
-            وضعیت اشتراک
-          </CardTitle>
-          <SubscriptionStatusBadge status={subscription?.status ?? null} />
-        </div>
-        <div className="space-y-1 px-6 text-sm text-muted-foreground">
-          {data.in_club ? (
-            <p>شما عضو یک باشگاه هستید و از اشتراک باشگاه استفاده می‌کنید؛ نیازی به پرداخت جداگانه نیست.</p>
-          ) : subscription ? (
-            <>
-              <p>
-                پلن <span className="font-medium text-foreground">{subscription.plan_name}</span>
-                {subscription.status === "expired" ? " در تاریخ " : " تا "}
-                <span className="font-medium text-foreground">
-                  {formatPersianDate(parseDate(subscription.expires_at))}
-                </span>
-                {subscription.status === "expired"
-                  ? " تمام شده است."
-                  : ` (${formatNumber(subscription.remaining_days)} روز مانده) فعال است.`}
-              </p>
-              <p>
-                ورزشکاران: {formatNumber(used)}
-                {subscription.max_athletes != null
-                  ? ` از ${formatNumber(subscription.max_athletes)}`
-                  : " (بدون سقف)"}
-                {athletes.pending_invites > 0 && ` · شامل ${formatNumber(athletes.pending_invites)} دعوت در انتظار`}
-              </p>
-            </>
-          ) : (
-            <p>هنوز اشتراکی ندارید.</p>
-          )}
-          {!data.in_club && subscription && subscription.status !== "active" && (
-            <p className="font-medium text-warning">
-              {subscription.status === "expiring"
-                ? "اشتراک شما رو به پایان است. برای تمدید، یکی از پلن‌های زیر را انتخاب کنید."
-                : "اشتراک شما تمام شده است. برای تمدید، یکی از پلن‌های زیر را انتخاب کنید."}
-            </p>
-          )}
-          {!data.in_club &&
-            (data.enforcing ? (
-              <p>برای دعوت ورزشکار تازه، اشتراک فعال و ظرفیت آزاد لازم است. ورزشکاران فعلی‌تان همیشه می‌مانند.</p>
-            ) : (
-              <p>در حال حاضر داشتن اشتراک الزامی نیست؛ هر زمان لازم شد، قبلش خبر می‌دهیم.</p>
-            ))}
-        </div>
-      </Card>
+      {data.limits?.ready ? <PlanStatusCard data={data} /> : <LegacyStatusCard data={data} />}
 
       {!data.in_club && (
         <Card className="gap-4 py-5">
@@ -158,7 +109,8 @@ function Content({ data }: { data: TrainerBillingOverview }) {
             <CardTitle className="text-base">پلن‌ها</CardTitle>
             <CardDescription>
               پلن را انتخاب و به کارت پلتفرم واریز کنید، بعد کد پیگیری و رسید را ثبت کنید. بعد از
-              تأیید مدیریت، اشتراک فعال یا تمدید می‌شود و روزهای باقی‌ماندهٔ قبلی از دست نمی‌رود.
+              تأیید مدیریت، تمدید همان پلن به روزهای باقی‌ماندهٔ قبلی اضافه می‌شود؛ پلن دیگری از همان
+              روز تأیید با مدت کامل شروع می‌شود.
             </CardDescription>
           </div>
           {plans.length === 0 ? (
@@ -246,6 +198,130 @@ function Content({ data }: { data: TrainerBillingOverview }) {
   );
 }
 
+/** The plan in effect (Limits): free or paid, its dates, and how much of it is used. */
+function PlanStatusCard({ data }: { data: TrainerBillingOverview }) {
+  const limits = data.limits!;
+  const subscription = limits.subscription;
+  const used = limits.usage.active + limits.usage.pending_invites;
+  const paid = subscription !== null && !subscription.is_free;
+
+  return (
+    <>
+      <PlanGraceBanner limits={limits} />
+      <Card className="gap-4 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-6">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarClock className="size-4" />
+            پلن فعلی: {limits.plan.name ?? "—"}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {limits.override && <Badge variant="info">سقف ویژه از طرف مدیریت</Badge>}
+            {limits.plan.is_free ? <Badge variant="secondary">رایگان</Badge> : <SubscriptionStatusBadge status={limits.status} />}
+          </div>
+        </div>
+        <div className="space-y-1 px-6 text-sm text-muted-foreground">
+          {paid && subscription.expires_at && limits.status !== "expired" && (
+            <p>
+              از {formatPersianDate(parseDate(subscription.started_at))} تا{" "}
+              <span className="font-medium text-foreground">{formatPersianDate(parseDate(subscription.expires_at))}</span>
+              {subscription.remaining_days ? ` (${formatNumber(subscription.remaining_days)} روز مانده)` : ""}
+            </p>
+          )}
+          {limits.plan.is_free && <p>پلن رایگان محدودیت زمانی ندارد. برای ورزشکار بیشتر، یکی از پلن‌های زیر را تهیه کنید.</p>}
+          <p>
+            ورزشکاران: <span className="font-medium text-foreground">{formatNumber(used)}</span>
+            {limits.max_athletes != null ? ` از ${formatNumber(limits.max_athletes)}` : " (بدون سقف)"}
+            {limits.usage.pending_invites > 0 && ` · شامل ${formatNumber(limits.usage.pending_invites)} دعوت در انتظار`}
+          </p>
+          {limits.usage.suspended > 0 && (
+            <p className="text-warning">
+              {formatNumber(limits.usage.suspended)} ورزشکار به‌خاطر پایان اشتراک غیرفعال است؛ اطلاعاتشان باقی است و با تمدید برمی‌گردند.
+            </p>
+          )}
+          {limits.club && (
+            <p>
+              ورزشکارانی که از طرف باشگاه «{limits.club.name}» دعوت می‌کنید، تابع پلن باشگاه هستند و از این سقف کم نمی‌کنند.
+            </p>
+          )}
+          {!limits.enforcing && <p>در حال حاضر محدودیت پلن‌ها اعمال نمی‌شود؛ هر زمان لازم شد، قبلش خبر می‌دهیم.</p>}
+        </div>
+        {paid && (limits.usage.active + limits.usage.suspended > (limits.free_max_athletes ?? Infinity)) && (
+          <div className="px-6">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/subscription/athletes">انتخاب ورزشکارانی که بعد از پایان اشتراک فعال می‌مانند</Link>
+            </Button>
+          </div>
+        )}
+        {!paid && limits.usage.suspended > 0 && (
+          <div className="px-6">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/subscription/athletes">انتخاب ورزشکاران فعال</Link>
+            </Button>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+/** Before the plan-limits database update: the subscription as it was shown until now. */
+function LegacyStatusCard({ data }: { data: TrainerBillingOverview }) {
+  const subscription = data.subscription ?? null;
+  const athletes = data.athletes ?? { active: 0, pending_invites: 0 };
+  const used = athletes.active + athletes.pending_invites;
+
+  return (
+    <Card className="gap-4 py-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-6">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <CalendarClock className="size-4" />
+          وضعیت اشتراک
+        </CardTitle>
+        <SubscriptionStatusBadge status={subscription?.status ?? null} />
+      </div>
+      <div className="space-y-1 px-6 text-sm text-muted-foreground">
+        {data.in_club ? (
+          <p>شما عضو یک باشگاه هستید و از اشتراک باشگاه استفاده می‌کنید؛ نیازی به پرداخت جداگانه نیست.</p>
+        ) : subscription?.expires_at ? (
+          <>
+            <p>
+              پلن <span className="font-medium text-foreground">{subscription.plan_name}</span>
+              {subscription.status === "expired" ? " در تاریخ " : " تا "}
+              <span className="font-medium text-foreground">{formatPersianDate(parseDate(subscription.expires_at))}</span>
+              {subscription.status === "expired"
+                ? " تمام شده است."
+                : ` (${formatNumber(subscription.remaining_days ?? 0)} روز مانده) فعال است.`}
+            </p>
+            <p>
+              ورزشکاران: {formatNumber(used)}
+              {subscription.max_athletes != null ? ` از ${formatNumber(subscription.max_athletes)}` : " (بدون سقف)"}
+            </p>
+          </>
+        ) : (
+          <p>هنوز اشتراکی ندارید.</p>
+        )}
+        {!data.in_club &&
+          (data.enforcing ? (
+            <p>برای دعوت ورزشکار تازه، اشتراک فعال و ظرفیت آزاد لازم است. ورزشکاران فعلی‌تان همیشه می‌مانند.</p>
+          ) : (
+            <p>در حال حاضر داشتن اشتراک الزامی نیست؛ هر زمان لازم شد، قبلش خبر می‌دهیم.</p>
+          ))}
+      </div>
+    </Card>
+  );
+}
+
+const REPORT_LABEL: Record<string, string> = {
+  count: "گزارش تعداد",
+  basic: "گزارش پایه",
+  full: "گزارش کامل",
+  full_excel: "گزارش کامل + خروجی Excel",
+};
+
+/** "Unlimited" for null, else the number with its unit. */
+const cap = (value: number | null | undefined, unit: string) =>
+  value == null ? `${unit} نامحدود` : `${formatNumber(value)} ${unit}`;
+
 function PlanCard({
   plan,
   data,
@@ -256,7 +332,9 @@ function PlanCard({
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const current = data.subscription?.plan_name === plan.name && data.subscription.status !== "expired";
+  const current = data.limits?.ready
+    ? data.limits.plan.id === plan.id && data.limits.status !== "expired"
+    : data.subscription?.plan_name === plan.name && data.subscription.status !== "expired";
 
   return (
     <div className="flex flex-col justify-between gap-3 rounded-xl border border-border p-4">
@@ -267,6 +345,14 @@ function PlanCard({
           {formatNumber(plan.duration_days)} روز ·{" "}
           {plan.max_athletes != null ? `تا ${formatNumber(plan.max_athletes)} ورزشکار` : "ورزشکار نامحدود"}
         </p>
+        {plan.report_level !== undefined && (
+          <ul className="space-y-0.5 pt-1 text-xs text-muted-foreground">
+            <li>{cap(plan.max_custom_exercises, "حرکت سفارشی")}</li>
+            <li>{cap(plan.max_templates, "قالب برنامه")}</li>
+            <li>{plan.history_months == null ? "تاریخچهٔ کامل" : `تاریخچهٔ ${formatNumber(plan.history_months)} ماه اخیر`}</li>
+            {plan.report_level && <li>{REPORT_LABEL[plan.report_level]}</li>}
+          </ul>
+        )}
       </div>
       <Button size="sm" disabled={disabled} onClick={() => setOpen(true)}>
         {current ? "تمدید" : "خرید"}

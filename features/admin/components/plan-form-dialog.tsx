@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus } from "lucide-react";
@@ -19,7 +20,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { formatNumber } from "@/lib/persian";
 import { createPlan, updatePlan } from "../services/admin-service";
+import { listPlanAccounts } from "../services/plan-accounts-service";
 import {
   planFormSchema,
   type PlanFormInput,
@@ -33,10 +36,14 @@ interface PlanFormDialogProps {
     priceToman: number;
     durationDays: number;
     maxMembers: number | null;
+    /** undefined before the plan-limits database update. */
+    maxTrainers?: number | null;
   };
+  /** Whether the plan-limits columns exist (the catalogue sends max_trainers). */
+  withTrainerCap?: boolean;
 }
 
-export function PlanFormDialog({ plan }: PlanFormDialogProps) {
+export function PlanFormDialog({ plan, withTrainerCap = false }: PlanFormDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const isEdit = !!plan;
@@ -48,19 +55,40 @@ export function PlanFormDialog({ plan }: PlanFormDialogProps) {
       priceToman: plan?.priceToman ?? 0,
       durationDays: plan?.durationDays ?? 30,
       maxMembers: plan?.maxMembers != null ? String(plan.maxMembers) : "",
+      maxTrainers: plan?.maxTrainers != null ? String(plan.maxTrainers) : "",
     },
   });
 
+  // Before saving a lower cap: how many clubs on this plan it leaves above it.
+  const watched = useWatch({ control: form.control, name: ["maxMembers", "maxTrainers"] });
+  const accounts = useQuery({
+    queryKey: ["admin", "plan-accounts"],
+    queryFn: listPlanAccounts,
+    enabled: open && isEdit && withTrainerCap,
+  });
+  const newMembers = watched[0] ? Number(watched[0]) : null;
+  const newTrainers = watched[1] ? Number(watched[1]) : null;
+  const capsChanged =
+    isEdit && (newMembers !== (plan.maxMembers ?? null) || newTrainers !== (plan.maxTrainers ?? null));
+  const onPlan = (accounts.data?.clubs ?? []).filter((c) => plan && c.limits.plan_id === plan.id && !c.limits.override);
+  const affected = onPlan.filter(
+    (c) =>
+      (newMembers !== null && c.limits.usage.members > newMembers) ||
+      (newTrainers !== null && c.limits.usage.trainers > newTrainers)
+  ).length;
+
   async function onSubmit(values: PlanFormValues) {
     const maxMembers = values.maxMembers ? Number(values.maxMembers) : null;
+    const maxTrainers = withTrainerCap ? (values.maxTrainers ? Number(values.maxTrainers) : null) : undefined;
+    const input = { ...values, maxMembers, maxTrainers };
     try {
       if (isEdit) {
-        await updatePlan(plan.id, { ...values, maxMembers });
+        await updatePlan(plan.id, input);
         toast.success("پلن به‌روزرسانی شد.");
       } else {
-        await createPlan({ ...values, maxMembers });
+        await createPlan(input);
         toast.success("پلن جدید ثبت شد.");
-        form.reset({ name: "", priceToman: 0, durationDays: 30, maxMembers: "" });
+        form.reset({ name: "", priceToman: 0, durationDays: 30, maxMembers: "", maxTrainers: "" });
       }
       setOpen(false);
       router.refresh();
@@ -144,6 +172,36 @@ export function PlanFormDialog({ plan }: PlanFormDialogProps) {
               </p>
             )}
           </div>
+
+          {withTrainerCap && (
+            <div className="space-y-2">
+              <Label htmlFor="plan-max-trainers">سقف تعداد مربی (اختیاری)</Label>
+              <Input
+                id="plan-max-trainers"
+                type="number"
+                dir="ltr"
+                placeholder="بدون محدودیت"
+                {...form.register("maxTrainers")}
+              />
+              {form.formState.errors.maxTrainers && (
+                <p className="text-xs text-destructive">{form.formState.errors.maxTrainers.message}</p>
+              )}
+            </div>
+          )}
+
+          {withTrainerCap && (
+            <p className="text-xs leading-5 text-muted-foreground">
+              تغییر قیمت از خرید بعدی اعمال می‌شود؛ تغییر سقف‌ها برای همهٔ باشگاه‌های این پلن فوراً اعمال می‌شود.
+            </p>
+          )}
+          {capsChanged && accounts.data?.ready && (
+            <p className="rounded-xl bg-info-muted px-3 py-2 text-xs leading-5 text-foreground">
+              {formatNumber(onPlan.length)} باشگاه الان روی این پلن هستند (بدون سقف دستی).{" "}
+              {affected > 0
+                ? `با سقف تازه، ${formatNumber(affected)} باشگاه بالای سقف می‌مانند: کسی حذف یا غیرفعال نمی‌شود، فقط دعوت تازه بسته می‌شود.`
+                : "با سقف تازه کسی بالای سقف نمی‌ماند."}
+            </p>
+          )}
 
           <DialogFooter>
             <Button type="submit" disabled={form.formState.isSubmitting}>

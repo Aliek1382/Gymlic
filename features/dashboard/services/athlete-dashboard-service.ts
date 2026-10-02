@@ -1,4 +1,4 @@
-import { api } from "@/lib/api/client";
+import { api, fullName } from "@/lib/api/client";
 import type { AthleteDashboardData, AthletePlanSummary } from "../types/dashboard-types";
 
 interface PlanRow {
@@ -32,10 +32,12 @@ export async function getAthleteDashboard(): Promise<AthleteDashboardData> {
   const data = await api.get<{
     todays_workout: PlanRow | null;
     nutrition_plan: PlanRow | null;
+    suspended_trainers?: { id: string; first_name: string | null; last_name: string | null }[];
   }>("/dashboard/athlete");
 
   return {
     todaysWorkout: mapPlan(data.todays_workout),
     nutritionPlan: mapPlan(data.nutrition_plan),
+    suspendedTrainers: (data.suspended_trainers ?? []).map((t) => fullName(t.first_name, t.last_name, "مربی")),
   };
 }

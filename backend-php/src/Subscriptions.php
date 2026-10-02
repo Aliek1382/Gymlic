@@ -20,18 +20,41 @@ final class Subscriptions
     {
     }
 
-    /** 'active' | 'expiring' | 'expired', or null for no subscription. */
-    public static function status(?string $expiresAt): ?string
+    /**
+     * 'active' | 'expiring' | 'grace' | 'expired', or null for no expiry
+     * (no subscription, or the trainers' free plan, which never ends).
+     * 'grace' is the billing settings' grace days after the end, during
+     * which a platform subscription still works as before; pass
+     * $grace = false for anything else that ends (a club membership).
+     */
+    public static function status(?string $expiresAt, bool $grace = true): ?string
     {
         if ($expiresAt === null || $expiresAt === '') {
             return null;
         }
         $expires = strtotime($expiresAt);
-        if ($expires === false || $expires <= time()) {
+        if ($expires === false) {
             return 'expired';
+        }
+        if ($expires <= time()) {
+            return $grace && $expires + self::graceDays() * 86400 > time() ? 'grace' : 'expired';
         }
         $days = Settings::get('billing')['expiring_days'];
         return $expires <= time() + $days * 86400 ? 'expiring' : 'active';
+    }
+
+    public static function graceDays(): int
+    {
+        return (int) (Settings::get('billing')['grace_days'] ?? 7);
+    }
+
+    /** When the grace days after $expiresAt run out. */
+    public static function graceEndsAt(?string $expiresAt): ?string
+    {
+        if ($expiresAt === null || $expiresAt === '' || strtotime($expiresAt) === false) {
+            return null;
+        }
+        return date('Y-m-d H:i:s', (int) strtotime($expiresAt) + self::graceDays() * 86400);
     }
 
     /** Whole days left, rounded up; 0 once expired. */
@@ -62,12 +85,12 @@ final class Subscriptions
         return $rows;
     }
 
-    /** @return array{id: string, plan_name: string, expires_at: string}|null */
+    /** @return array{id: string, plan_id: ?string, plan_name: string, started_at: string, expires_at: string}|null */
     public static function latest(PDO $pdo, string $clubId, bool $lock = false): ?array
     {
         $stmt = $pdo->prepare(
-            'SELECT id, plan_name, expires_at FROM subscriptions
-             WHERE club_id = :club_id ORDER BY expires_at DESC LIMIT 1' . ($lock ? ' FOR UPDATE' : '')
+            'SELECT id, ' . (Limits::ready() ? 'plan_id' : 'NULL AS plan_id') . ', plan_name, started_at, expires_at
+             FROM subscriptions WHERE club_id = :club_id ORDER BY expires_at DESC LIMIT 1' . ($lock ? ' FOR UPDATE' : '')
         );
         $stmt->execute(['club_id' => $clubId]);
         $row = $stmt->fetch();
@@ -75,60 +98,102 @@ final class Subscriptions
     }
 
     /**
-     * Adds $days, counted from the current expiry while it is still in the
-     * future (renewing early doesn't cost the club its remaining days), else
-     * from now. Returns the new expiry.
+     * Adds $days to the club's subscription and returns the new expiry.
+     * Renewing the same plan counts from the current expiry while it is
+     * still running (renewing early doesn't cost the club its remaining
+     * days). A different plan starts today with its full period, and the
+     * remaining days of the old one are not carried over. $planId null keeps
+     * the club's plan (gift days).
      */
-    public static function extend(PDO $pdo, string $clubId, int $days, ?string $planName): string
+    public static function extend(PDO $pdo, string $clubId, int $days, ?string $planName, ?string $planId = null): string
     {
         $current = self::latest($pdo, $clubId, true);
-        $base = ($current !== null && strtotime($current['expires_at']) > time())
-            ? (int) strtotime($current['expires_at'])
-            : time();
+        $running = $current !== null && strtotime($current['expires_at']) > time();
+        $samePlan = $planId === null || ($current !== null && $current['plan_id'] === $planId);
+        $base = ($running && $samePlan) ? (int) strtotime($current['expires_at']) : time();
         $expiresAt = date('Y-m-d H:i:s', (int) strtotime('+' . $days . ' days', $base));
 
-        self::write($pdo, $clubId, $current, $planName ?? ($current['plan_name'] ?? 'اشتراک'), $expiresAt, $current === null || strtotime($current['expires_at']) <= time());
+        self::write(
+            $pdo,
+            $clubId,
+            $current,
+            $planName ?? ($current['plan_name'] ?? 'اشتراک'),
+            $planId ?? ($current['plan_id'] ?? null),
+            ($running && $samePlan) ? null : date('Y-m-d H:i:s'),
+            $expiresAt,
+            !$samePlan
+        );
 
         return $expiresAt;
     }
 
-    /** Puts the expiry (and plan name) at exactly what the admin chose. */
-    public static function set(PDO $pdo, string $clubId, string $planName, string $expiresAt): void
-    {
+    /**
+     * Puts the subscription exactly where the admin chose. $startedAt null
+     * keeps the current start; $planId null keeps the current plan.
+     */
+    public static function set(
+        PDO $pdo,
+        string $clubId,
+        string $planName,
+        string $expiresAt,
+        ?string $planId = null,
+        ?string $startedAt = null,
+        bool $clearOverride = false
+    ): void {
         $current = self::latest($pdo, $clubId, true);
-        self::write($pdo, $clubId, $current, $planName, $expiresAt, false);
+        self::write($pdo, $clubId, $current, $planName, $planId ?? ($current['plan_id'] ?? null), $startedAt, $expiresAt, $clearOverride);
     }
 
     /**
-     * @param array{id: string, plan_name: string, expires_at: string}|null $current
-     * @param bool $restart a lapsed or new subscription starts counting today
+     * @param array{id: string, plan_id: ?string, plan_name: string, expires_at: string}|null $current
+     * @param string|null $startedAt null keeps the current start (a new row starts now)
      */
-    private static function write(PDO $pdo, string $clubId, ?array $current, string $planName, string $expiresAt, bool $restart): void
-    {
+    private static function write(
+        PDO $pdo,
+        string $clubId,
+        ?array $current,
+        string $planName,
+        ?string $planId,
+        ?string $startedAt,
+        string $expiresAt,
+        bool $clearOverride
+    ): void {
+        $ready = Limits::ready();
         $status = self::status($expiresAt) ?? 'expired';
+        // 'grace' only exists in the column once plan-limits-update.sql ran.
+        if ($status === 'grace' && !$ready) {
+            $status = 'expired';
+        }
 
         if ($current === null) {
-            $pdo->prepare(
-                'INSERT INTO subscriptions (id, club_id, plan_name, status, expires_at)
-                 VALUES (:id, :club_id, :plan_name, :status, :expires_at)'
-            )->execute([
+            $row = [
                 'id'         => Uuid::v4(),
                 'club_id'    => $clubId,
                 'plan_name'  => $planName,
                 'status'     => $status,
+                'started_at' => $startedAt ?? date('Y-m-d H:i:s'),
                 'expires_at' => $expiresAt,
-            ]);
+            ] + ($ready ? ['plan_id' => $planId] : []);
+            $pdo->prepare(
+                'INSERT INTO subscriptions (' . implode(', ', array_keys($row)) . ')
+                 VALUES (:' . implode(', :', array_keys($row)) . ')'
+            )->execute($row);
             return;
         }
 
-        $pdo->prepare(
-            'UPDATE subscriptions SET plan_name = :plan_name, status = :status, expires_at = :expires_at'
-            . ($restart ? ', started_at = :started_at' : '') . ' WHERE id = :id'
-        )->execute([
-            'plan_name'  => $planName,
-            'status'     => $status,
-            'expires_at' => $expiresAt,
-            'id'         => $current['id'],
-        ] + ($restart ? ['started_at' => date('Y-m-d H:i:s')] : []));
+        $sets = ['plan_name = :plan_name', 'status = :status', 'expires_at = :expires_at'];
+        $bind = ['plan_name' => $planName, 'status' => $status, 'expires_at' => $expiresAt, 'id' => $current['id']];
+        if ($startedAt !== null) {
+            $sets[] = 'started_at = :started_at';
+            $bind['started_at'] = $startedAt;
+        }
+        if ($ready) {
+            $sets[] = 'plan_id = :plan_id';
+            $bind['plan_id'] = $planId;
+            if ($clearOverride) {
+                $sets[] = 'override_on = 0, override_max_members = NULL, override_max_trainers = NULL';
+            }
+        }
+        $pdo->prepare('UPDATE subscriptions SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($bind);
     }
 }

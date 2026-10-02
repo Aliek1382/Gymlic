@@ -47,6 +47,8 @@ export interface PlanInput {
   durationDays: number;
   // null = no cap from this plan (clubs.member_capacity stays unlimited).
   maxMembers?: number | null;
+  /** null = no cap on trainers. Sent once the plan-limits update has run. */
+  maxTrainers?: number | null;
   isActive?: boolean;
 }
 
@@ -56,6 +58,7 @@ function toPlanPayload(input: Partial<PlanInput>) {
   if (input.priceToman !== undefined) payload.price_toman = input.priceToman;
   if (input.durationDays !== undefined) payload.duration_days = input.durationDays;
   if (input.maxMembers !== undefined) payload.max_members = input.maxMembers;
+  if (input.maxTrainers !== undefined) payload.max_trainers = input.maxTrainers;
   if (input.isActive !== undefined) payload.is_active = input.isActive;
   return payload;
 }
@@ -258,6 +261,9 @@ export interface CatalogPlanRow {
   duration_days: number;
   max_members: number | null;
   is_active: boolean;
+  /** Present once the plan-limits database update has run; null = unlimited. */
+  max_trainers?: number | null;
+  subscriber_count?: number;
 }
 
 export async function listCatalogPlans(): Promise<CatalogPlanRow[]> {

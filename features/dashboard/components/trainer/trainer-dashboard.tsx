@@ -10,6 +10,7 @@ import { PointsWidget } from "@/features/points";
 import { MonthlyEarningsCard } from "@/features/earnings/components/monthly-earnings-card";
 import { useTrainerEarningsSeries } from "@/features/earnings/hooks/use-trainer-earnings-series";
 import { featureForPath, useFeatureCheck } from "@/features/site-settings";
+import { TrainerPlanCard } from "@/features/trainer-billing/components/trainer-plan-card";
 import { useTrainerStatistics } from "../../hooks/use-trainer-statistics";
 import { useTrainerRecentActivities } from "../../hooks/use-trainer-recent-activities";
 import { useTrainerDraftPlans } from "../../hooks/use-trainer-draft-plans";
@@ -62,6 +63,8 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
         name={trainerName}
         subtitle="امروز چه شاگردهایی و چه برنامه‌هایی در انتظار شما هستند را ببینید."
       />
+
+      <TrainerPlanCard />
 
       {isEnabled("points") && <PointsWidget />}
 

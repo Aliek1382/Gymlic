@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy, Loader2, UserPlus } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { InviteShareButtons } from "@/components/ui/invite-share-buttons";
 import { Label } from "@/components/ui/label";
-import { getErrorMessage } from "@/lib/get-error-message";
+import { showPlanLimitError } from "@/features/trainer-billing/utils/plan-limit-toast";
 import { useCreateAthleteInvite } from "../hooks/use-create-athlete-invite";
 import { useTrainerClub } from "../hooks/use-trainer-club";
 import {
@@ -30,6 +30,7 @@ export function AddAthleteDialog() {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [invitedPhone, setInvitedPhone] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
   const createInvite = useCreateAthleteInvite();
   const trainerClub = useTrainerClub();
 
@@ -56,7 +57,9 @@ export function AddAthleteDialog() {
       setInviteLink(`${window.location.origin}/join/${code}`);
       setInvitedPhone(values.phone ? values.phone : null);
     } catch (error) {
-      toast.error(getErrorMessage(error, "افزودن ورزشکار با خطا مواجه شد."));
+      showPlanLimitError(error, "افزودن ورزشکار با خطا مواجه شد.", trainerClub.data
+          ? null // the club's cap: the club upgrades, not the trainer
+          : { href: "/subscription", navigate: router.push });
     }
   }
 

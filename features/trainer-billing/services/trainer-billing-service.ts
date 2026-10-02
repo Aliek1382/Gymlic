@@ -10,7 +10,8 @@ import type {
 } from "@/features/finance/services/finance-service";
 
 export type TrainerRequestStatus = "pending" | "approved" | "rejected";
-export type TrainerSubscriptionStatus = "active" | "expiring" | "expired";
+export type TrainerSubscriptionStatus = "active" | "expiring" | "grace" | "expired";
+export type ReportLevel = "count" | "basic" | "full" | "full_excel";
 
 export interface TrainerPlan {
   id: string;
@@ -20,15 +21,70 @@ export interface TrainerPlan {
   /** null = no cap on athletes. */
   max_athletes: number | null;
   is_active?: boolean;
+  /** The plan every trainer has without paying (admin list only). */
+  is_free?: boolean;
+  /** Read by later phases; null = unlimited. Present once the plan-limits update ran. */
+  max_custom_exercises?: number | null;
+  max_templates?: number | null;
+  history_months?: number | null;
+  report_level?: ReportLevel | null;
+  /** Admin list: trainers whose subscription is on this plan. */
+  subscriber_count?: number;
 }
 
 export interface TrainerSubscription {
   plan_name: string;
   max_athletes: number | null;
   started_at: string;
-  expires_at: string;
+  /** null on the free plan, which never ends. */
+  expires_at: string | null;
   status: TrainerSubscriptionStatus;
-  remaining_days: number;
+  remaining_days: number | null;
+}
+
+/**
+ * What the trainer's plan allows right now (server: Limits::forTrainer).
+ * status "expired" means a paid plan and its grace days are over, so the
+ * free plan applies; the free plan itself is always "active".
+ */
+export interface TrainerLimits {
+  /** False until the plan-limits database update has run. */
+  ready: boolean;
+  enforcing: boolean;
+  plan: {
+    id: string | null;
+    name: string | null;
+    is_free: boolean;
+    max_athletes: number | null;
+    max_custom_exercises: number | null;
+    max_templates: number | null;
+    history_months: number | null;
+    report_level: ReportLevel | null;
+  };
+  status: TrainerSubscriptionStatus | null;
+  /** The stored subscription row, paid or free; null for a trainer who never had one. */
+  subscription: {
+    plan_id: string | null;
+    plan_name: string;
+    is_free: boolean;
+    started_at: string;
+    expires_at: string | null;
+    remaining_days: number | null;
+    grace_ends_at: string | null;
+    override_on: boolean;
+    override_max_athletes: number | null;
+    downgraded: boolean;
+  } | null;
+  /** An admin's cap is in effect instead of the plan's. */
+  override: boolean;
+  /** The cap in effect; null = unlimited. */
+  max_athletes: number | null;
+  free_max_athletes: number | null;
+  usage: { active: number; pending_invites: number; suspended: number };
+  over_cap: boolean;
+  /** While a paid plan or its grace days run: athletes that would be suspended when it ends. */
+  suspend_after_grace: number;
+  club: { club_id: string; name: string } | null;
 }
 
 export interface TrainerPaymentRequest {
@@ -61,6 +117,7 @@ export interface TrainerBillingOverview {
   in_club?: boolean;
   subscription?: TrainerSubscription | null;
   athletes?: { active: number; pending_invites: number };
+  limits?: TrainerLimits;
   plans?: TrainerPlan[];
   requests?: TrainerPaymentRequest[];
   /** False until the discount-code tables exist. */
@@ -102,6 +159,26 @@ export async function submitTrainerPayment(input: {
   }
 }
 
+export interface KeepListAthlete {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  last_seen_at: string | null;
+  suspended_by_plan: boolean;
+  keep_on_downgrade: boolean;
+  created_at: string;
+}
+
+/** The athletes coached outside a club, for picking who stays active on the free plan. */
+export async function getKeepList(): Promise<{ ready: boolean; limits?: TrainerLimits; items: KeepListAthlete[] }> {
+  return api.get("/trainer-billing/athletes");
+}
+
+export async function saveKeepList(athleteIds: string[]): Promise<void> {
+  await api.post("/trainer-billing/athletes", { keep: athleteIds });
+}
+
 // ---------------------------------------------------------------------------
 // Admin
 // ---------------------------------------------------------------------------
@@ -127,7 +204,7 @@ export async function rejectTrainerRequest(id: string, adminNote?: string): Prom
   await api.post(`/admin/trainer-billing/requests/${id}/reject`, { admin_note: adminNote || null });
 }
 
-export async function listAdminTrainerPlans(): Promise<{ ready: boolean; items: TrainerPlan[] }> {
+export async function listAdminTrainerPlans(): Promise<{ ready: boolean; limits?: boolean; items: TrainerPlan[] }> {
   return api.get("/admin/trainer-plans");
 }
 
@@ -137,6 +214,10 @@ export interface TrainerPlanInput {
   durationDays: number;
   maxAthletes: number | null;
   isActive?: boolean;
+  maxCustomExercises?: number | null;
+  maxTemplates?: number | null;
+  historyMonths?: number | null;
+  reportLevel?: ReportLevel | null;
 }
 
 function toPlanPayload(input: Partial<TrainerPlanInput>) {
@@ -146,6 +227,10 @@ function toPlanPayload(input: Partial<TrainerPlanInput>) {
   if (input.durationDays !== undefined) payload.duration_days = input.durationDays;
   if (input.maxAthletes !== undefined) payload.max_athletes = input.maxAthletes;
   if (input.isActive !== undefined) payload.is_active = input.isActive;
+  if (input.maxCustomExercises !== undefined) payload.max_custom_exercises = input.maxCustomExercises;
+  if (input.maxTemplates !== undefined) payload.max_templates = input.maxTemplates;
+  if (input.historyMonths !== undefined) payload.history_months = input.historyMonths;
+  if (input.reportLevel !== undefined) payload.report_level = input.reportLevel;
   return payload;
 }
 

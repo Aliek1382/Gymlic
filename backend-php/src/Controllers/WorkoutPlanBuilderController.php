@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -46,6 +47,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
 
         $data = Validate::required(Validate::body(), ['day_number']);
         $pdo = Database::connection();
@@ -80,6 +82,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         $data = Validate::body();
@@ -111,6 +114,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         Database::connection()
@@ -125,6 +129,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         $data = Validate::required(Validate::body(), ['exercise_id']);
@@ -165,6 +170,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
         $day = self::dayOr404($params['id'], $params['dayId']);
         $exercise = self::exerciseOr404($day['id'], $params['exId']);
 
@@ -201,6 +207,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
         $day = self::dayOr404($params['id'], $params['dayId']);
         $exercise = self::exerciseOr404($day['id'], $params['exId']);
 
@@ -217,6 +224,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
         $day = self::dayOr404($params['id'], $params['dayId']);
 
         $data = Validate::required(Validate::body(), ['day_number']);
@@ -253,6 +261,7 @@ final class WorkoutPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
+        Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
 
         $data = Validate::required(Validate::body(), ['target_week_number']);
         $sourceWeek = (int) $params['weekNumber'];
