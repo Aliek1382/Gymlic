@@ -277,6 +277,12 @@ final class Migrations
                 ['row', 'plans', '7c000000-0000-4000-8000-000000000004'],
             ],
         ],
+        [
+            'id'    => 'membership-level',
+            'file'  => 'membership-level-update.sql',
+            'title' => 'نام تازهٔ ستون سطح عضویت ورزشکار در باشگاه (membership_level)',
+            'check' => [['column', 'memberships', 'membership_level'], ['column', 'invitations', 'membership_level']],
+        ],
     ];
 
     /**

@@ -783,5 +783,69 @@ check($status === 200 && str_contains($all, 'history-club-athlete') && !str_cont
 [$athleteStatus] = call('GET', '/trainer/data-export', null, $dAthleteToken);
 check($athleteStatus === 403, 'an athlete cannot use it', $athleteStatus);
 
+// ---- Phase 5, part B: plan_tier renamed to membership_level ---------------
+
+/** Whether $table has $column now. */
+function hasCol(string $table, string $column): bool
+{
+    global $pdo;
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c');
+    $stmt->execute(['t' => $table, 'c' => $column]);
+    return (int) $stmt->fetchColumn() === 1;
+}
+
+/** A new athlete joins the club by its member invite; returns [status, athlete id]. */
+function joinClub(string $name): array
+{
+    global $owner, $clubId;
+    [$status, $inv] = call('POST', "/clubs/{$clubId}/member-invites", [], $owner);
+    if ($status !== 201) {
+        return [$status, null];
+    }
+    [$accepted, , $id] = accept($inv['code'], $name);
+    return [$accepted, $id];
+}
+
+echo "\nPhase 5, part B: the membership level column is renamed\n";
+// Put a rerun back where the live database is now: the old name.
+$old = 'plan_tier';
+foreach (['memberships', 'invitations'] as $table) {
+    if (hasCol($table, 'membership_level')) {
+        $pdo->exec("ALTER TABLE {$table} RENAME COLUMN membership_level TO {$old}");
+    }
+}
+[$status, $before1] = joinClub('level-athlete1');
+check($status === 200, 'before the update: an athlete joins the club', $status);
+$pdo->prepare("UPDATE memberships SET {$old} = 'elite' WHERE user_id = :u AND club_id = :c")->execute(['u' => $before1, 'c' => $clubId]);
+$snapshot = static fn (string $column): array => [
+    $pdo->query("SELECT COUNT(*), SUM({$column} = 'elite'), SUM({$column} = 'basic'), SUM({$column} = 'daily') FROM memberships")->fetch(PDO::FETCH_NUM),
+    $pdo->query('SELECT COUNT(*) FROM invitations')->fetchColumn(),
+];
+$data = $snapshot($old);
+
+[$status, $result] = call('POST', '/admin/system/migrations/membership-level/run', null, $adminToken);
+check($status === 200 && ($result['ok'] ?? false), 'the update runs from the admin panel', $result);
+check(hasCol('memberships', 'membership_level') && hasCol('invitations', 'membership_level')
+    && !hasCol('memberships', $old) && !hasCol('invitations', $old), 'both columns have the new name');
+[, $again] = call('POST', '/admin/system/migrations/membership-level/run', null, $adminToken);
+check(!($again['ok'] ?? true), 'the panel does not run it a second time', $again);
+$sql = (string) file_get_contents(__DIR__ . '/../schema/membership-level-update.sql');
+$rerun = true;
+foreach (array_filter(array_map('trim', explode(';', (string) preg_replace('/^--.*$/m', '', $sql)))) as $statement) {
+    try {
+        $pdo->exec($statement);
+    } catch (PDOException $e) {
+        $rerun = false;
+    }
+}
+check($rerun, 'running the SQL file again by hand gives no error');
+check($snapshot('membership_level') == $data, 'the data is untouched (rows and levels)', [$data, $snapshot('membership_level')]);
+$lvl = $pdo->prepare('SELECT membership_level FROM memberships WHERE user_id = :u AND club_id = :c');
+$lvl->execute(['u' => $before1, 'c' => $clubId]);
+check($lvl->fetchColumn() === 'elite', "an athlete's level is kept");
+[$status, $after] = joinClub('level-athlete2');
+$lvl->execute(['u' => $after, 'c' => $clubId]);
+check($status === 200 && $lvl->fetchColumn() === 'basic', 'after the update: a club invite is made and accepted as before', $status);
+
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);

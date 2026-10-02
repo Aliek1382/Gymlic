@@ -361,6 +361,11 @@ allows; every cap is checked on the server.
   queries unbuffered), so a big account doesn't run out of memory or time;
   a table an update hasn't created yet is left out. Separate from the
   reports page's Excel export.
+- **`membership_level`** (`elite` / `basic` / `daily`, on `memberships` and
+  `invitations`) is an athlete's level in a club, unrelated to the
+  platform's plans; it was called `plan_tier` until
+  `membership-level-update.sql`. Until that SQL runs, the invitation code
+  falls back to the old name (`InvitationController::levelColumn`).
 - **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
   plan opens; the seven plans carry their tier (free/silver/gold/diamond),
   and a plan counts as running for tiers through its grace days too. The
