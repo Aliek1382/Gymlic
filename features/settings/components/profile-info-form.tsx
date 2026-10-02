@@ -32,7 +32,8 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
     },
   });
 
-  // Club accounts have no birthday-offer use case (yet) — everyone else does.
+  // A club account has no birthday; trainers and athletes do (an athlete's
+  // trainer gets a reminder on the day).
   const showBirthDate =
     profile.accountType === "trainer" || profile.accountType === "athlete";
 
@@ -120,7 +121,9 @@ export function ProfileInfoForm({ profile }: { profile: Profile }) {
                 )}
               />
               <p className="text-xs text-muted-foreground">
-                برای ارسال آفر یا تخفیف تولد به شما استفاده می‌شود.
+                {profile.accountType === "athlete"
+                  ? "مربی‌تان سن شما را می‌بیند و روز تولدتان به او یادآوری می‌شود."
+                  : "فقط در پروفایل شما ثبت می‌شود."}
               </p>
             </div>
           )}

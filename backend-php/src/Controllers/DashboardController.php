@@ -5,8 +5,10 @@ namespace Gymlic\Controllers;
 
 use Gymlic\Acl;
 use Gymlic\Auth;
+use Gymlic\Birthdays;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\ErrorLog;
 use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Subscriptions;
@@ -86,6 +88,9 @@ final class DashboardController
             ]),
             'activity' => self::trainerActivity($user['id'], (int) ($_GET['limit'] ?? 10)),
             'drafts'   => self::trainerDrafts($user['id'], 5),
+            // The coming week's birthdays (today's notification is sent here
+            // too, for a host whose cron isn't set up).
+            'birthdays' => self::trainerBirthdays($pdo, $user),
             // The plan card and the grace banner (Limits).
             'plan'     => $user['account_type'] === 'trainer' ? Limits::forTrainer($pdo, $user['id']) : null,
         ]);
@@ -248,6 +253,22 @@ final class DashboardController
             'recent_members'    => $recentMembers->fetchAll(),
             'trainers'          => $trainers->fetchAll(),
         ]);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private static function trainerBirthdays(PDO $pdo, array $user): array
+    {
+        if ($user['account_type'] !== 'trainer') {
+            return [];
+        }
+        try {
+            Birthdays::sendDue($pdo, $user['id']);
+            return Birthdays::upcoming($pdo, $user['id'], 7);
+        } catch (\Throwable $e) {
+            // A birthday card must never take the dashboard down.
+            ErrorLog::exception($e);
+            return [];
+        }
     }
 
     private static function trainerActivity(string $trainerId, int $limit): array

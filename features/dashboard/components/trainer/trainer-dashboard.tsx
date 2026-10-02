@@ -26,6 +26,7 @@ import { ErrorState } from "../shared/error-state";
 import { QuickActions } from "../shared/quick-actions";
 import { TrainerRecentActivities } from "./trainer-recent-activities";
 import { TrainerDraftPlans } from "./trainer-draft-plans";
+import { UpcomingBirthdays } from "./upcoming-birthdays";
 import type { QuickAction } from "../../types/dashboard-types";
 
 // Code-split out of the dashboard bundle for the same reason the club
@@ -121,6 +122,8 @@ export function TrainerDashboard({ trainerName }: { trainerName: string }) {
           />
         )}
       </StatisticsGrid>
+
+      <UpcomingBirthdays />
 
       {showEarnings && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

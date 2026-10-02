@@ -4,6 +4,7 @@
    print dialog on until it has decoded. */
 import { Apple, Dumbbell, GraduationCap, User } from "lucide-react";
 
+import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { formatMacro } from "@/features/foods";
 import { formatAge, formatNumber, formatPersianDate, toPersianDigits } from "@/lib/persian";
 import { cn } from "@/lib/utils";
@@ -445,7 +446,11 @@ function StructuredNutrition({ meals }: { meals: NutritionPlanMeal[] }) {
 }
 
 export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
+  // The trainer's own logo and watermark (theirs, or for an athlete their
+  // trainer's), set in the trainer's settings.
+  const { data: context } = useAuthContext();
   if (!plan) return null;
+  const logoUrl = context?.printLogoUrl ?? null;
 
   const KindIcon = KIND_ICON[plan.kind];
   // Each plan kind parses to its own shape — day blocks of exercises, or
@@ -473,9 +478,8 @@ export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
         ));
   const assignedLabel = formatPersianDate(new Date(plan.assignedAt));
   const athleteAge = formatAge(plan.athleteBirthDate);
-  const watermarkLabel = plan.trainerName
-    ? `جیم‌لیک — ${plan.trainerName}`
-    : "جیم‌لیک";
+  const watermarkLabel =
+    context?.printWatermark || (plan.trainerName ? `جیم‌لیک — ${plan.trainerName}` : "جیم‌لیک");
 
   return (
     <div className="print-area hidden bg-white print:block" dir="rtl">
@@ -513,7 +517,10 @@ export function PlanPrintArea({ plan }: { plan: PrintablePlan | null }) {
                     </p>
                   </div>
                 </div>
-                <p className="text-[8pt] text-[#6b7280]">{assignedLabel}</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-[8pt] text-[#6b7280]">{assignedLabel}</p>
+                  {logoUrl && <img src={logoUrl} alt="" className="h-9 max-w-32 object-contain" />}
+                </div>
               </div>
             </td>
           </tr>

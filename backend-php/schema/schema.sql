@@ -1222,6 +1222,9 @@ CREATE TABLE trainer_profiles (
   certificates   JSON NULL,   -- array of image URLs (output of UploadController)
   pricing_table  JSON NULL,   -- array of {"title":"...", "price_toman":..., "description":"..."}
   social_links   JSON NULL,   -- {"instagram":"...", "telegram":"...", "website":"..."}
+  -- A printed / PDF plan's logo and watermark (trainer-print-branding-update.sql).
+  print_logo_url  VARCHAR(1024) NULL,
+  print_watermark VARCHAR(80) NULL,
   -- The admin's check of the certificates; 'verified' shows the badge.
   verification_status ENUM('none','pending','verified','rejected') NOT NULL DEFAULT 'none',
   verification_note   VARCHAR(500) NULL,

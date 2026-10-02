@@ -75,3 +75,26 @@ export async function uploadAvatar(file: File): Promise<{ url: string }> {
 
   return api.upload<{ url: string }>("/me/avatar", file);
 }
+
+/** The trainer's logo and watermark on a printed plan. ready: false until its database update has run. */
+export interface PrintBranding {
+  ready: boolean;
+  logo_url: string | null;
+  watermark: string | null;
+}
+
+export function getPrintBranding(): Promise<PrintBranding> {
+  return api.get<PrintBranding>("/trainer/print-branding");
+}
+
+export function uploadPrintLogo(file: File): Promise<PrintBranding> {
+  return api.upload<PrintBranding>("/trainer/print-branding/logo", file);
+}
+
+export function removePrintLogo(): Promise<PrintBranding> {
+  return api.delete<PrintBranding>("/trainer/print-branding/logo");
+}
+
+export function savePrintWatermark(watermark: string | null): Promise<PrintBranding> {
+  return api.put<PrintBranding>("/trainer/print-branding", { watermark });
+}

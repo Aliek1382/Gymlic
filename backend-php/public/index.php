@@ -63,6 +63,7 @@ use Gymlic\Controllers\PagesController;
 use Gymlic\Controllers\PlanAccountsController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\PointsController;
+use Gymlic\Controllers\PrintBrandingController;
 use Gymlic\Controllers\ReceiptController;
 use Gymlic\Controllers\SessionPackageController;
 use Gymlic\Controllers\SupplementController;
@@ -296,6 +297,11 @@ $router->get('/reports/trainer/completion-rates', fn () => ReportController::com
 $router->get('/reports/trainer/excel', fn () => ReportExportController::excel());
 // All of the trainer's own data as one file: every plan, free included.
 $router->get('/trainer/data-export', fn () => TrainerDataExportController::download());
+// The trainer's logo and watermark on a printed plan.
+$router->get('/trainer/print-branding', fn () => PrintBrandingController::get());
+$router->put('/trainer/print-branding', fn () => PrintBrandingController::update());
+$router->post('/trainer/print-branding/logo', fn () => PrintBrandingController::uploadLogo());
+$router->delete('/trainer/print-branding/logo', fn () => PrintBrandingController::removeLogo());
 $router->get('/reports/financial-summary', fn () => ReportController::financialSummary());
 $router->get('/athletes/{id}/completed-plans', fn (array $p) => ReportController::completedPlans($p));
 
