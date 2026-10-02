@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Gymlic\Controllers;
 
 use Gymlic\Auth;
+use Gymlic\ContentLibrary;
 use Gymlic\Database;
 use Gymlic\Jalali;
 use Gymlic\Limits;
@@ -138,7 +139,13 @@ final class PlanAccountsController
                        ORDER BY m.joined_at ASC LIMIT 1) AS club_id,
                     (SELECT c.name FROM memberships m JOIN clubs c ON c.id = m.club_id
                        WHERE m.user_id = t.id AND m.role = 'trainer' AND m.status = 'active'
-                       ORDER BY m.joined_at ASC LIMIT 1) AS club_name
+                       ORDER BY m.joined_at ASC LIMIT 1) AS club_name,
+                    (SELECT MAX(cs.expires_at) FROM subscriptions cs
+                       WHERE cs.club_id = (SELECT m.club_id FROM memberships m WHERE m.user_id = t.id AND m.role = 'trainer'
+                                             AND m.status = 'active' ORDER BY m.joined_at ASC LIMIT 1)) AS club_expires_at,
+                    (SELECT COUNT(*) FROM exercises x WHERE x.created_by = t.id) AS u_exercises,
+                    (SELECT COUNT(*) FROM workout_assignments w WHERE w.trainer_id = t.id AND w.is_template = 1" . ContentLibrary::ownOnly('w.') . ")
+                    + (SELECT COUNT(*) FROM nutrition_assignments n WHERE n.trainer_id = t.id AND n.is_template = 1" . ContentLibrary::ownOnly('n.') . ") AS u_templates
              FROM profiles t
              LEFT JOIN trainer_subscriptions s ON s.trainer_id = t.id
              LEFT JOIN trainer_plans p ON p.id = s.plan_id
@@ -153,7 +160,13 @@ final class PlanAccountsController
                 $pdo,
                 $r,
                 ['active' => (int) $r['u_active'], 'pending_invites' => (int) $r['u_pending'], 'suspended' => (int) $r['u_suspended']],
-                $r['club_id'] !== null ? ['club_id' => $r['club_id'], 'name' => $r['club_name']] : null
+                $r['club_id'] !== null ? ['club_id' => $r['club_id'], 'name' => $r['club_name']] : null,
+                [
+                    'exercises'    => (int) $r['u_exercises'],
+                    'templates'    => (int) $r['u_templates'],
+                    'club_running' => $r['club_id'] !== null
+                        && in_array(Subscriptions::status($r['club_expires_at']), ['active', 'expiring', 'grace'], true),
+                ]
             );
             $out[] = [
                 'kind'       => 'trainer',

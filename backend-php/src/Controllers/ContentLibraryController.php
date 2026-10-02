@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Auth;
 use Gymlic\ContentLibrary;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 use Throwable;
 
@@ -57,6 +58,16 @@ final class ContentLibraryController
 
         $pdo->beginTransaction();
         try {
+            // A copied workout or nutrition template is one of the trainer's
+            // templates, so it counts against their plan's cap (Limits).
+            if (in_array($kind, ['workout', 'nutrition'], true)) {
+                $limit = Limits::contentBlock($pdo, $user['id'], 'templates');
+                if ($limit !== null) {
+                    $pdo->rollBack();
+                    Response::error(...$limit);
+                    return;
+                }
+            }
             $id = ContentLibrary::copy($pdo, $kind, $source['id'], $user['id'], false);
             $pdo->commit();
         } catch (Throwable $e) {

@@ -269,5 +269,160 @@ check($status === 200 && count($data['trainers'] ?? []) >= 4 && count($data['clu
 [$status] = admin('trainer', $t2Id, ['action' => 'reactivate']);
 check($status === 200, 'reactivate runs');
 
+// ---- Phase 2: custom exercises and templates ----------------------------
+
+function exercise(string $token, string $name): array
+{
+    return call('POST', '/library/exercises', ['name' => $name, 'muscle_group' => 'chest'], $token);
+}
+
+function template(string $token, string $title, ?string $source = null): array
+{
+    return call('POST', '/plans/workout/templates', ['title' => $title] + ($source ? ['source_id' => $source] : []), $token);
+}
+
+function content(string $token): array
+{
+    return limits($token)['content'] ?? [];
+}
+
+echo "\nPhase 2: a free trainer has 5 custom exercises and no templates\n";
+[$c1, $c1Id] = account('content1', 'trainer');
+$ok = 0;
+for ($i = 1; $i <= 5; $i++) {
+    $ok += exercise($c1, "حرکت {$i}")[0] === 201 ? 1 : 0;
+}
+check($ok === 5, 'exercises 1 to 5 are made', $ok);
+[$status, $data] = exercise($c1, 'حرکت ۶');
+check($status === 402 && ($data['error']['code'] ?? '') === 'exercise_limit', 'the sixth is refused (402 exercise_limit)', [$status, $data]);
+[$status, $data] = template($c1, 'قالب');
+check($status === 402 && ($data['error']['code'] ?? '') === 'template_limit', 'no template on the free plan (402 template_limit)', [$status, $data]);
+check(str_contains($data['error']['message'] ?? '', 'نقره‌ای'), 'the message names the cheapest plan with templates', $data);
+$c = content($c1);
+check(($c['exercises']['used'] ?? 0) === 5 && ($c['exercises']['max'] ?? 0) === 5 && ($c['templates']['max'] ?? 1) === 0, 'usage shows 5 of 5 and 0 templates', $c);
+
+echo "\nDeleting frees a place; one used in a plan can't be deleted\n";
+$ids = $pdo->prepare('SELECT id FROM exercises WHERE created_by = :t ORDER BY created_at');
+$ids->execute(['t' => $c1Id]);
+$own = $ids->fetchAll(PDO::FETCH_COLUMN);
+[$status] = call('PATCH', "/library/exercises/{$own[0]}", ['name' => 'حرکت ویرایش‌شده'], $c1);
+check($status === 200, 'the trainer edits their own exercise');
+[$status] = call('DELETE', "/library/exercises/{$own[1]}", null, $c1);
+check($status === 200, 'and deletes an unused one');
+[$status] = exercise($c1, 'حرکت جایگزین');
+check($status === 201, 'which frees the place for a new one');
+[$otherToken] = account('content-other', 'trainer');
+[$status] = call('DELETE', "/library/exercises/{$own[2]}", null, $otherToken);
+check($status === 404, "another trainer can't delete it");
+
+echo "\nAfter a silver payment: 30 exercises and 5 templates\n";
+[$status, $data] = call('POST', '/trainer-billing/requests', ['plan_id' => $tPlan['نقره‌ای'], 'tracking_code' => 'CNT' . $run, 'card_last4' => '4321'], $c1);
+call('POST', '/admin/trainer-billing/requests/' . ($data['id'] ?? '') . '/approve', [], $adminToken);
+$ok = 0;
+for ($i = 6; $i <= 30; $i++) {
+    $ok += exercise($c1, "حرکت {$i}")[0] === 201 ? 1 : 0;
+}
+check($ok === 25, 'exercises 6 to 30 are made', $ok);
+check(exercise($c1, 'حرکت ۳۱')[0] === 402, 'the 31st is refused');
+$templates = [];
+for ($i = 1; $i <= 5; $i++) {
+    [$status, $data] = template($c1, "قالب {$i}");
+    if ($status === 201) {
+        $templates[] = $data['id'];
+    }
+}
+check(count($templates) === 5, 'templates 1 to 5 are made', count($templates));
+check(template($c1, 'قالب ۶')[0] === 402, 'the sixth is refused');
+check(template($c1, 'کپی قالب', $templates[0])[0] === 402, 'copying a template counts too');
+
+// Save a plan as a template: the plan needs an athlete.
+[$status, $data] = invite($c1);
+[, , $athlete] = accept($data['code'], 'content-athlete');
+[$status, $plan] = call('POST', '/plans/workout', ['title' => 'برنامه', 'athlete_id' => $athlete], $c1);
+check(template($c1, 'از روی برنامه', $plan['id'] ?? null)[0] === 402, 'saving a plan as a template counts too');
+[, $planDay] = call('POST', "/plans/workout/{$plan['id']}/days", ['day_number' => 1], $c1);
+call('POST', "/plans/workout/{$plan['id']}/days/{$planDay['id']}/exercises", ['exercise_id' => $own[2]], $c1);
+[$status, $data] = call('DELETE', "/library/exercises/{$own[2]}", null, $c1);
+check($status === 409 && ($data['error']['code'] ?? '') === 'in_use', 'an exercise used in a plan is not deleted', [$status, $data]);
+
+// The content library: a public template the admin offers.
+$public = '7e000000-0000-4000-8000-' . substr(str_pad($run, 12, '0', STR_PAD_LEFT), -12);
+$pdo->prepare("INSERT INTO workout_assignments (id, trainer_id, title, is_template, is_public) VALUES (:id, :t, 'قالب عمومی', 1, 1)")
+    ->execute(['id' => $public, 't' => $adminId]);
+[$status, $data] = call('POST', "/content-library/workout/{$public}/copy", null, $c1);
+check($status === 402, 'copying from the content library counts too', [$status, $data]);
+[$status] = call('DELETE', "/plans/workout/templates/{$templates[4]}", null, $c1);
+check($status === 200 && template($c1, 'قالب جایگزین')[0] === 201, 'deleting a template frees a place');
+
+echo "\nGold: exercises unlimited, 20 templates; diamond: both unlimited\n";
+admin('trainer', $c1Id, ['action' => 'activate', 'plan_id' => $tPlan['طلایی'], 'expires_at' => $day(30)]);
+check(exercise($c1, 'حرکت طلایی')[0] === 201, 'gold: a 31st exercise is made');
+$ok = 0;
+for ($i = 6; $i <= 20; $i++) {
+    $ok += template($c1, "قالب {$i}")[0] === 201 ? 1 : 0;
+}
+check($ok === 15, 'gold: templates up to 20', $ok);
+check(template($c1, 'قالب ۲۱')[0] === 402, 'gold: the 21st template is refused');
+admin('trainer', $c1Id, ['action' => 'activate', 'plan_id' => $tPlan['الماسی'], 'expires_at' => $day(30)]);
+check(template($c1, 'قالب ۲۱')[0] === 201, 'diamond: templates unlimited');
+
+echo "\nAfter the paid plan and its grace days end: what's there stays, nothing new\n";
+admin('trainer', $c1Id, ['action' => 'dates', 'started_at' => $day(-40), 'expires_at' => $day(-10)]);
+$c = content($c1);
+check(($c['exercises']['used'] ?? 0) === 31 && ($c['exercises']['over'] ?? false) && ($c['templates']['over'] ?? false), 'back on free: 31 exercises and 21 templates, both above the cap', $c);
+[, $picker] = call('GET', '/library/exercises/picker', null, $c1);
+$mine = array_filter($picker['items'] ?? [], fn ($e) => ($e['created_by'] ?? null) === $c1Id);
+check(count($mine) === 31, 'all 31 are still in the picker', count($mine));
+check(exercise($c1, 'حرکت تازه')[0] === 402, 'but a new one is refused');
+[$status] = call('PATCH', "/library/exercises/{$own[0]}", ['description' => 'هنوز قابل ویرایش'], $c1);
+check($status === 200, 'and the old ones can still be edited');
+[, $accounts] = call('GET', '/admin/plan-accounts', null, $adminToken);
+$row = array_values(array_filter($accounts['trainers'] ?? [], fn ($t) => $t['id'] === $c1Id))[0] ?? null;
+check(($row['limits']['over_cap'] ?? false) && ($row['limits']['content']['templates']['used'] ?? 0) === 21, 'the admin list shows usage and "over cap"', $row['limits']['content'] ?? null);
+
+echo "\nConcurrent requests can't pass the cap\n";
+[$c2, $c2Id] = account('content2', 'trainer');
+for ($i = 1; $i <= 4; $i++) {
+    exercise($c2, "حرکت {$i}");
+}
+$mh = curl_multi_init();
+$handles = [];
+for ($i = 0; $i < 6; $i++) {
+    $ch = curl_init($api . '/library/exercises');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $c2],
+        CURLOPT_POSTFIELDS => json_encode(['name' => "هم‌زمان {$i}", 'muscle_group' => 'back']),
+    ]);
+    curl_multi_add_handle($mh, $ch);
+    $handles[] = $ch;
+}
+do {
+    curl_multi_exec($mh, $running);
+    curl_multi_select($mh);
+} while ($running > 0);
+$codes = array_map(fn ($ch) => curl_getinfo($ch, CURLINFO_HTTP_CODE), $handles);
+$count = $pdo->prepare('SELECT COUNT(*) FROM exercises WHERE created_by = :t');
+$count->execute(['t' => $c2Id]);
+check((int) $count->fetchColumn() === 5 && count(array_filter($codes, fn ($c) => $c === 201)) === 1, 'six at once for the last place: exactly one is made', $codes);
+
+echo "\nA club trainer has no cap while the club's plan runs\n";
+[$c3, $c3Id] = account('content3', null);
+[$status] = call('POST', '/invitations/accept-club', ['code' => $trainerCodes[1]], $c3);
+check($status === 200, 'trainer joins the club (silver, running)');
+check(template($c3, 'قالب باشگاهی')[0] === 201, 'a template on the free personal plan: allowed through the club');
+$ok = 0;
+for ($i = 1; $i <= 6; $i++) {
+    $ok += exercise($c3, "حرکت باشگاهی {$i}")[0] === 201 ? 1 : 0;
+}
+check($ok === 6, 'and more than 5 exercises', $ok);
+admin('club', $clubId, ['action' => 'dates', 'started_at' => $day(-40), 'expires_at' => $day(-10)]);
+check(template($c3, 'قالب بعد از انقضا')[0] === 402, "once the club's plan has ended, the trainer's own plan applies");
+
+echo "\nWith enforcement off, no cap at all\n";
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => false, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+check(exercise($c2, 'بدون محدودیت')[0] === 201 && template($c2, 'بدون محدودیت')[0] === 201, 'a free trainer makes a 6th exercise and a template');
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => true, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);

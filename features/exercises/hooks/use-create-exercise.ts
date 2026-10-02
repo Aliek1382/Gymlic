@@ -11,6 +11,8 @@ export function useCreateExercise() {
     mutationFn: createExercise,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises", "list"] });
+      // The "4 of 5 custom exercises" line reads the trainer's limits.
+      queryClient.invalidateQueries({ queryKey: ["trainer-billing"] });
     },
   });
 }

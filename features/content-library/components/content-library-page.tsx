@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { showPlanLimitError } from "@/features/trainer-billing/utils/plan-limit-toast";
 import { formatNumber } from "@/lib/persian";
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
@@ -69,9 +70,11 @@ export function ContentLibraryPage() {
       void queryClient.invalidateQueries({ queryKey: ["athletes", "templates"] });
       void queryClient.invalidateQueries({ queryKey: ["techniques"] });
       void queryClient.invalidateQueries({ queryKey: ["questionnaires"] });
+      void queryClient.invalidateQueries({ queryKey: ["trainer-billing"] });
       setPreview(null);
     } catch (error) {
-      toast.error(getErrorMessage(error, "افزودن ناموفق بود."));
+      // A copied template counts against the plan's template cap.
+      showPlanLimitError(error, "افزودن ناموفق بود.", { href: "/subscription", navigate: (href) => window.location.assign(href) });
     } finally {
       setBusy(null);
     }

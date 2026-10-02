@@ -3,11 +3,15 @@
 import { Apple, Dumbbell } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ContentUsageLine } from "@/features/trainer-billing/components/content-usage";
 import { TemplateFormDialog } from "./template-form-dialog";
 import { TemplateList } from "./template-list";
 
 export function TemplateManager() {
   return (
+    <div className="space-y-4">
+    {/* Workout and nutrition templates count together against the plan. */}
+    <ContentUsageLine kind="templates" />
     <Tabs defaultValue="workout" className="space-y-4">
       <TabsList>
         <TabsTrigger value="workout">
@@ -34,5 +38,6 @@ export function TemplateManager() {
         <TemplateList kind="nutrition" />
       </TabsContent>
     </Tabs>
+    </div>
   );
 }

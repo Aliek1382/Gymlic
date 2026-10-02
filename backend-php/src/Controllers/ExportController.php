@@ -192,7 +192,7 @@ final class ExportController
     /** Every trainer's plan and usage (see Limits). @return list<list<mixed>> */
     private static function trainerSubscriptions(): array
     {
-        $rows = [['مربی', 'موبایل', 'باشگاه', 'پلن', 'وضعیت', 'شروع', 'پایان', 'پایان مهلت', 'ورزشکار فعال', 'دعوت در انتظار', 'غیرفعال به‌خاطر پلن', 'سقف ورزشکار', 'سقف دستی']];
+        $rows = [['مربی', 'موبایل', 'باشگاه', 'پلن', 'وضعیت', 'شروع', 'پایان', 'پایان مهلت', 'ورزشکار فعال', 'دعوت در انتظار', 'غیرفعال به‌خاطر پلن', 'سقف ورزشکار', 'سقف دستی', 'حرکت سفارشی', 'سقف حرکت', 'قالب', 'سقف قالب']];
         if (!Limits::ready()) {
             return $rows;
         }
@@ -213,6 +213,10 @@ final class ExportController
                 $l['usage']['suspended'],
                 $l['max_athletes'] ?? 'بدون محدودیت',
                 $l['override'] ? 'بله' : '',
+                $l['content']['exercises']['used'] ?? null,
+                isset($l['content']) ? ($l['content']['exercises']['max'] ?? 'بدون محدودیت') : null,
+                $l['content']['templates']['used'] ?? null,
+                isset($l['content']) ? ($l['content']['templates']['max'] ?? 'بدون محدودیت') : null,
             ];
         }
         return $rows;
