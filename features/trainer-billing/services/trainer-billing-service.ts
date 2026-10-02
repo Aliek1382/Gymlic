@@ -318,11 +318,14 @@ export async function listTrainerDiscounts(): Promise<{
   ready: boolean;
   items: DiscountCodeRow[];
   plans: { id: string; name: string; price_toman: number; is_active: boolean }[];
+  personal?: boolean;
 }> {
   const data = await api.get<{
     ready: boolean;
     items: TrainerDiscountRow[];
     plans: { id: string; name: string; price_toman: number; is_active: boolean }[];
+    /** Whether a code can be tied to one trainer (its database update has run). */
+    personal?: boolean;
   }>("/admin/trainer-discounts");
   return {
     ...data,

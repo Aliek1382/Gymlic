@@ -25,6 +25,12 @@ final class TrainerDiscounts
             && Database::hasColumn('trainer_payment_requests', 'discount_code_id');
     }
 
+    /** False until trainer-discount-owner-update.sql: no code can be tied to one trainer yet. */
+    public static function personalReady(): bool
+    {
+        return self::ready() && Database::hasColumn('trainer_discount_codes', 'for_trainer_id');
+    }
+
     public static function uses(PDO $pdo, string $codeId, ?string $trainerId = null): int
     {
         $sql = "SELECT COUNT(*) FROM trainer_payment_requests
@@ -60,7 +66,9 @@ final class TrainerDiscounts
         $stmt->execute(['code' => Discounts::normalizeCode($code)]);
         $row = $stmt->fetch();
 
-        if ($row === false || !(bool) $row['is_active']) {
+        // A code that belongs to another trainer reads as no code at all.
+        if ($row === false || !(bool) $row['is_active']
+            || (($row['for_trainer_id'] ?? null) !== null && $row['for_trainer_id'] !== $trainerId)) {
             return self::fail('invalid_code', 'کد تخفیف معتبر نیست.');
         }
         if ($row['expires_at'] !== null && strtotime((string) $row['expires_at']) <= time()) {

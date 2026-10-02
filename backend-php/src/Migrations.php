@@ -289,6 +289,12 @@ final class Migrations
             'title' => 'لوگو و واترمارک مربی روی برنامه‌ی چاپی',
             'check' => [['column', 'trainer_profiles', 'print_logo_url'], ['column', 'trainer_profiles', 'print_watermark']],
         ],
+        [
+            'id'    => 'trainer-discount-owner',
+            'file'  => 'trainer-discount-owner-update.sql',
+            'title' => 'کد تخفیف اختصاصی یک مربی (هدیه‌ی تولد)',
+            'check' => [['column', 'trainer_discount_codes', 'for_trainer_id']],
+        ],
     ];
 
     /**

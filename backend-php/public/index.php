@@ -71,6 +71,7 @@ use Gymlic\Controllers\SupportController;
 use Gymlic\Controllers\TechniqueController;
 use Gymlic\Controllers\TrainerBillingController;
 use Gymlic\Controllers\TrainerDiscountController;
+use Gymlic\Controllers\TrainerGiftController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
@@ -365,6 +366,9 @@ $router->delete('/admin/trainer-billing/requests/{id}/receipt', fn (array $p) =>
 $router->get('/admin/trainer-billing/subscriptions', fn () => TrainerBillingController::adminSubscriptions());
 $router->post('/admin/trainer-billing/subscriptions/{trainerId}/grant', fn (array $p) => TrainerBillingController::grant($p));
 $router->get('/admin/trainer-discounts', fn () => TrainerDiscountController::list());
+// A discount code only one trainer can use, sent to them (a birthday gift).
+$router->get('/admin/trainer-birthdays', fn () => TrainerGiftController::birthdays());
+$router->post('/admin/trainers/{id}/gift-code', fn (array $p) => TrainerGiftController::create($p));
 $router->post('/admin/trainer-discounts', fn () => TrainerDiscountController::create());
 $router->patch('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::update($p));
 $router->delete('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::delete($p));

@@ -46,29 +46,61 @@ final class Birthdays
             . (Database::hasColumn('trainer_athletes', 'suspended_by_plan') ? ' AND ta.suspended_by_plan = 0' : '')
         );
         $stmt->execute(['t' => $trainerId]);
-        $athletes = $stmt->fetchAll();
-        if ($athletes === []) {
+        return array_map(static function (array $b): array {
+            $b['athlete_id'] = $b['id'];
+            unset($b['id']);
+            return $b;
+        }, self::within($stmt->fetchAll(), $days));
+    }
+
+    /**
+     * Trainers with a birthday in the next $days days (0 = today), soonest
+     * first: for the admin's «تولد مربی‌ها».
+     *
+     * @return list<array<string, mixed>> id, first_name, last_name, phone, email, birth_date, date, days_left, age
+     */
+    public static function trainers(PDO $pdo, int $days = 7): array
+    {
+        $rows = $pdo->query(
+            "SELECT id, first_name, last_name, phone, email, birth_date FROM profiles
+             WHERE account_type = 'trainer' AND birth_date IS NOT NULL AND is_suspended = 0"
+        )->fetchAll();
+        return self::within($rows, $days);
+    }
+
+    /** The current Jalali year in Tehran. */
+    public static function jalaliYear(): int
+    {
+        $now = new DateTimeImmutable('now', new DateTimeZone(self::TIMEZONE));
+        return Jalali::fromGregorian((int) $now->format('Y'), (int) $now->format('n'), (int) $now->format('j'))[0];
+    }
+
+    /**
+     * The rows (each with birth_date) whose birthday falls in the next $days
+     * days, each with date (Y-m-d of that day), days_left and the age reached.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private static function within(array $rows, int $days): array
+    {
+        if ($rows === []) {
             return [];
         }
-
         $today = new DateTimeImmutable('today', new DateTimeZone(self::TIMEZONE));
         $out = [];
         for ($d = 0; $d <= $days; $d++) {
             $day = $today->modify("+{$d} days");
             [$jy, $jm, $jd] = Jalali::fromGregorian((int) $day->format('Y'), (int) $day->format('n'), (int) $day->format('j'));
-            foreach ($athletes as $a) {
-                [$by, $bm, $bd] = self::jalaliOf((string) $a['birth_date']);
+            foreach ($rows as $row) {
+                [$by, $bm, $bd] = self::jalaliOf((string) $row['birth_date']);
                 if ($bm === 0 || $jy <= $by || !self::falls($jy, $jm, $jd, $bm, $bd)) {
                     continue;
                 }
-                $out[] = [
-                    'athlete_id' => $a['id'],
-                    'first_name' => $a['first_name'],
-                    'last_name'  => $a['last_name'],
-                    'birth_date' => substr((string) $a['birth_date'], 0, 10),
-                    'date'       => $day->format('Y-m-d'),
-                    'days_left'  => $d,
-                    'age'        => $jy - $by,
+                $out[] = ['birth_date' => substr((string) $row['birth_date'], 0, 10)] + $row + [
+                    'date'      => $day->format('Y-m-d'),
+                    'days_left' => $d,
+                    'age'       => $jy - $by,
                 ];
             }
         }
