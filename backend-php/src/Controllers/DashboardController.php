@@ -254,6 +254,8 @@ final class DashboardController
     {
         $pdo = Database::connection();
         $rows = [];
+        // Old finished plans hidden by the trainer's plan don't show here either.
+        $cutoff = Limits::historyCutoff($pdo, $trainerId);
 
         foreach (['workout', 'nutrition'] as $kind) {
             $stmt = $pdo->prepare(
@@ -261,10 +263,11 @@ final class DashboardController
                         p.first_name, p.last_name
                  FROM ' . Acl::planTable($kind) . ' a
                  LEFT JOIN profiles p ON p.id = a.athlete_id
-                 WHERE a.trainer_id = :trainer_id AND a.status <> \'draft\' AND a.is_template = 0
+                 WHERE a.trainer_id = :trainer_id AND a.status <> \'draft\' AND a.is_template = 0'
+                . Limits::historyVisibleSql($cutoff, 'a.') . '
                  ORDER BY a.assigned_at DESC LIMIT ' . $limit
             );
-            $stmt->execute(['trainer_id' => $trainerId]);
+            $stmt->execute(['trainer_id' => $trainerId] + ($cutoff !== null ? ['history_cutoff' => $cutoff] : []));
             foreach ($stmt->fetchAll() as $row) {
                 $rows[] = $row + ['kind' => $kind];
             }

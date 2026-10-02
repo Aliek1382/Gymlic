@@ -36,6 +36,8 @@ final class NutritionPlanBuilderController
         $user = Auth::requireUser();
         $assignment = self::assignmentOr404($params['id']);
 
+        // The trainer's own old finished plan may be hidden by their plan's history limit.
+        Limits::requirePlanVisible($assignment, $user['id']);
         if ($assignment['trainer_id'] !== $user['id']) {
             Acl::require(Acl::canViewPlan($user, $assignment));
             if ($assignment['athlete_id'] === $user['id']) {
@@ -52,6 +54,7 @@ final class NutritionPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
 
         $data = Validate::required(Validate::body(), ['meal_name']);
         $pdo = Database::connection();
@@ -83,6 +86,7 @@ final class NutritionPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $meal = self::mealOr404($params['id'], $params['mealId']);
 
         $data = Validate::body();
@@ -116,6 +120,7 @@ final class NutritionPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $meal = self::mealOr404($params['id'], $params['mealId']);
 
         Database::connection()
@@ -131,6 +136,7 @@ final class NutritionPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $meal = self::mealOr404($params['id'], $params['mealId']);
 
         $data = Validate::required(Validate::body(), ['food_id', 'amount']);
@@ -175,6 +181,7 @@ final class NutritionPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $meal = self::mealOr404($params['id'], $params['mealId']);
         $item = self::itemOr404($meal['id'], $params['itemId']);
 
@@ -217,6 +224,7 @@ final class NutritionPlanBuilderController
         $assignment = self::assignmentOr404($params['id']);
         Acl::require($assignment['trainer_id'] === $user['id']);
         Limits::requireWritable($user['id'], $assignment['athlete_id'] ?? null);
+        Limits::requirePlanVisible($assignment, $user['id']);
         $meal = self::mealOr404($params['id'], $params['mealId']);
         $item = self::itemOr404($meal['id'], $params['itemId']);
 

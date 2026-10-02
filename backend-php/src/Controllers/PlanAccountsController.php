@@ -179,7 +179,43 @@ final class PlanAccountsController
                 'limits'     => $limits,
             ];
         }
-        return $out;
+        return self::withHiddenPlans($pdo, $out);
+    }
+
+    /**
+     * Each trainer's finished plans hidden by their history limit (phase 3),
+     * as limits.history.hidden: one query per distinct cutoff, not per trainer.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private static function withHiddenPlans(PDO $pdo, array $rows): array
+    {
+        $byCutoff = [];
+        foreach ($rows as $i => $row) {
+            $rows[$i]['limits']['history']['hidden'] = 0;
+            $cutoff = $row['limits']['history']['cutoff'] ?? null;
+            if ($cutoff !== null) {
+                $byCutoff[$cutoff][$row['id']] = $i;
+            }
+        }
+        foreach ($byCutoff as $cutoff => $index) {
+            $ids = array_keys($index);
+            $marks = implode(',', array_fill(0, count($ids), '?'));
+            foreach (['workout_assignments', 'nutrition_assignments'] as $table) {
+                $stmt = $pdo->prepare(
+                    "SELECT trainer_id, COUNT(*) FROM {$table}
+                     WHERE trainer_id IN ({$marks}) AND is_template = 0
+                       AND status IN (" . Limits::FINISHED_STATUSES . ") AND assigned_at < ?
+                     GROUP BY trainer_id"
+                );
+                $stmt->execute([...$ids, $cutoff]);
+                foreach ($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $trainerId => $count) {
+                    $rows[$index[$trainerId]]['limits']['history']['hidden'] += (int) $count;
+                }
+            }
+        }
+        return $rows;
     }
 
     /** @return list<array<string, mixed>> */

@@ -314,6 +314,21 @@ allows; every cap is checked on the server.
   Trainers can now edit their own exercises (`PATCH /library/exercises/{id}`)
   and delete one no plan uses (`DELETE`, 409 `in_use` otherwise), which frees
   a place. Food and supplement libraries have no cap.
+- **Plan history (phase 3).** A trainer sees their finished plans
+  (completed / cancelled) back `history_months` of the plan in effect,
+  counted from `assigned_at` (the plans have no created_at; it is set when
+  the plan is made and never moves). Active plans and drafts always show.
+  Nothing is deleted: a renewal or upgrade moves the cutoff and they show at
+  once. Applied, for the trainer only, to the plan list (which returns how
+  many are hidden), opening, editing or saving as a template by id, the
+  builders, the completed-plans report list, the plans offered in messages
+  and a plan's comment thread (403 `history_hidden`), and the dashboard's
+  recent activity. Athletes always see all of theirs; no limit while the
+  trainer's club has a plan running. `Limits::historyCutoff` /
+  `historyVisibleSql` are separate pieces, so the full export of a later
+  phase simply doesn't apply them. Not filtered yet (statistics, phase 4):
+  the reports' counts and rates, the dashboard counters, per-athlete plan
+  counts, workout logs and progress, and invoices (a financial record).
 - **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
   plan opens; the seven plans carry their tier (free/silver/gold/diamond),
   and a plan counts as running for tiers through its grace days too. The

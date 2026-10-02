@@ -314,6 +314,9 @@ function AccountRow({ account, onManage }: { account: PlanAccount; onManage: () 
             {account.limits.usage.suspended > 0 && (
               <p className="text-xs text-warning">{formatNumber(account.limits.usage.suspended)} غیرفعال</p>
             )}
+            {(account.limits.history?.hidden ?? 0) > 0 && (
+              <p className="text-xs">{formatNumber(account.limits.history!.hidden!)} برنامهٔ پنهان</p>
+            )}
             {account.limits.content && (
               <p className="text-xs">
                 {account.limits.content.via_club ? (

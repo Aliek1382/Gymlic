@@ -212,17 +212,28 @@ function toPlanEntry(row: PlanRow): PlanEntry {
   };
 }
 
+/**
+ * Finished plans older than the trainer's plan shows (history_months),
+ * left out of the list by the server; null when nothing is limited.
+ */
+export interface HiddenPlans {
+  count: number;
+  months: number | null;
+}
+
 export async function listPlans(
   kind: PlanKind,
   target: PlanTarget
-): Promise<PlanEntry[]> {
+): Promise<{ items: PlanEntry[]; hidden: HiddenPlans | null }> {
   const params =
     "athleteId" in target
       ? { athlete_id: target.athleteId }
       : { invitation_id: target.invitationId };
 
-  const data = await api.get<ListResponse<PlanRow>>(`/plans/${kind}${query(params)}`);
-  return data.items.map(toPlanEntry);
+  const data = await api.get<ListResponse<PlanRow> & { hidden?: HiddenPlans | null }>(
+    `/plans/${kind}${query(params)}`
+  );
+  return { items: data.items.map(toPlanEntry), hidden: data.hidden ?? null };
 }
 
 export async function listMyPlans(kind: PlanKind): Promise<PlanEntry[]> {

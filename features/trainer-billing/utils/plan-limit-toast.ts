@@ -12,6 +12,7 @@ const PLAN_LIMIT_CODES = new Set([
   "club_plan_required",
   "exercise_limit",
   "template_limit",
+  "history_hidden",
 ]);
 
 /**

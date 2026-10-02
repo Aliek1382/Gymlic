@@ -7,6 +7,7 @@ use Gymlic\Acl;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Response;
 
 /** Trainer-side analytics. All read-only. */
@@ -223,13 +224,17 @@ final class ReportController
 
         $pdo = Database::connection();
         $rows = [];
+        // A list of the trainer's old plans: the history limit applies (Limits).
+        $cutoff = Limits::historyCutoff($pdo, $user['id']);
 
         foreach (['workout', 'nutrition'] as $kind) {
             $stmt = $pdo->prepare(
                 'SELECT id, title, assigned_at FROM ' . Acl::planTable($kind) . "
                  WHERE trainer_id = :trainer_id AND athlete_id = :athlete_id AND status = 'completed'"
+                . Limits::historyVisibleSql($cutoff)
             );
-            $stmt->execute(['trainer_id' => $user['id'], 'athlete_id' => $athleteId]);
+            $stmt->execute(['trainer_id' => $user['id'], 'athlete_id' => $athleteId]
+                + ($cutoff !== null ? ['history_cutoff' => $cutoff] : []));
             foreach ($stmt->fetchAll() as $row) {
                 $rows[] = $row + ['kind' => $kind];
             }
