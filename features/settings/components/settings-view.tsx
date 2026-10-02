@@ -10,6 +10,7 @@ import { NotificationChannelsCard } from "./notification-channels-card";
 import { PasswordForm } from "./password-form";
 import { ProfileInfoForm } from "./profile-info-form";
 import { SignOutSection } from "./sign-out-section";
+import { TrainerDataExportCard } from "./trainer-data-export";
 
 export function SettingsView() {
   const profile = useProfile();
@@ -44,6 +45,7 @@ export function SettingsView() {
       <NotificationChannelsCard profile={profile.data} />
       <EmailForm currentEmail={profile.data.email} />
       <PasswordForm />
+      {profile.data.accountType === "trainer" && <TrainerDataExportCard />}
       <SignOutSection />
     </div>
   );

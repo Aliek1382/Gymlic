@@ -1,12 +1,5 @@
-import {
-  ApiError,
-  api,
-  fullName,
-  getApiBaseUrl,
-  getToken,
-  query,
-  type ListResponse,
-} from "@/lib/api/client";
+import { api, fullName, query, type ListResponse } from "@/lib/api/client";
+import { downloadFile } from "@/lib/api/download-file";
 import {
   calendarWindowStart,
   computeWeekStreak,
@@ -186,32 +179,8 @@ export async function listCompletedPlansForAthlete(
 
 /**
  * The reports page as an .xlsx (report level full_excel; the server refuses
- * it otherwise with 402 report_locked). A file, not JSON: fetched with the
- * session token and handed to the browser as a download.
+ * it otherwise with 402 report_locked).
  */
-export async function downloadReportExcel(): Promise<void> {
-  const token = getToken();
-  const response = await fetch(`${getApiBaseUrl()}/reports/trainer/excel`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new ApiError(
-      payload?.error?.message ?? "دریافت فایل ناموفق بود.",
-      response.status,
-      payload?.error?.code ?? "export_failed"
-    );
-  }
-
-  const name =
-    /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "")?.[1] ??
-    "gymlic-report.xlsx";
-  const url = URL.createObjectURL(await response.blob());
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+export function downloadReportExcel(): Promise<void> {
+  return downloadFile("/reports/trainer/excel", "gymlic-report.xlsx");
 }

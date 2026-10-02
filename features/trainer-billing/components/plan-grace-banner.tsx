@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarClock, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { TrainerDataExportButton } from "@/features/settings/components/trainer-data-export";
 import { formatNumber, formatPersianDate } from "@/lib/persian";
 import type { TrainerLimits } from "../services/trainer-billing-service";
 
@@ -46,6 +47,7 @@ export function PlanGraceBanner({
           </>
         }
         chooseLink={showChooseLink && limits.suspend_after_grace > 0}
+        exportLink
       />
     );
   }
@@ -68,6 +70,7 @@ export function PlanGraceBanner({
         title="برخی ورزشکاران غیرفعال هستند"
         text={`اشتراک شما و مهلت پس از آن تمام شده و پلن رایگان تا ${formatNumber(limits.free_max_athletes ?? 0)} ورزشکار فعال دارد؛ ${formatNumber(limits.usage.suspended)} ورزشکار غیرفعال شده‌اند. برنامه‌هایشان فقط‌خواندنی است. با تمدید، همه فوراً برمی‌گردند.`}
         chooseLink={showChooseLink}
+        exportLink
       />
     );
   }
@@ -80,11 +83,14 @@ function Banner({
   title,
   text,
   chooseLink,
+  exportLink = false,
 }: {
   tone: "warning" | "info";
   title: string;
   text: React.ReactNode;
   chooseLink: boolean;
+  /** After a paid plan ends: the trainer's data stays theirs to take, on any plan. */
+  exportLink?: boolean;
 }) {
   const Icon = tone === "warning" ? TriangleAlert : CalendarClock;
   return (
@@ -108,6 +114,7 @@ function Banner({
             <Link href="/subscription/athletes">انتخاب ورزشکاران فعال</Link>
           </Button>
         )}
+        {exportLink && <TrainerDataExportButton size="sm" variant="ghost" label="اطلاعات خود را دریافت کنید" />}
         <Button size="sm" asChild>
           <Link href="/subscription">تمدید اشتراک</Link>
         </Button>

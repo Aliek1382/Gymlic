@@ -345,6 +345,22 @@ allows; every cap is checked on the server.
   the trainer's club has a plan running. Never limited: progress
   measurements, earnings and its summary, streaks, birthdays, anything an
   athlete sees.
+- **The trainer's full data export (phase 5).** «دریافت همه‌ی اطلاعات» in
+  the trainer's settings (and in the grace / downgrade banner):
+  `GET /trainer/data-export`, `TrainerDataExportController`. A right, not a
+  plan feature: open on every plan, free included, grace days and after,
+  whatever `billing.trainer_enforce` says. One per trainer every 10 minutes
+  (429 `export_too_soon`, checked and logged under a row lock), each logged
+  as `trainer_data_export`. One .xlsx, a sheet per kind: athletes (with
+  status, suspended included), every plan (the history limit is not
+  applied), the builder's plan rows, templates, custom exercises / foods /
+  supplements / techniques, measurements (with BMI), earnings, invoices,
+  session packages, plan comments, notes, calendar, workout ticks,
+  questionnaires and the résumé. Only the trainer's own, also in a club; no
+  platform payments, no discount codes. `Xlsx` streams (deflated on the fly,
+  queries unbuffered), so a big account doesn't run out of memory or time;
+  a table an update hasn't created yet is left out. Separate from the
+  reports page's Excel export.
 - **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
   plan opens; the seven plans carry their tier (free/silver/gold/diamond),
   and a plan counts as running for tiers through its grace days too. The

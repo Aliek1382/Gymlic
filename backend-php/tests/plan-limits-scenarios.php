@@ -532,18 +532,15 @@ function reports(string $token, string $athlete): array
     return $out;
 }
 
-/** [status, error code or null, the xlsx's sheets (name => XML) or null] of the Excel report. */
-function excel(string $token): array
+/** The sheets of an .xlsx (name => XML), or null when it isn't one. */
+function sheetsOf(string $raw): ?array
 {
-    [$status, $data] = call('GET', '/reports/trainer/excel', null, $token);
-    if ($status !== 200) {
-        return [$status, $data['error']['code'] ?? null, null];
-    }
     $path = tempnam(sys_get_temp_dir(), 'xlsx');
-    file_put_contents($path, $data['raw'] ?? '');
+    file_put_contents($path, $raw);
     $zip = new ZipArchive();
     if ($zip->open($path) !== true) {
-        return [$status, 'not_a_zip', null];
+        unlink($path);
+        return null;
     }
     preg_match_all('/<sheet name="([^"]+)"/', (string) $zip->getFromName('xl/workbook.xml'), $names);
     $sheets = [];
@@ -552,7 +549,18 @@ function excel(string $token): array
     }
     $zip->close();
     unlink($path);
-    return [$status, null, $sheets];
+    return $sheets;
+}
+
+/** [status, error code or null, the xlsx's sheets (name => XML) or null] of the Excel report. */
+function excel(string $token): array
+{
+    [$status, $data] = call('GET', '/reports/trainer/excel', null, $token);
+    if ($status !== 200) {
+        return [$status, $data['error']['code'] ?? null, null];
+    }
+    $sheets = sheetsOf($data['raw'] ?? '');
+    return [$status, $sheets === null ? 'not_a_zip' : null, $sheets];
 }
 
 /** How many report_excel_export entries the trainer has in the activity log. */
@@ -670,6 +678,110 @@ check($status === 400, 'and on a club plan', $status);
 $lvl = $pdo->prepare('SELECT report_level FROM trainer_plans WHERE id = :id');
 $lvl->execute(['id' => $tPlan['طلایی']]);
 check($lvl->fetchColumn() === 'full', 'the plan keeps its level');
+
+// ---- Phase 5: the trainer's full data export ------------------------------
+
+/**
+ * [status, error code, sheets] of «دریافت همه‌ی اطلاعات». Unless $keepLimit,
+ * the export is then dated 11 minutes back, so the next check isn't held up
+ * by the one-per-10-minutes limit.
+ */
+function dataExport(string $token, string $trainerId, bool $keepLimit = false): array
+{
+    global $pdo;
+    [$status, $data] = call('GET', '/trainer/data-export', null, $token);
+    if (!$keepLimit) {
+        $pdo->prepare("UPDATE activity_logs SET created_at = created_at - INTERVAL 11 MINUTE WHERE actor_id = :t AND action = 'trainer_data_export'")
+            ->execute(['t' => $trainerId]);
+    }
+    if ($status !== 200) {
+        return [$status, $data['error']['code'] ?? null, null];
+    }
+    $sheets = sheetsOf($data['raw'] ?? '');
+    return [$status, $sheets === null ? 'not_a_zip' : null, $sheets];
+}
+
+/** The text of a sheet's cells, for "contains" checks. */
+function sheetText(?array $sheets, string $name): string
+{
+    return html_entity_decode(strip_tags(str_replace('</c>', ' | ', $sheets[$name] ?? '')));
+}
+
+echo "\nPhase 5: a free trainer takes all of their data\n";
+[$d1, $d1Id] = account('data1', 'trainer');
+$dAthletes = [];
+for ($i = 1; $i <= 3; $i++) {
+    [, $inv] = invite($d1);
+    [, , $id, $tok] = accept($inv['code'], "data-athlete{$i}");
+    $dAthletes[] = [$id, $tok];
+}
+[$dAthlete, $dAthleteToken] = $dAthletes[0];
+// One suspended by the plan, one by hand: both still in the file.
+$pdo->prepare('UPDATE trainer_athletes SET suspended_by_plan = 1 WHERE trainer_id = :t AND athlete_id = :a')->execute(['t' => $d1Id, 'a' => $dAthletes[1][0]]);
+$pdo->prepare("UPDATE trainer_athletes SET status = 'suspended' WHERE trainer_id = :t AND athlete_id = :a")->execute(['t' => $d1Id, 'a' => $dAthletes[2][0]]);
+$dOld = agedPlan($d1, $dAthlete, 'برنامهٔ قدیمی پنهان', 8, 'completed');
+[, $dPlan] = call('POST', '/plans/workout', ['title' => 'برنامهٔ جاری داده', 'athlete_id' => $dAthlete, 'description' => "شنبه:\nاسکوات"], $d1);
+call('POST', "/plans/workout/{$dPlan['id']}/comments", ['body' => 'کامنت ورزشکار روی برنامه'], $dAthleteToken);
+call('POST', "/athletes/{$dAthlete}/measurements", ['measured_at' => date('Y-m-d'), 'weight_kg' => 80, 'height_cm' => 180], $d1);
+call('POST', '/earnings', ['athlete_id' => $dAthlete, 'amount_toman' => 750000, 'paid_at' => date('Y-m-d')], $d1);
+exercise($d1, 'حرکت سفارشی داده');
+$pdo->prepare("INSERT INTO athlete_discount_codes (id, trainer_id, code, kind, value) VALUES (UUID(), :t, :c, 'percent', 10)")
+    ->execute(['t' => $d1Id, 'c' => 'SECRET' . strtoupper($run)]);
+[$status, $dPayment] = call('POST', '/trainer-billing/requests', ['plan_id' => $tPlan['نقره‌ای'], 'tracking_code' => 'PAYDATA' . $run, 'card_last4' => '4321'], $d1);
+check(!in_array('برنامهٔ قدیمی پنهان', planList($d1, $dAthlete)[0], true), 'the 8-month-old finished plan is hidden from the free trainer\'s list (phase 3)');
+
+[$status, $code, $sheets] = dataExport($d1, $d1Id, true);
+check($status === 200 && $sheets !== null, 'a free trainer gets the file', [$status, $code]);
+[$status, $code] = dataExport($d1, $d1Id, true);
+check($status === 429 && $code === 'export_too_soon', 'a second one within 10 minutes is refused', [$status, $code]);
+$logs = $pdo->prepare("SELECT COUNT(*) FROM activity_logs WHERE action = 'trainer_data_export' AND actor_id = :t");
+$logs->execute(['t' => $d1Id]);
+check((int) $logs->fetchColumn() === 1, 'the export is in the activity log, the refused one is not');
+[, $hist] = call('GET', "/admin/plan-accounts/trainer/{$d1Id}", null, $adminToken);
+check(in_array('trainer_data_export', array_column($hist['history'] ?? [], 'action'), true), "and in the trainer's history in the admin panel");
+$pdo->prepare("UPDATE activity_logs SET created_at = created_at - INTERVAL 11 MINUTE WHERE actor_id = :t AND action = 'trainer_data_export'")->execute(['t' => $d1Id]);
+
+$athletesText = sheetText($sheets, 'ورزشکاران');
+check(str_contains($athletesText, 'data-athlete2') && str_contains($athletesText, 'غیرفعال با پایان پلن')
+    && str_contains($athletesText, 'data-athlete3') && str_contains($athletesText, 'معلق'),
+    'athletes suspended by the plan and by hand are in it, with their status', $athletesText);
+check(str_contains(sheetText($sheets, 'برنامه‌های تمرینی'), 'برنامهٔ قدیمی پنهان'), 'the plan the history limit hides is in it');
+check(str_contains(sheetText($sheets, 'کامنت‌های برنامه‌ها'), 'کامنت ورزشکار روی برنامه'), 'plan comments');
+$measure = sheetText($sheets, 'اندازه‌گیری‌ها');
+check(str_contains($measure, '24.7'), 'measurements, with BMI worked out (80 kg, 180 cm → 24.7)', $measure);
+check(str_contains(sheetText($sheets, 'درآمد من'), '750000'), 'earnings');
+check(str_contains(sheetText($sheets, 'حرکت‌ها و موارد سفارشی'), 'حرکت سفارشی داده'), 'custom exercises');
+$all = implode('', $sheets ?? []);
+check(!str_contains($all, 'SECRET' . strtoupper($run)) && !str_contains($all, 'PAYDATA' . $run) && !str_contains($all, '4321'),
+    'no discount codes and no platform subscription payments');
+check(count($sheets ?? []) > 0 && substr_count($all, 'rightToLeft="1"') === count($sheets), 'every sheet is right-to-left');
+check(isset($sheets['برنامه‌های تمرینی']) && str_contains(sheetText($sheets, 'برنامه‌های تمرینی'), \Gymlic\Jalali::format(date('Y-m-d'))),
+    'Persian sheet names and Jalali dates', \Gymlic\Jalali::format(date('Y-m-d')));
+check(!str_contains($all, 'reports-athlete') && !str_contains($all, 'history-athlete'), "no other trainer's athletes");
+
+echo "\nThe same with enforcement off, in the grace days and after them\n";
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => false, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+[$status, , $off] = dataExport($d1, $d1Id);
+check($status === 200 && array_keys($off ?? []) === array_keys($sheets ?? []) && sheetText($off, 'ورزشکاران') === $athletesText,
+    'with enforcement off: the same file');
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => true, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+admin('trainer', $d1Id, ['action' => 'activate', 'plan_id' => $tPlan['طلایی'], 'started_at' => $day(-40), 'expires_at' => $day(-1)]);
+check((limits($d1)['status'] ?? null) === 'grace' && dataExport($d1, $d1Id)[0] === 200, 'in the grace days');
+admin('trainer', $d1Id, ['action' => 'dates', 'started_at' => $day(-40), 'expires_at' => $day(-8)]);
+check((limits($d1)['status'] ?? null) === 'expired' && dataExport($d1, $d1Id)[0] === 200, 'after them (expired)');
+
+echo "\nAbove the caps, and in a club only one's own\n";
+[$status, , $sheets] = dataExport($c2, $c2Id);
+$custom = sheetText($sheets, 'حرکت‌ها و موارد سفارشی');
+check($status === 200 && substr_count($custom, 'حرکت') >= 7 && str_contains($custom, 'بدون محدودیت')
+    && str_contains(sheetText($sheets, 'قالب‌ها'), 'بدون محدودیت'),
+    'a free trainer above the exercise and template caps gets all of them', $custom);
+[$status, , $sheets] = dataExport($c3, $c3Id);
+$all = implode('', $sheets ?? []);
+check($status === 200 && str_contains($all, 'history-club-athlete') && !str_contains($all, 'club-colleague-athlete'),
+    "a club trainer gets their own athletes, not the club's", $status);
+[$athleteStatus] = call('GET', '/trainer/data-export', null, $dAthleteToken);
+check($athleteStatus === 403, 'an athlete cannot use it', $athleteStatus);
 
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);
