@@ -32,7 +32,11 @@ import { SubscriptionStatusBadge } from "@/features/admin/components/subscriptio
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
-import { PaymentInfoCard } from "@/features/finance/components/payment-info-card";
+import {
+  hasPaymentInfo,
+  PaymentInfoCard,
+  PaymentInfoMissing,
+} from "@/features/finance/components/payment-info-card";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -530,7 +534,7 @@ function PaymentDialog({
             </div>
           )}
 
-          {!free && <PaymentInfoCard info={data.payment} />}
+          {!free && (hasPaymentInfo(data.payment) ? <PaymentInfoCard info={data.payment} /> : <PaymentInfoMissing />)}
 
           {!free && (
           <>

@@ -35,7 +35,11 @@ function CopyRow({ label, value, display }: { label: string; value: string; disp
   );
 }
 
-/** Where a club transfers the money for its subscription. Nothing set = nothing shown. */
+/**
+ * Where the money for a subscription goes: the card the admin set in the
+ * billing settings, shown to a club or a trainer paying for a plan. Nothing set = nothing shown
+ * (see PaymentInfoMissing for the notice to put instead).
+ */
 export function PaymentInfoCard({ info }: { info: PaymentInfo | null | undefined }) {
   if (!info || (!info.card_number && !info.sheba && !info.instructions)) return null;
 
@@ -58,5 +62,19 @@ export function PaymentInfoCard({ info }: { info: PaymentInfo | null | undefined
         </p>
       )}
     </div>
+  );
+}
+
+/** Whether the admin has put any receiving details for the payer to see. */
+export function hasPaymentInfo(info: PaymentInfo | null | undefined): boolean {
+  return !!info && !!(info.card_number || info.sheba || info.instructions);
+}
+
+/** Shown in place of the card when the admin has not entered it yet. */
+export function PaymentInfoMissing() {
+  return (
+    <p className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
+      مدیریت هنوز شمارهٔ کارت را در سایت ثبت نکرده است. روش پرداخت را از پشتیبانی بپرسید.
+    </p>
   );
 }
