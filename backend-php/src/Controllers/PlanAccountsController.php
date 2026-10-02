@@ -51,9 +51,8 @@ final class PlanAccountsController
         'plan_activate', 'plan_dates', 'plan_extend', 'plan_override', 'plan_reactivate', 'plan_revoke_invites',
         'trainer_payment_approved', 'trainer_payment_rejected', 'trainer_subscription_granted',
         'payment_request_approved', 'subscription_renewed', 'subscription_gifted', 'subscription_set',
+        'report_excel_export',
     ];
-
-    private const REPORT_LEVELS = ['count', 'basic', 'full', 'full_excel'];
 
     // ---- Reading ---------------------------------------------------------
 
@@ -628,7 +627,7 @@ final class PlanAccountsController
         }
         if (array_key_exists('report_level', $data)) {
             $level = $data['report_level'];
-            if ($level !== null && $level !== '' && !in_array($level, self::REPORT_LEVELS, true)) {
+            if ($level !== null && $level !== '' && !in_array($level, Limits::REPORT_LEVELS, true)) {
                 return ['error' => ['invalid_report_level', 'سطح گزارش معتبر نیست.']];
             }
             $out['report_level'] = $level === '' ? null : $level;

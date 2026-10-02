@@ -64,6 +64,7 @@ export const PLAN_ACTION_LABEL: Record<string, string> = {
   subscription_renewed: "تمدید دستی اشتراک باشگاه",
   subscription_gifted: "روز هدیه به باشگاه",
   subscription_set: "تنظیم دستی اشتراک باشگاه",
+  report_excel_export: "خروجی اکسل گزارش (مربی)",
 };
 
 /** The plan, dates and caps of one trainer or club, changed by hand. */

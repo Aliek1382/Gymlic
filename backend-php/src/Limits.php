@@ -187,6 +187,7 @@ final class Limits
             'club'         => $club,
             'content'      => $contentShape,
             'history'      => self::historyShape($plan, $content, $enforcing),
+            'reports'      => self::reportsShape($plan, $content, $enforcing),
         ];
     }
 
@@ -268,6 +269,77 @@ final class Limits
             'این برنامه قدیمی‌تر از ' . self::fa((int) $months) . ' ماه است و در پلن فعلی شما نمایش داده نمی‌شود. برای دیدن برنامه‌های قدیمی‌تر، پلن خود را ارتقا دهید.'
         );
         exit;
+    }
+
+    // ---- Report levels (phase 4) -----------------------------------------
+
+    /** Lowest to highest; each level includes the ones before it. */
+    public const REPORT_LEVELS = ['count', 'basic', 'full', 'full_excel'];
+
+    /**
+     * Which report sections the trainer gets: report_level of the plan in
+     * effect (the free plan's once a paid one and its grace days have
+     * ended). level: the plan's (null = unlimited, which is full_excel).
+     * effective: what applies now; full_excel while enforcement is off or
+     * the trainer's club has a plan running (club plans don't limit reports).
+     *
+     * @param array<string, mixed> $plan
+     * @param array{club_running: bool}|null $content
+     * @return array{level: ?string, effective: string}
+     */
+    private static function reportsShape(array $plan, ?array $content, bool $enforcing): array
+    {
+        $level = ($content === null || $content['club_running']) ? null : ($plan['report_level'] ?? null);
+        if ($level !== null && !in_array($level, self::REPORT_LEVELS, true)) {
+            $level = null;
+        }
+        return ['level' => $level, 'effective' => $enforcing && $level !== null ? $level : 'full_excel'];
+    }
+
+    /** Whether report level $have includes $need. */
+    public static function reportAllows(string $have, string $need): bool
+    {
+        return (int) array_search($have, self::REPORT_LEVELS, true) >= (int) array_search($need, self::REPORT_LEVELS, true);
+    }
+
+    /**
+     * Ends the request with 402 report_locked unless the caller's report
+     * level includes $need. Only trainers are limited; the data is never
+     * computed for a level that doesn't include it.
+     *
+     * @param array<string, mixed> $user
+     * @param string $section the section's name in the message, e.g. «پایبندی هفتگی»
+     * @param string $verb what the trainer would do with it: «دیدن», «دریافت»
+     */
+    public static function requireReport(array $user, string $need, string $section, string $verb = 'دیدن'): void
+    {
+        if (($user['account_type'] ?? null) !== 'trainer' || !self::enforcing()) {
+            return;
+        }
+        $pdo = Database::connection();
+        if (self::reportAllows(self::forTrainer($pdo, $user['id'])['reports']['effective'], $need)) {
+            return;
+        }
+        $plan = self::cheapestReport($pdo, $need);
+        Response::error(
+            402,
+            'report_locked',
+            $section . ($plan !== null ? ' از پلن «' . $plan . '» فعال است' : ' در پلن فعلی شما نیست')
+                . '. برای ' . $verb . ' آن، پلن خود را ارتقا دهید.'
+        );
+        exit;
+    }
+
+    /** The cheapest plan on sale whose report level includes $need, by name. */
+    private static function cheapestReport(PDO $pdo, string $need): ?string
+    {
+        $levels = array_slice(self::REPORT_LEVELS, (int) array_search($need, self::REPORT_LEVELS, true));
+        $name = $pdo->query(
+            "SELECT name FROM trainer_plans WHERE is_active = 1 AND is_free = 0
+               AND (report_level IS NULL OR report_level IN ('" . implode("','", $levels) . "'))
+             ORDER BY price_toman ASC LIMIT 1"
+        )->fetchColumn();
+        return $name === false ? null : (string) $name;
     }
 
     // ---- Custom exercises and templates (phase 2) ------------------------
@@ -820,6 +892,7 @@ final class Limits
             'club'         => self::trainerClub($pdo, $trainerId),
             'content'      => null,
             'history'      => ['months' => null, 'cutoff' => null],
+            'reports'      => ['level' => null, 'effective' => 'full_excel'],
         ];
     }
 

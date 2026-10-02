@@ -55,6 +55,23 @@ final class Jalali
             : $text;
     }
 
+    public const MONTH_NAMES = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+
+    /** 'Y-m-d' of the first day of the Jalali month $date ('Y-m-d', default today in Tehran) falls in. */
+    public static function monthStart(?string $date = null): string
+    {
+        $day = new \DateTimeImmutable(($date ?? (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Tehran')))->format('Y-m-d')) . ' 12:00:00');
+        [, , $jd] = self::fromGregorian((int) $day->format('Y'), (int) $day->format('n'), (int) $day->format('j'));
+        return $day->modify('-' . ($jd - 1) . ' days')->format('Y-m-d');
+    }
+
+    /** «مهر 1405» for a 'Y-m-d' date. */
+    public static function monthLabel(string $date): string
+    {
+        [$jy, $jm] = self::fromGregorian((int) substr($date, 0, 4), (int) substr($date, 5, 2), (int) substr($date, 8, 2));
+        return self::MONTH_NAMES[$jm - 1] . ' ' . $jy;
+    }
+
     public static function isLeapYear(int $jy): bool
     {
         return self::cal($jy)['leap'] === 0;
