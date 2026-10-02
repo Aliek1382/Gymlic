@@ -770,6 +770,7 @@ CREATE TABLE trainer_discount_codes (
   kind             ENUM('percent','amount') NOT NULL,
   value            BIGINT NOT NULL,                  -- 1..100 for percent, toman for amount
   plan_id          CHAR(36) NULL,                    -- NULL = any trainer plan
+  for_trainer_id   CHAR(36) NULL,                    -- NULL = any trainer; else only this one (trainer-discount-owner-update.sql)
   max_uses         INT NULL,                         -- NULL = unlimited, pending and approved requests count
   once_per_trainer TINYINT(1) NOT NULL DEFAULT 0,
   expires_at       DATETIME NULL,
@@ -779,6 +780,7 @@ CREATE TABLE trainer_discount_codes (
   created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_tdiscount_code (code),
+  KEY idx_tdiscount_for_trainer (for_trainer_id),
   CONSTRAINT fk_tdiscount_plan FOREIGN KEY (plan_id) REFERENCES trainer_plans(id) ON DELETE CASCADE,
   CONSTRAINT fk_tdiscount_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL,
   CONSTRAINT chk_tdiscount_value CHECK (value > 0)

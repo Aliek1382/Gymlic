@@ -373,6 +373,16 @@ allows; every cap is checked on the server.
   year: sent by `cron/calendar-reminders.php`, and also when the trainer
   opens the dashboard, so it works on a host without that cron. Active
   athletes only (not suspended).
+- **Personal trainer codes and birthday gifts** (`TrainerGiftController`,
+  `trainer-discount-owner-update.sql`). A trainer-plan discount code can
+  belong to one trainer (`for_trainer_id`): any other trainer gets «کد
+  تخفیف معتبر نیست». The admin's discount page sets it by mobile or email;
+  the overview lists the coming week's trainer birthdays with «هدیه‌ی
+  تولد», and a trainer's page has «کد تخفیف اختصاصی»: a one-use code
+  (BDAY-… / GIFT-…) only that trainer can use, sent as the
+  `trainer_gift_code` notification and logged. One birthday gift per trainer
+  per Jalali year. Until the SQL runs no such code is made (it couldn't be
+  tied to one trainer).
 - **Print logo and watermark** (`PrintBrandingController`,
   `trainer-print-branding-update.sql`): the trainer's own logo and watermark
   text on a printed / PDF plan, theirs and their athletes'. /auth/me carries

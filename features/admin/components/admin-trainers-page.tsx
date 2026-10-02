@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatAge, formatNumber } from "@/lib/persian";
+import { formatAge, formatNumber, formatPersianDate } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
 
 import { listAdminProfiles } from "../services/admin-service";
@@ -60,7 +60,7 @@ export function AdminTrainersPage() {
               <TableRow>
                 <TableHead>مربی</TableHead>
                 <TableHead>تماس</TableHead>
-                <TableHead>سن</TableHead>
+                <TableHead>تاریخ تولد</TableHead>
                 <TableHead>باشگاه</TableHead>
                 <TableHead>تعداد شاگردان</TableHead>
                 <TableHead>وضعیت</TableHead>
@@ -105,7 +105,14 @@ export function AdminTrainersPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {age ?? "—"}
+                      {trainer.birth_date ? (
+                        <>
+                          <p>{formatPersianDate(new Date(`${trainer.birth_date.slice(0, 10)}T12:00:00`))}</p>
+                          {age && <p className="text-xs">{age}</p>}
+                        </>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {trainer.club_name || "مستقل"}

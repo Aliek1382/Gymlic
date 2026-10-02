@@ -66,6 +66,7 @@ export const PLAN_ACTION_LABEL: Record<string, string> = {
   subscription_set: "تنظیم دستی اشتراک باشگاه",
   report_excel_export: "خروجی اکسل گزارش (مربی)",
   trainer_data_export: "دریافت همه‌ی اطلاعات (مربی)",
+  trainer_gift_code: "کد تخفیف هدیه (مثلاً تولد)",
 };
 
 /** The plan, dates and caps of one trainer or club, changed by hand. */

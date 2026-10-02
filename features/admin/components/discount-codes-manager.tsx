@@ -51,7 +51,7 @@ type PlanOption = { id: string; name: string; price_toman: number; is_active: bo
 /** What differs between the club codes and the trainer codes. */
 export interface DiscountManagerConfig {
   queryKey: readonly string[];
-  load: () => Promise<{ ready: boolean; items: DiscountCodeRow[]; plans: PlanOption[] }>;
+  load: () => Promise<{ ready: boolean; items: DiscountCodeRow[]; plans: PlanOption[]; personal?: boolean }>;
   create: (input: DiscountCodeInput) => Promise<unknown>;
   update: (id: string, input: DiscountCodeInput) => Promise<unknown>;
   remove: (id: string) => Promise<unknown>;
@@ -65,6 +65,8 @@ export interface DiscountManagerConfig {
   hidePlanScope?: boolean;
   /** Highest percent a code may give; 100 (the default) for the platform's own, 99 where a code may not make it free. */
   maxPercent?: number;
+  /** The trainer codes: a code can belong to one trainer (given by mobile or email). */
+  personalLabel?: string;
 }
 
 function describe(code: Pick<DiscountCodeRow, "kind" | "value">): string {
@@ -136,6 +138,9 @@ export function DiscountCodesManager({ config }: { config: DiscountManagerConfig
                       <span dir="ltr" className="font-mono font-medium text-foreground">
                         {code.code}
                       </span>
+                      {code.for_trainer_id && (
+                        <p className="text-xs text-primary">فقط برای {code.for_trainer_name || code.for_trainer_contact || "یک مربی"}</p>
+                      )}
                       {code.note && <p className="max-w-48 truncate text-xs text-muted-foreground">{code.note}</p>}
                     </TableCell>
                     <TableCell className="text-foreground">{describe(code)}</TableCell>
@@ -187,6 +192,7 @@ export function DiscountCodesManager({ config }: { config: DiscountManagerConfig
           code={editing}
           config={config}
           plans={data.plans}
+          personal={!!data.personal && !!config.personalLabel}
           onClose={() => setEditing(null)}
           onSaved={refresh}
         />
@@ -213,12 +219,15 @@ function DiscountDialog({
   code,
   config,
   plans,
+  personal,
   onClose,
   onSaved,
 }: {
   code: DiscountCodeRow | "new" | null;
   config: DiscountManagerConfig;
   plans: PlanOption[];
+  /** Whether the code can be tied to one person here. */
+  personal: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -236,6 +245,7 @@ function DiscountDialog({
   );
   const [isActive, setIsActive] = useState(existing?.is_active ?? true);
   const [note, setNote] = useState(existing?.note ?? "");
+  const [forTrainer, setForTrainer] = useState(existing?.for_trainer_contact ?? "");
   const [saving, setSaving] = useState(false);
 
   const numericValue = parseLocaleNumber(value);
@@ -279,6 +289,7 @@ function DiscountDialog({
       expires_at: hasExpiry ? expiresAt : null,
       is_active: isActive,
       note: note.trim(),
+      ...(personal ? { for_trainer: forTrainer.trim() || null } : {}),
     };
 
     setSaving(true);
@@ -387,6 +398,24 @@ function DiscountDialog({
               onChange={(e) => setMaxUses(e.target.value)}
             />
           </div>
+
+          {personal && (
+            <div className="space-y-2">
+              <Label htmlFor="discount-for">
+                {config.personalLabel} <span className="text-muted-foreground">(اختیاری)</span>
+              </Label>
+              <Input
+                id="discount-for"
+                dir="ltr"
+                value={forTrainer}
+                placeholder="09xxxxxxxxx یا ایمیل"
+                onChange={(e) => setForTrainer(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                شماره موبایل یا ایمیل مربی. فقط همان مربی می‌تواند از کد استفاده کند. خالی یعنی همه.
+              </p>
+            </div>
+          )}
 
           <label className="flex cursor-pointer items-center gap-3 text-sm">
             <Switch checked={oncePerClub} onCheckedChange={setOncePerClub} />
