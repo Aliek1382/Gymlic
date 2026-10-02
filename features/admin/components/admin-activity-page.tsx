@@ -88,8 +88,9 @@ const ADMIN_ACTIONS = [
   "trainer_payment_approved",
   "trainer_payment_rejected",
   "trainer_subscription_granted",
-  // Written by the trainer, not an admin: each Excel report they download.
+  // Written by the trainer, not an admin: each file they download.
   "report_excel_export",
+  "trainer_data_export",
 ];
 
 const ACTION_LABEL: Record<string, string> = {

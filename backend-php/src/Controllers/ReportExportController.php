@@ -44,24 +44,39 @@ final class ReportExportController
         $trainerId = $user['id'];
         $athletes = self::athletes($pdo, $trainerId);
 
-        $xlsx = (new Xlsx())
-            ->sheet('آمار ماهانه', self::monthly($pdo, $trainerId), [16, 16, 16, 16])
-            ->sheet('نرخ تکمیل', self::completion($pdo, $trainerId, $athletes), [24, 14, 12, 18, 14, 12, 18])
-            ->sheet('پایبندی هفتگی', self::adherence($pdo, $trainerId, $athletes), array_merge([24, 26, 14, 16, 18, 16], array_fill(0, self::WEEKS, 16)));
-        $file = $xlsx->build();
+        // Every query below runs before the first byte goes out, so an
+        // error still reaches the trainer as a message, not a broken file.
+        $sheets = [
+            ['آمار ماهانه', self::monthly($pdo, $trainerId), [16, 16, 16, 16]],
+            ['نرخ تکمیل', self::completion($pdo, $trainerId, $athletes), [24, 14, 12, 18, 14, 12, 18]],
+            ['پایبندی هفتگی', self::adherence($pdo, $trainerId, $athletes), array_merge([24, 26, 14, 16, 18, 16], array_fill(0, self::WEEKS, 16))],
+        ];
 
         AdminController::logActivity($pdo, null, $trainerId, $trainerId, 'report_excel_export', [
             'athletes' => count($athletes),
         ]);
 
-        $name = 'gymlic-report-' . str_replace('/', '-', Jalali::format(TrainingWeek::today())) . '.xlsx';
+        self::sendHeaders('gymlic-report-' . str_replace('/', '-', Jalali::format(TrainingWeek::today())) . '.xlsx');
+        $xlsx = new Xlsx(static function (string $bytes): void {
+            echo $bytes;
+        });
+        foreach ($sheets as [$name, $rows, $widths]) {
+            $xlsx->sheet($name, $rows, $widths);
+        }
+        $xlsx->finish();
+    }
+
+    /** The download's headers, before the file streams out. Shared with the full data export. */
+    public static function sendHeaders(string $fileName): void
+    {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $name . '"');
-        header('Content-Length: ' . strlen($file));
+        header('Content-Disposition: attachment; filename="' . $fileName . '"');
         header('Cache-Control: no-store');
         // The site is on another origin; this lets it read the file name.
         header('Access-Control-Expose-Headers: Content-Disposition');
-        echo $file;
     }
 
     /** @return array<string, string> the trainer's active athletes, id => name */

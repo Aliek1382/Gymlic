@@ -46,6 +46,7 @@ use Gymlic\Controllers\ErrorLogController;
 use Gymlic\Controllers\ExportController;
 use Gymlic\Controllers\ReportController;
 use Gymlic\Controllers\ReportExportController;
+use Gymlic\Controllers\TrainerDataExportController;
 use Gymlic\Controllers\RevenueController;
 use Gymlic\Controllers\ClubController;
 use Gymlic\Controllers\ContentLibraryController;
@@ -293,6 +294,8 @@ $router->get('/reports/trainer/weekly-adherence', fn () => ReportController::wee
 $router->get('/reports/trainer/completion-rates', fn () => ReportController::completionRates());
 // The reports page as an Excel file (report level full_excel). Not the full data export.
 $router->get('/reports/trainer/excel', fn () => ReportExportController::excel());
+// All of the trainer's own data as one file: every plan, free included.
+$router->get('/trainer/data-export', fn () => TrainerDataExportController::download());
 $router->get('/reports/financial-summary', fn () => ReportController::financialSummary());
 $router->get('/athletes/{id}/completed-plans', fn (array $p) => ReportController::completedPlans($p));
 

@@ -12,7 +12,8 @@ export type SubscriptionStatus = "active" | "expiring" | "grace" | "expired";
 export type InvitationRole = "trainer" | "reception" | "athlete";
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type WorkoutStatus = "active" | "completed" | "cancelled" | "draft";
-export type MembershipPlanTier = "elite" | "basic" | "daily";
+/** An athlete's membership level in a club; nothing to do with the platform's subscription plans. */
+export type MembershipLevel = "elite" | "basic" | "daily";
 export type PaymentRequestStatus = "pending" | "approved" | "rejected";
 export type RevenueCategory = "membership" | "session" | "product" | "other";
 // Not a DB enum on purpose — `notifications.type` is plain text so new
@@ -100,8 +101,8 @@ export interface Database {
           working_hours?: string | null;
         }
       >;
-      // The plans a club sells, in its own words — replaces the fixed
-      // membership_plan_tier enum as what a membership actually points at.
+      // The memberships a club sells, in its own words — what a membership
+      // points at (plan_id), beside its fixed level (membership_level).
       club_membership_plans: TableOf<
         {
           id: string;
@@ -132,7 +133,7 @@ export interface Database {
           user_id: string;
           role: MembershipRole;
           status: MembershipStatus;
-          plan_tier: MembershipPlanTier;
+          membership_level: MembershipLevel;
           plan_id: string | null;
           expires_at: string | null;
           joined_at: string;
@@ -142,7 +143,7 @@ export interface Database {
           user_id: string;
           role: MembershipRole;
           status?: MembershipStatus;
-          plan_tier?: MembershipPlanTier;
+          membership_level?: MembershipLevel;
           plan_id?: string | null;
           expires_at?: string | null;
         }
@@ -177,7 +178,7 @@ export interface Database {
           last_name: string | null;
           height_cm: number | null;
           weight_kg: number | null;
-          plan_tier: MembershipPlanTier | null;
+          membership_level: MembershipLevel | null;
           plan_id: string | null;
           status: InvitationStatus;
           created_by: string;
@@ -197,7 +198,7 @@ export interface Database {
           last_name?: string | null;
           height_cm?: number | null;
           weight_kg?: number | null;
-          plan_tier?: MembershipPlanTier | null;
+          membership_level?: MembershipLevel | null;
           plan_id?: string | null;
           status?: InvitationStatus;
           expires_at?: string;

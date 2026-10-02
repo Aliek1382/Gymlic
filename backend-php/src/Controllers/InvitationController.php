@@ -103,16 +103,19 @@ final class InvitationController
                 }
                 $expiresAt = date('Y-m-d', strtotime("+{$durationDays} days"));
 
+                // The athlete's membership level in the club (elite / basic /
+                // daily), carried over from the invitation.
+                $level = self::levelColumn();
                 $pdo->prepare(
-                    'INSERT INTO memberships (id, club_id, user_id, role, status, plan_tier, plan_id, expires_at)
-                     VALUES (:id, :club_id, :user_id, "athlete", "active", :plan_tier, :plan_id, :expires_at)
-                     ON DUPLICATE KEY UPDATE status = "active", plan_tier = VALUES(plan_tier),
-                       plan_id = VALUES(plan_id), expires_at = VALUES(expires_at)'
+                    "INSERT INTO memberships (id, club_id, user_id, role, status, {$level}, plan_id, expires_at)
+                     VALUES (:id, :club_id, :user_id, 'athlete', 'active', :level, :plan_id, :expires_at)
+                     ON DUPLICATE KEY UPDATE status = 'active', {$level} = VALUES({$level}),
+                       plan_id = VALUES(plan_id), expires_at = VALUES(expires_at)"
                 )->execute([
                     'id'         => Uuid::v4(),
                     'club_id'    => $invite['club_id'],
                     'user_id'    => $user['id'],
-                    'plan_tier'  => $invite['plan_tier'] ?? 'basic',
+                    'level'      => $invite[$level] ?? 'basic',
                     'plan_id'    => $invite['plan_id'],
                     'expires_at' => $expiresAt,
                 ]);
@@ -322,4 +325,17 @@ final class InvitationController
         [$status, $message] = $map[$e->getMessage()] ?? [500, 'Could not accept the invitation.'];
         Response::error($status, $e->getMessage() ?: 'server_error', $message);
     }
+
+    /**
+     * The column holding an athlete's membership level in a club, on
+     * memberships and invitations alike: membership_level, or its old name
+     * until membership-level-update.sql has run (the backend reaches the
+     * host before its SQL). Drop the fallback once the update is in.
+     */
+    private static function levelColumn(): string
+    {
+        return Database::hasColumn('memberships', 'membership_level') ? 'membership_level' : self::LEVEL_COLUMN_BEFORE_UPDATE;
+    }
+
+    private const LEVEL_COLUMN_BEFORE_UPDATE = 'plan_tier';
 }
