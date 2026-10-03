@@ -16,6 +16,7 @@ use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Subscriptions;
+use Gymlic\TelegramAlerts;
 use Gymlic\Templates;
 use Gymlic\Tiers;
 use Gymlic\TrainerBilling;
@@ -237,6 +238,20 @@ final class TrainerBillingController
         } catch (Throwable $e) {
             error_log('trainer payment notice: ' . $e->getMessage());
         }
+        TelegramAlerts::paymentSubmitted([
+            'kind'          => 'trainer',
+            'who'           => trim($user['first_name'] . ' ' . $user['last_name']) ?: 'مربی',
+            'plan'          => (string) $plan['name'],
+            'amount'        => (int) $row['amount_toman'],
+            'paid_amount'   => isset($row['paid_amount_toman']) ? (int) $row['paid_amount_toman'] : null,
+            'discount'      => (int) ($row['discount_toman'] ?? 0),
+            'discount_code' => $code,
+            'tracking_code' => $row['tracking_code'],
+            'card_last4'    => $row['card_last4'],
+            'paid_at'       => $row['paid_at'],
+            'note'          => $row['reference_note'],
+            'receipt'       => $file,
+        ]);
         if ($file !== null) {
             Receipts::purgeIfDue($pdo);
         }
