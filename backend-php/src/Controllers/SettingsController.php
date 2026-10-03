@@ -11,6 +11,7 @@ use Gymlic\MailGateway;
 use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\SmsGateway;
+use Gymlic\TelegramGateway;
 use Gymlic\Templates;
 use Gymlic\Validate;
 use Throwable;
@@ -293,6 +294,22 @@ final class SettingsController
             return;
         }
         Response::error(502, 'sms_failed', 'ارسال پیامک ناموفق بود: ' . SmsGateway::lastError());
+    }
+
+    /** Sends one Telegram message through whatever is configured, and says why not if it fails. */
+    public static function testTelegram(): void
+    {
+        Auth::requireAdmin(AdminAccess::SUPER);
+
+        if (!TelegramGateway::configured()) {
+            Response::error(409, 'telegram_not_configured', 'ابتدا توکن ربات و شناسه‌ی چت را ذخیره کنید.');
+            return;
+        }
+        if (TelegramGateway::send('✅ <b>پیام آزمایشی جیم‌لیک</b>' . "\n" . 'اتصال ربات تلگرام درست کار می‌کند.')) {
+            Response::ok(['ok' => true]);
+            return;
+        }
+        Response::error(502, 'telegram_failed', 'ارسال به تلگرام ناموفق بود: ' . TelegramGateway::lastError());
     }
 
     public static function testMail(): void

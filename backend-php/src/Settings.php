@@ -19,7 +19,7 @@ final class Settings
     public const ROLES = ['club', 'trainer', 'athlete'];
 
     public const KEYS = [
-        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'security', 'billing', 'templates', 'branding', 'reports', 'tiers',
+        'maintenance', 'signup', 'announcement', 'support', 'features', 'points_levels', 'limits', 'sms', 'mail', 'telegram', 'security', 'billing', 'templates', 'branding', 'reports', 'tiers',
     ];
 
     /** The groups any visitor may read; everything else is admin-only. */
@@ -30,7 +30,7 @@ final class Settings
      * screen gets a masked hint instead), and kept as they are when a save
      * leaves them empty. See SettingsController.
      */
-    public const SECRETS = ['sms' => ['api_key'], 'mail' => ['smtp_pass']];
+    public const SECRETS = ['sms' => ['api_key'], 'mail' => ['smtp_pass'], 'telegram' => ['bot_token']];
 
     public const ATTACHMENT_TYPES = ['voice', 'image', 'video', 'file'];
 
@@ -239,8 +239,33 @@ final class Settings
                 'smtp_user'    => self::text($v['smtp_user'] ?? null, 150),
                 'smtp_pass'    => self::text($v['smtp_pass'] ?? null, 200),
             ],
+            // The owner's Telegram bot (TelegramGateway). Empty = off.
+            'telegram' => [
+                'bot_token' => self::text($v['bot_token'] ?? null, 100),
+                'chat_id'   => self::chatId($v['chat_id'] ?? null),
+                'api_base'  => self::httpsBase($v['api_base'] ?? null),
+            ],
             default => throw new \InvalidArgumentException("Unknown settings key: {$key}"),
         };
+    }
+
+    /** A Telegram chat: a number (groups are negative) or an @channel name; anything else is dropped. */
+    private static function chatId(mixed $v): string
+    {
+        $text = self::text($v, 64);
+        return preg_match('/^(-?\d{1,20}|@[A-Za-z0-9_]{3,64})$/', $text) === 1 ? $text : '';
+    }
+
+    /** A relay address: https only, no query or credentials, no trailing slash; else empty (= Telegram itself). */
+    private static function httpsBase(mixed $v): string
+    {
+        $text = rtrim(self::text($v, 200), '/');
+        $parts = parse_url($text);
+        if ($text === '' || !is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || ($parts['host'] ?? '') === ''
+            || isset($parts['user']) || isset($parts['query']) || isset($parts['fragment'])) {
+            return '';
+        }
+        return $text;
     }
 
     /**
