@@ -9,6 +9,7 @@ import {
   Mail,
   Megaphone,
   MessageSquareText,
+  Send,
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ import { formatNumber, parseLocaleNumber } from "@/lib/persian";
 import {
   sendTestMail,
   sendTestSms,
+  sendTestTelegram,
   useAdminSiteSettings,
   useUpdateSiteSetting,
   type AdminSettingKey,
@@ -42,6 +44,7 @@ import {
   type SignupSettings,
   type SmsSettings,
   type SupportSettings,
+  type TelegramSettings,
 } from "@/features/site-settings";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import type { AccountType } from "@/types/database.types";
@@ -82,7 +85,7 @@ export function AdminSiteSettingsPage() {
             <TabsTrigger value="limits">محدودیت‌ها</TabsTrigger>
             {/* Credentials: only a super admin gets them from the API at all. */}
             {data.settings.sms && data.settings.mail && (
-              <TabsTrigger value="delivery">پیامک و ایمیل</TabsTrigger>
+              <TabsTrigger value="delivery">پیامک، ایمیل و تلگرام</TabsTrigger>
             )}
           </TabsList>
           <TabsContent value="general">
@@ -115,6 +118,9 @@ export function AdminSiteSettingsPage() {
                   delivery={data.delivery}
                   locked={!data.storageReady}
                 />
+                {data.settings.telegram && (
+                  <TelegramCard initial={data.settings.telegram} locked={!data.storageReady} />
+                )}
               </div>
             </TabsContent>
           )}
@@ -720,6 +726,81 @@ function SmsCard({
           پیش از ارسال آزمایشی، تغییرات را ذخیره کنید.
         </p>
       </div>
+    </SettingsCard>
+  );
+}
+
+function TelegramCard({ initial, locked }: { initial: TelegramSettings; locked: boolean }) {
+  const { draft, patch, save, isSaving } = useDraft("telegram", initial);
+  const [clearToken, setClearToken] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  async function test() {
+    setSending(true);
+    try {
+      await sendTestTelegram();
+      toast.success("ارسال شد. ربات تلگرام را بررسی کنید.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "ارسال آزمایشی ناموفق بود."));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <SettingsCard
+      icon={Send}
+      title="ربات تلگرام"
+      description="اعلان رویدادهای سایت (پرداخت، تیکت، خطا) برای مدیر. توکن را از BotFather بگیرید. توکن ذخیره‌شده هیچ‌وقت کامل نمایش داده نمی‌شود."
+      onSave={() => {
+        save({ clearSecrets: clearToken ? ["bot_token"] : [] });
+        setClearToken(false);
+      }}
+      isSaving={isSaving}
+      locked={locked}
+      actions={
+        <Button variant="outline" onClick={test} disabled={sending}>
+          {sending && <Loader2 className="animate-spin" />}
+          پیام آزمایشی تلگرام
+        </Button>
+      }
+    >
+      <SecretInput
+        id="telegram-bot-token"
+        label="توکن ربات"
+        isSet={!!draft.bot_token_set}
+        hint={draft.bot_token_hint ?? ""}
+        value={draft.bot_token}
+        cleared={clearToken}
+        onChange={(bot_token) => patch({ bot_token })}
+        onClear={setClearToken}
+      />
+      <div className="space-y-2">
+        <Label htmlFor="telegram-chat-id">شناسه‌ی چت</Label>
+        <Input
+          id="telegram-chat-id"
+          dir="ltr"
+          value={draft.chat_id}
+          placeholder="123456789"
+          onChange={(e) => patch({ chat_id: e.target.value })}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="telegram-api-base">آدرس واسط (اختیاری)</Label>
+        <Input
+          id="telegram-api-base"
+          dir="ltr"
+          value={draft.api_base}
+          placeholder="https://relay.example.com"
+          onChange={(e) => patch({ api_base: e.target.value })}
+        />
+        <p className="text-xs text-muted-foreground">
+          فقط اگر هاست به تلگرام وصل نمی‌شود: آدرس https یک سرور واسط خارج از ایران. خالی = اتصال مستقیم.
+        </p>
+      </div>
+      <p className="rounded-xl bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
+        پیش از ارسال آزمایشی، تغییرات را ذخیره کنید.
+      </p>
     </SettingsCard>
   );
 }

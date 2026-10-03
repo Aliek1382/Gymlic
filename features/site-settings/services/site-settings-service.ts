@@ -156,6 +156,15 @@ export interface SmsSettings {
   sender: string;
 }
 
+/** The owner's Telegram bot. api_base is an optional relay for hosts that cannot reach Telegram. */
+export interface TelegramSettings {
+  bot_token: string;
+  bot_token_set?: boolean;
+  bot_token_hint?: string;
+  chat_id: string;
+  api_base: string;
+}
+
 export interface MailSettings {
   from_address: string;
   from_name: string;
@@ -176,7 +185,7 @@ export interface DeliveryStatus {
 }
 
 export interface AdminSiteSettings {
-  settings: SiteSettings & { sms: SmsSettings; mail: MailSettings };
+  settings: SiteSettings & { sms: SmsSettings; mail: MailSettings; telegram: TelegramSettings };
   featureCatalog: FeatureCatalogEntry[];
   /** False until app-settings-update.sql has been run on the database. */
   storageReady: boolean;
@@ -235,6 +244,10 @@ export async function removeBrandLogo(): Promise<BrandingSettings> {
 
 export async function sendTestSms(phone: string) {
   await api.post("/admin/settings/test-sms", { phone });
+}
+
+export async function sendTestTelegram() {
+  await api.post("/admin/settings/test-telegram", {});
 }
 
 export async function sendTestMail(email: string) {

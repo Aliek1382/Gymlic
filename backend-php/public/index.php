@@ -402,6 +402,7 @@ $router->get('/admin/export/{kind}', fn (array $p) => ExportController::download
 $router->get('/admin/settings', fn () => SettingsController::adminGet());
 $router->post('/admin/settings/test-sms', fn () => SettingsController::testSms());
 $router->post('/admin/settings/test-mail', fn () => SettingsController::testMail());
+$router->post('/admin/settings/test-telegram', fn () => SettingsController::testTelegram());
 $router->put('/admin/settings/{key}', fn (array $p) => SettingsController::adminUpdate($p));
 $router->post('/admin/branding/logo', fn () => BrandingController::uploadLogo());
 $router->delete('/admin/branding/logo', fn () => BrandingController::removeLogo());
