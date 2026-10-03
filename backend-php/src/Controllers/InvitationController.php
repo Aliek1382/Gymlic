@@ -10,6 +10,7 @@ use Gymlic\PointsService;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\TelegramAlerts;
 use Gymlic\Templates;
 use PDO;
 use Throwable;
@@ -280,11 +281,24 @@ final class InvitationController
             }
 
             $pdo->commit();
-            Response::ok(['ok' => true]);
         } catch (Throwable $e) {
             $pdo->rollBack();
             self::respondForException($e);
+            return;
         }
+
+        // Only a brand-new account is a new trainer; an existing one just joined a club.
+        if ($user['account_type'] === null) {
+            $club = $pdo->prepare('SELECT name FROM clubs WHERE id = :id');
+            $club->execute(['id' => $invite['club_id']]);
+            TelegramAlerts::newAccount('trainer', [
+                'first_name' => $user['first_name'] ?: $invite['first_name'],
+                'last_name'  => $user['last_name'] ?: $invite['last_name'],
+                'phone'      => $user['phone'] ?: $invite['phone'],
+                'email'      => $user['email'],
+            ], (string) ($club->fetchColumn() ?: '—'));
+        }
+        Response::ok(['ok' => true]);
     }
 
     /**

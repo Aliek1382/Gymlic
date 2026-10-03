@@ -5,7 +5,8 @@ declare(strict_types=1);
 // copies of notifications queued in notification_deliveries
 // (AuthController::notify queues them; nothing is sent during a web request).
 // Also sends the weekly email report on Saturday morning (WeeklyReport) and
-// empties the recycle bin of items older than 30 days (Trash).
+// empties the recycle bin of items older than 30 days (Trash), and tells the
+// owner on Telegram, once a day, which subscriptions are about to run out.
 // Meant for the host's cron, every 5 minutes:
 //
 //   php /home/USER/path/to/backend-php/cron/notification-dispatch.php
@@ -36,6 +37,7 @@ use Gymlic\Broadcasts;
 use Gymlic\CronHeartbeat;
 use Gymlic\Database;
 use Gymlic\DeliveryDispatcher;
+use Gymlic\ExpiryAlerts;
 use Gymlic\Trash;
 use Gymlic\WeeklyReport;
 
@@ -66,7 +68,9 @@ foreach (DeliveryDispatcher::due($pdo, BATCH) as $row) {
 $weekly = WeeklyReport::sendIfDue($pdo);
 // And the recycle bin's 30-day clean-up, a few times a day at most.
 Trash::purgeIfDue($pdo);
+// And, once a day, the owner's Telegram note on subscriptions about to run out.
+$expiry = ExpiryAlerts::sendIfDue($pdo);
 
-$summary = "broadcasts: {$broadcasts}, deliveries sent: {$ok}, failed: {$bad}" . ($weekly !== null ? ", {$weekly}" : '');
+$summary = "broadcasts: {$broadcasts}, deliveries sent: {$ok}, failed: {$bad}" . ($weekly !== null ? ", {$weekly}" : '') . ($expiry !== null ? ", {$expiry}" : '');
 CronHeartbeat::record('notification-dispatch', $summary);
 echo date('Y-m-d H:i:s'), " {$summary}\n";

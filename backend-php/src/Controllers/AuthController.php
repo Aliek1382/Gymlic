@@ -11,6 +11,7 @@ use Gymlic\Security;
 use Gymlic\Settings;
 use Gymlic\Uuid;
 use Gymlic\Validate;
+use Gymlic\TelegramAlerts;
 use Gymlic\Templates;
 use Gymlic\Tiers;
 use Gymlic\TrainerVerification;
@@ -342,6 +343,15 @@ final class AuthController
 
         if ($wasUnset && $role !== 'club') {
             Templates::notify($pdo, 'complete_profile', $user['id'], $user['id'], 'complete_profile', [], '/settings');
+        }
+        if ($wasUnset && $role === 'trainer') {
+            // The names just saved are in $body; $user still has the old row.
+            TelegramAlerts::newAccount('trainer', [
+                'first_name' => Validate::nullableString($body['first_name'] ?? null) ?? $user['first_name'],
+                'last_name'  => Validate::nullableString($body['last_name'] ?? null) ?? $user['last_name'],
+                'phone'      => $user['phone'],
+                'email'      => $user['email'],
+            ]);
         }
 
         Response::ok(['user' => self::profilePublic(self::fetchProfile($user['id']))]);

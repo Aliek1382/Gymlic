@@ -8,6 +8,7 @@ use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\TelegramAlerts;
 use Gymlic\Templates;
 use Gymlic\TrainerVerification;
 use Gymlic\Uuid;
@@ -58,6 +59,7 @@ final class TrainerProfileController
         foreach (AdminAccess::holders($pdo, 'users.verify') as $adminId) {
             Templates::notify($pdo, 'trainer_verification_requested', $adminId, $user['id'], 'broadcast', ['name' => $name], '/admin/verifications');
         }
+        TelegramAlerts::verificationRequested($user, count($profile['certificates']));
 
         Response::ok(self::load($user['id']));
     }

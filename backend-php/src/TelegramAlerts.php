@@ -13,7 +13,7 @@ namespace Gymlic;
  */
 final class TelegramAlerts
 {
-    private const SITE = 'https://gymlic-panel.ir';
+    public const SITE = 'https://gymlic-panel.ir';
 
     private function __construct()
     {
@@ -145,6 +145,88 @@ final class TelegramAlerts
         } catch (\Throwable $e) {
             error_log('telegram support alert: ' . $e->getMessage());
         }
+    }
+
+    /** A trainer sent their certificates for the verified badge and is waiting for an answer. */
+    public static function verificationRequested(array $user, int $certificates): void
+    {
+        self::guarded('verification', static function () use ($user, $certificates): array {
+            $lines = [
+                '🏅 <b>درخواست تأیید مدارک مربی</b>',
+                '',
+                'مربی: ' . self::person($user),
+                'تعداد مدارک: ' . self::digits((string) $certificates),
+                '',
+                '<a href="' . self::SITE . '/admin/verifications">بررسی در پنل</a>',
+            ];
+            return $lines;
+        });
+    }
+
+    /**
+     * A new trainer or club owner. $club is the club's name: for a club, the
+     * one just created; for a trainer, the club whose invitation they took
+     * (null = signed up on their own). Athletes are not announced.
+     */
+    public static function newAccount(string $kind, array $user, ?string $club = null): void
+    {
+        self::guarded('new account', static function () use ($kind, $user, $club): array {
+            if ($kind === 'club') {
+                return [
+                    '🏢 <b>باشگاه جدید</b>',
+                    '',
+                    'باشگاه: ' . TelegramGateway::esc((string) $club),
+                    'صاحب: ' . self::person($user),
+                    '',
+                    '<a href="' . self::SITE . '/admin/clubs">باز کردن در پنل</a>',
+                ];
+            }
+
+            return [
+                '👤 <b>مربی جدید</b>',
+                '',
+                'مربی: ' . self::person($user),
+                $club !== null ? 'از طریق دعوت باشگاه: ' . TelegramGateway::esc($club) : 'ثبت‌نام مستقل',
+                '',
+                '<a href="' . self::SITE . '/admin/trainers">باز کردن در پنل</a>',
+            ];
+        });
+    }
+
+    /** Sends the lines the builder returns. Never throws, never needs the bot to be set up. */
+    private static function guarded(string $what, callable $build): void
+    {
+        try {
+            if (!TelegramGateway::configured()) {
+                return;
+            }
+            if (!TelegramGateway::send(implode("\n", $build()))) {
+                error_log("telegram {$what} alert: " . TelegramGateway::lastError());
+            }
+        } catch (\Throwable $e) {
+            error_log("telegram {$what} alert: " . $e->getMessage());
+        }
+    }
+
+    /** "Name (phone, email)" for a profile row, escaped. */
+    public static function person(array $user): string
+    {
+        $name = trim(((string) ($user['first_name'] ?? '')) . ' ' . ((string) ($user['last_name'] ?? '')));
+        $parts = [];
+        if (($user['phone'] ?? '') !== '') {
+            $parts[] = '<code>' . TelegramGateway::esc((string) $user['phone']) . '</code>';
+        }
+        if (($user['email'] ?? '') !== '') {
+            $parts[] = TelegramGateway::esc((string) $user['email']);
+        }
+
+        return ($name !== '' ? TelegramGateway::esc($name) : '—') . ($parts !== [] ? ' (' . implode('، ', $parts) . ')' : '');
+    }
+
+    /** Latin digits as Persian ones. */
+    public static function digits(string $text): string
+    {
+        return strtr($text, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
     }
 
     private static function toman(int $amount): string

@@ -11,6 +11,7 @@ use Gymlic\Limits;
 use Gymlic\Response;
 use Gymlic\Subscriptions;
 use Gymlic\Uuid;
+use Gymlic\TelegramAlerts;
 use Gymlic\Validate;
 use Throwable;
 
@@ -54,11 +55,14 @@ final class ClubController
                 ->execute(['id' => $user['id']]);
 
             $pdo->commit();
-            Response::ok(['club_id' => $clubId], 201);
         } catch (Throwable $e) {
             $pdo->rollBack();
             Response::error(500, 'club_create_failed', 'Could not create the club.');
+            return;
         }
+
+        TelegramAlerts::newAccount('club', $user, (string) $data['name']);
+        Response::ok(['club_id' => $clubId], 201);
     }
 
     public static function get(array $params): void
