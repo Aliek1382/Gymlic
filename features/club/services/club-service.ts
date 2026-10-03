@@ -6,7 +6,7 @@ import type {
   MembershipPlanInput,
 } from "../types/club-types";
 
-interface ClubRow {
+export interface ClubRow {
   id: string;
   name: string;
   logo_url: string | null;
@@ -17,6 +17,8 @@ interface ClubRow {
   subscription_plan_name: string | null;
   subscription_status: string | null;
   subscription_expires_at: string | null;
+  /** The free club plan, while no paid plan runs; absent from an older backend. */
+  free_plan?: { name: string; max_members: number | null; max_trainers: number | null } | null;
 }
 
 export async function getClubRow(clubId: string): Promise<ClubRow> {

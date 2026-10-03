@@ -58,7 +58,8 @@ export function FinancePage() {
 
       return {
         club,
-        plans: plans.filter((plan) => plan.is_active),
+        // The free plan is what a club has without one: never bought.
+        plans: plans.filter((plan) => plan.is_active && !plan.is_free),
         requests: requests.filter((request) => request.club_id === clubId),
       };
     },
@@ -122,7 +123,18 @@ export function FinancePage() {
               <SubmitPaymentRequestDialog plans={availablePlans} />
             </div>
 
-            <SubscriptionCard subscription={subscription} />
+            <SubscriptionCard
+              subscription={subscription}
+              freePlan={
+                club?.free_plan
+                  ? {
+                      name: club.free_plan.name,
+                      maxMembers: club.free_plan.max_members,
+                      maxTrainers: club.free_plan.max_trainers,
+                    }
+                  : null
+              }
+            />
 
             <Card className="gap-4 py-5">
               <div className="px-6">

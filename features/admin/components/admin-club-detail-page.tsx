@@ -335,7 +335,8 @@ export function AdminClubDetailPage() {
       {canManageSubscription && (
         <SubscriptionDialog
           club={managing ? club : null}
-          plans={plans ?? []}
+          // The free plan is what a club has without one: not given by hand.
+          plans={(plans ?? []).filter((plan) => !plan.is_free)}
           onClose={() => setManaging(false)}
           onSaved={() => void queryClient.invalidateQueries({ queryKey: ["admin"] })}
         />

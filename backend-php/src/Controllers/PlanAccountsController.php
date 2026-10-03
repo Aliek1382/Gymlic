@@ -656,6 +656,7 @@ final class PlanAccountsController
     {
         $rows = $pdo->query(
             'SELECT id, name, price_toman, duration_days, max_members, max_trainers, is_active FROM plans
+             WHERE 1 = 1' . Limits::notFreeClubPlan() . '
              ORDER BY is_active DESC, price_toman ASC'
         )->fetchAll();
         return \Gymlic\Cast::rows($rows, [], ['price_toman', 'duration_days', 'max_members', 'max_trainers'], ['is_active']);
@@ -680,7 +681,7 @@ final class PlanAccountsController
         $stmt = $pdo->prepare(
             $kind === 'trainer'
                 ? 'SELECT id, name, duration_days, max_athletes AS cap FROM trainer_plans WHERE id = :id AND is_free = 0'
-                : 'SELECT id, name, duration_days, max_members AS cap FROM plans WHERE id = :id'
+                : 'SELECT id, name, duration_days, max_members AS cap FROM plans WHERE id = :id' . Limits::notFreeClubPlan()
         );
         $stmt->execute(['id' => $planId]);
         $row = $stmt->fetch();

@@ -47,7 +47,7 @@ CREATE TABLE clubs (
   name            VARCHAR(255) NOT NULL,
   logo_url        VARCHAR(1024) NULL,
   owner_id        CHAR(36) NOT NULL,
-  status          ENUM('active','suspended','pending') NOT NULL DEFAULT 'pending',
+  status          ENUM('active','suspended','pending') NOT NULL DEFAULT 'active',
   member_capacity INT NULL,
   address         VARCHAR(500) NULL,
   phone           VARCHAR(32) NULL,
@@ -173,6 +173,7 @@ CREATE TABLE plans (
   history_months       INT NULL,
   report_level         ENUM('count','basic','full','full_excel') NULL,
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  is_free       TINYINT(1) NOT NULL DEFAULT 0,   -- the free club plan (club-free-plan-update.sql)
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT chk_plans_price CHECK (price_toman >= 0),
@@ -1439,16 +1440,18 @@ INSERT INTO site_pages (slug, title, body, is_published, sort_order) VALUES
   ('help', 'راهنما', '', 0, 4);
 
 -- The plans on sale (plan-limits-update.sql adds the same rows to an existing
--- database). The free trainer plan never expires; its duration is unused.
+-- database; club-free-plan-update.sql the free club plan). The free plans
+-- are what an account has without paying; their duration is unused.
 INSERT INTO trainer_plans (id, name, price_toman, duration_days, max_athletes, is_free, max_custom_exercises, max_templates, history_months, report_level, tier) VALUES
   ('7a000000-0000-4000-8000-000000000001', 'رایگان', 0, 30, 3, 1, 5, 0, 3, 'count', 'free'),
   ('7a000000-0000-4000-8000-000000000002', 'نقره‌ای', 290000, 30, 15, 0, 30, 5, 12, 'basic', 'silver'),
   ('7a000000-0000-4000-8000-000000000003', 'طلایی', 590000, 30, 40, 0, NULL, 20, NULL, 'full', 'gold'),
   ('7a000000-0000-4000-8000-000000000004', 'الماسی', 990000, 30, NULL, 0, NULL, NULL, NULL, 'full_excel', 'diamond');
-INSERT INTO plans (id, name, price_toman, duration_days, max_members, max_trainers, tier) VALUES
-  ('7c000000-0000-4000-8000-000000000002', 'نقره‌ای', 990000, 30, 100, 3, 'silver'),
-  ('7c000000-0000-4000-8000-000000000003', 'طلایی', 1800000, 30, 300, 8, 'gold'),
-  ('7c000000-0000-4000-8000-000000000004', 'الماسی', 2900000, 30, NULL, NULL, 'diamond');
+INSERT INTO plans (id, name, price_toman, duration_days, max_members, max_trainers, tier, is_free) VALUES
+  ('7c000000-0000-4000-8000-000000000001', 'رایگان', 0, 30, 20, 1, 'free', 1),
+  ('7c000000-0000-4000-8000-000000000002', 'نقره‌ای', 990000, 30, 100, 3, 'silver', 0),
+  ('7c000000-0000-4000-8000-000000000003', 'طلایی', 1800000, 30, 300, 8, 'gold', 0),
+  ('7c000000-0000-4000-8000-000000000004', 'الماسی', 2900000, 30, NULL, NULL, 'diamond', 0);
 
 -- Access set by hand for one trainer or one club (account-access-update.sql).
 CREATE TABLE trainer_access (

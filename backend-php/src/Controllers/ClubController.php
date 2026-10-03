@@ -30,9 +30,11 @@ final class ClubController
         $pdo->beginTransaction();
 
         try {
+            // Open at once, on the free club plan (Limits::freeClubPlan): no
+            // admin approval, like a trainer's sign-up.
             $clubId = Uuid::v4();
             $pdo->prepare(
-                'INSERT INTO clubs (id, name, owner_id, status) VALUES (:id, :name, :owner_id, "pending")'
+                'INSERT INTO clubs (id, name, owner_id, status) VALUES (:id, :name, :owner_id, "active")'
             )->execute([
                 'id'       => $clubId,
                 'name'     => (string) $data['name'],
@@ -91,7 +93,10 @@ final class ClubController
 
         $club['subscription_status'] = Subscriptions::status($club['subscription_expires_at']);
         // The cap that is actually enforced: the plan's, or the admin's override.
-        $club['member_capacity'] = Limits::forClub($pdo, $club['id'])['max_members'];
+        $limits = Limits::forClub($pdo, $club['id']);
+        $club['member_capacity'] = $limits['max_members'];
+        // No paid plan running: the free club plan, with its caps.
+        $club['free_plan'] = !empty($limits['is_free']) ? Limits::freeClubPlan() : null;
         Response::ok(Cast::row($club, [], ['member_capacity']));
     }
 

@@ -403,6 +403,16 @@ allows; every cap is checked on the server.
   year: sent by `cron/calendar-reminders.php`, and also when the trainer
   opens the dashboard, so it works on a host without that cron. Active
   athletes only (not suspended).
+- **Free club plan, no club approval** (`club-free-plan-update.sql`).
+  A club with no paid plan running (never bought, or ended past its grace
+  days) is on the free club plan (`plans.is_free`, fixed id
+  `Limits::FREE_CLUB_PLAN_ID`; 20 members, 1 trainer, tier free): it can
+  invite up to those caps, and whoever is above them stays. It is never
+  sold or given by hand, can't be switched off or priced, and doesn't lift
+  the club trainers' own caps (only a running paid plan does). Clubs sign
+  up straight into it: no admin approval; the update lets in the ones still
+  waiting. Before the SQL runs, a club without a plan can't invite (while
+  enforcing), as before.
 - **Personal trainer codes and birthday gifts** (`TrainerGiftController`,
   `trainer-discount-owner-update.sql`). A trainer-plan discount code can
   belong to one trainer (`for_trainer_id`): any other trainer gets «کد

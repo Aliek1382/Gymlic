@@ -45,6 +45,8 @@ interface ClubDashboardResponse {
   plan_distribution: { plan_name: string; member_count: number }[];
   /** status is worked out from expires_at by the API, with the admin's "running out" window. */
   subscription: { plan_name: string; status: SubscriptionInfo["status"] | null; expires_at: string } | null;
+  /** The free club plan, while no paid plan runs; absent from an older backend. */
+  free_plan?: { name: string; max_members: number | null; max_trainers: number | null } | null;
   recent_members: {
     id: string;
     user_id: string;
@@ -80,6 +82,9 @@ export async function getClubDashboard(
     revenueSeries: toRevenueSeries(data, revenueMonths),
     recentActivities: toRecentActivities(data),
     subscription: toSubscription(data),
+    freePlan: data.free_plan
+      ? { name: data.free_plan.name, maxMembers: data.free_plan.max_members, maxTrainers: data.free_plan.max_trainers }
+      : null,
   };
 }
 

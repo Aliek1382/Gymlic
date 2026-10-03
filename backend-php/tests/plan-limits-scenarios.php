@@ -28,6 +28,7 @@ $pdo = new PDO(
 );
 
 require_once __DIR__ . '/../src/Jalali.php';
+require_once __DIR__ . '/../src/Uuid.php';
 
 $failures = 0;
 $run = bin2hex(random_bytes(3));
@@ -107,6 +108,15 @@ $day = static fn (int $offset): string => date('Y-m-d', strtotime(($offset >= 0 
 echo "Setup\n";
 [$adminToken, $adminId] = account('admin', null);
 $pdo->prepare('UPDATE profiles SET is_platform_admin = 1 WHERE id = :id')->execute(['id' => $adminId]);
+
+// A rerun: put the free club plan back where the live database starts, so
+// the earlier checks see a club without a plan as before it.
+$freeCol = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plans' AND COLUMN_NAME = 'is_free'")->fetchColumn();
+if ((int) $freeCol === 1) {
+    $pdo->exec("UPDATE subscriptions SET plan_id = NULL WHERE plan_id = '7c000000-0000-4000-8000-000000000001'");
+    $pdo->exec("DELETE FROM plans WHERE id = '7c000000-0000-4000-8000-000000000001'");
+    $pdo->exec('ALTER TABLE plans DROP COLUMN is_free');
+}
 
 $migrations = call('GET', '/admin/system/migrations', null, $adminToken)[1];
 $state = array_column($migrations['items'] ?? $migrations, 'state', 'id')['plan-limits'] ?? null;
@@ -993,6 +1003,80 @@ $row = array_values(array_filter($codes['items'] ?? [], fn ($c) => $c['code'] ==
 check(($row['for_trainer_id'] ?? null) === $g1Id && ($codes['personal'] ?? false) === true, 'the list shows whose it is', $row);
 check(call('POST', '/admin/trainer-discounts', ['code' => 'NOONE' . strtoupper($run), 'kind' => 'percent', 'value' => 5, 'for_trainer' => 'nobody@example.test'], $adminToken)[0] === 404,
     'an unknown trainer is refused');
+
+// ---- Free club plan, club sign-up without approval --------------------------
+
+/** A new club owner and their club; returns [token, club id]. */
+function newClub(string $who): array
+{
+    global $run;
+    [$token] = account($who, 'club');
+    [, $club] = call('POST', '/clubs', ['name' => "باشگاه {$who} {$run}"], $token);
+    return [$token, (string) ($club['club_id'] ?? $club['id'] ?? '')];
+}
+
+echo "\nFree club plan, club sign-up without approval\n";
+[$fc0, $fc0Id] = newClub('freeclub0');
+[, $me] = call('GET', '/auth/me', null, $fc0);
+check(($me['membership']['club_status'] ?? null) === 'active', 'a new club is active at once, no admin approval', $me['membership'] ?? null);
+check(call('POST', "/clubs/{$fc0Id}/member-invites", [], $fc0)[0] === 402, 'before the update, a club without a plan still cannot invite');
+$waiting = \Gymlic\Uuid::v4();
+$pdo->prepare("INSERT INTO clubs (id, name, owner_id, status) VALUES (:id, 'منتظر', :o, 'pending')")
+    ->execute(['id' => $waiting, 'o' => $pdo->query("SELECT owner_id FROM clubs WHERE id = '{$fc0Id}'")->fetchColumn()]);
+[$status, $result] = call('POST', '/admin/system/migrations/club-free-plan/run', null, $adminToken);
+check($status === 200 && ($result['ok'] ?? false), 'the update runs from the admin panel', $result);
+check($pdo->query("SELECT status FROM clubs WHERE id = '{$waiting}'")->fetchColumn() === 'active', 'and lets in the club that was waiting for approval');
+$pdo->prepare('DELETE FROM clubs WHERE id = :id')->execute(['id' => $waiting]);
+
+[$fc, $fcId] = newClub('freeclub1');
+[, $club] = call('GET', "/clubs/{$fcId}", null, $fc);
+check(($club['free_plan']['max_members'] ?? null) === 20 && ($club['free_plan']['max_trainers'] ?? null) === 1 && ($club['member_capacity'] ?? null) === 20,
+    'a new club is on the free plan: 20 members, 1 trainer', $club['free_plan'] ?? $club);
+$ok = 0;
+for ($i = 1; $i <= 20; $i++) {
+    $ok += call('POST', "/clubs/{$fcId}/member-invites", [], $fc)[0] === 201 ? 1 : 0;
+}
+check($ok === 20, 'it invites 20 members', $ok);
+[$status, $data] = call('POST', "/clubs/{$fcId}/member-invites", [], $fc);
+check($status === 409 && ($data['error']['code'] ?? '') === 'capacity_full', 'the 21st is refused', [$status, $data]);
+check(call('POST', "/clubs/{$fcId}/trainer-invites", ['first_name' => 'مربی'], $fc)[0] === 201, 'and invites one trainer');
+[$status, $data] = call('POST', "/clubs/{$fcId}/trainer-invites", ['first_name' => 'مربی ۲'], $fc);
+check($status === 409 && ($data['error']['code'] ?? '') === 'trainer_capacity_full', 'but not a second', [$status, $data]);
+[, $dash] = call('GET', "/dashboard/club/{$fcId}", null, $fc);
+check(($dash['free_plan']['name'] ?? null) === 'رایگان' && ($dash['limits']['is_free'] ?? null) === true, 'the club dashboard shows the free plan', $dash['free_plan'] ?? null);
+
+$freeId = '7c000000-0000-4000-8000-000000000001';
+[, $catalog] = call('GET', '/plans-catalog', null, $fc);
+$freeRow = array_values(array_filter($catalog['items'] ?? [], fn ($p) => $p['id'] === $freeId))[0] ?? null;
+check(($freeRow['is_free'] ?? null) === true, 'the plan list marks it free (the club finance page leaves it out)');
+check(call('POST', '/billing/discount-check', ['plan_id' => $freeId, 'code' => 'ANY'], $fc)[0] === 404, 'it cannot be bought');
+[$status] = call('PATCH', "/admin/plans/{$freeId}", ['is_active' => false], $adminToken);
+check($status === 409, 'the admin cannot switch it off', $status);
+check(call('PATCH', "/admin/plans/{$freeId}", ['price_toman' => 1000], $adminToken)[0] === 409, 'or price it');
+check(call('PATCH', "/admin/plans/{$freeId}", ['max_members' => 25], $adminToken)[0] === 200, 'but can change its caps');
+call('PATCH', "/admin/plans/{$freeId}", ['max_members' => 20], $adminToken);
+[, $accounts] = call('GET', '/admin/plan-accounts', null, $adminToken);
+$opts = array_column($accounts['club_plans'] ?? $accounts['plans']['club'] ?? [], 'id');
+check(!in_array($freeId, $opts, true), 'and it is not among the plans to activate by hand', $opts);
+
+echo "\nA paid club plan that ends falls back to the free plan\n";
+admin('club', $fcId, ['action' => 'activate', 'plan_id' => $cPlan['نقره‌ای'], 'expires_at' => $day(30)]);
+check(call('POST', "/clubs/{$fcId}/trainer-invites", ['first_name' => 'مربی ۲'], $fc)[0] === 201, 'on silver: a second trainer');
+admin('club', $fcId, ['action' => 'dates', 'started_at' => $day(-60), 'expires_at' => $day(-20)]);
+[, $club] = call('GET', "/clubs/{$fcId}", null, $fc);
+check(($club['free_plan'] ?? null) !== null, 'after its grace days: the free plan again');
+[$status, $data] = call('POST', "/clubs/{$fcId}/trainer-invites", ['first_name' => 'مربی ۳'], $fc);
+check($status === 409 && ($data['error']['code'] ?? '') === 'trainer_capacity_full', 'held to its caps', [$status, $data]);
+$kept = $pdo->prepare("SELECT COUNT(*) FROM invitations WHERE club_id = :c AND invited_role = 'trainer' AND status = 'pending'");
+$kept->execute(['c' => $fcId]);
+check((int) $kept->fetchColumn() === 2, 'nothing made under silver is taken away');
+[$ct, $ctId] = account('free-club-trainer', null);
+$code = $pdo->query("SELECT code FROM invitations WHERE club_id = '{$fcId}' AND invited_role = 'trainer' AND status = 'pending' LIMIT 1")->fetchColumn();
+call('POST', '/invitations/accept-club', ['code' => $code], $ct);
+check((limits($ct)['content']['via_club'] ?? null) === false, "the free club plan doesn't lift its trainers' own caps");
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => false, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
+check(call('POST', "/clubs/{$fcId}/trainer-invites", ['first_name' => 'مربی ۴'], $fc)[0] === 201, 'with enforcement off: no cap');
+call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => true, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
 
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);

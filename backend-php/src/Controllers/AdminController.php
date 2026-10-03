@@ -59,7 +59,8 @@ final class AdminController
             return;
         }
 
-        $plan = $pdo->prepare('SELECT id, name, price_toman FROM plans WHERE id = :id AND is_active = 1');
+        // The free club plan is never bought: it is what a club has without one.
+        $plan = $pdo->prepare('SELECT id, name, price_toman FROM plans WHERE id = :id AND is_active = 1' . Limits::notFreeClubPlan());
         $plan->execute(['id' => $data['plan_id']]);
         $planRow = $plan->fetch();
         if ($planRow === false) {
@@ -182,6 +183,7 @@ final class AdminController
         $limits = Limits::ready();
         $stmt = Database::connection()->query(
             'SELECT id, name, price_toman, duration_days, max_members, is_active'
+            . (Database::hasColumn('plans', 'is_free') ? ', is_free' : '')
             . ($limits ? ', max_trainers, max_custom_exercises, max_templates, history_months, report_level,
                 (SELECT COUNT(*) FROM subscriptions s WHERE s.plan_id = plans.id) AS subscriber_count' : '') . '
              FROM plans ORDER BY is_active DESC, price_toman ASC'
@@ -192,7 +194,7 @@ final class AdminController
                 $stmt->fetchAll(),
                 [],
                 ['price_toman', 'duration_days', 'max_members', 'max_trainers', 'max_custom_exercises', 'max_templates', 'history_months', 'subscriber_count'],
-                ['is_active']
+                ['is_active', 'is_free']
             ),
         ]);
     }
@@ -599,6 +601,14 @@ final class AdminController
 
         if ($fields === []) {
             Response::error(400, 'no_fields', 'Nothing to update.');
+            return;
+        }
+
+        // The free club plan is every unpaid club's: always on, always free.
+        if ($params['id'] === Limits::FREE_CLUB_PLAN_ID
+            && ((array_key_exists('is_active', $data) && !$data['is_active'])
+                || (array_key_exists('price_toman', $data) && (int) $data['price_toman'] !== 0))) {
+            Response::error(409, 'free_plan_locked', 'پلن رایگان باشگاه همیشه فعال و رایگان می‌ماند؛ فقط نام و محدودیت‌هایش قابل تغییر است.');
             return;
         }
 

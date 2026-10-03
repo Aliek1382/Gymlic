@@ -62,6 +62,13 @@ export interface QuickAction {
   icon: LucideIcon;
 }
 
+/** The free club plan a club is on while no paid plan runs; null = unlimited. */
+export interface FreeClubPlan {
+  name: string;
+  maxMembers: number | null;
+  maxTrainers: number | null;
+}
+
 export interface ClubDashboardData {
   clubName: string;
   statistics: ClubStatistics;
@@ -69,6 +76,7 @@ export interface ClubDashboardData {
   revenueSeries: RevenuePoint[];
   recentActivities: RecentActivityItem[];
   subscription: SubscriptionInfo | null;
+  freePlan: FreeClubPlan | null;
 }
 
 // ---------------------------------------------------------------------------
