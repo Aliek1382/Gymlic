@@ -33,8 +33,8 @@ final class Trash
         'user'             => AdminAccess::SUPER,
         'club'             => AdminAccess::SUPER,
         'page'             => 'content',
-        'discount'         => 'finance',
-        'trainer_discount' => 'finance',
+        'discount'         => 'finance.plans',
+        'trainer_discount' => 'finance.plans',
     ];
 
     /** Logins and one-off codes: never kept, never put back. */

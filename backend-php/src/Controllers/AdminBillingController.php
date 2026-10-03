@@ -33,7 +33,7 @@ final class AdminBillingController
 
     public static function subscriptions(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         $plans = Database::connection()->query(
             'SELECT id, name, price_toman, duration_days, max_members, is_active FROM plans ORDER BY price_toman ASC'
         )->fetchAll();
@@ -56,7 +56,7 @@ final class AdminBillingController
      */
     public static function updateSubscription(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         $data = Validate::required(Validate::body(), ['action']);
         $pdo = Database::connection();
 
@@ -236,7 +236,7 @@ final class AdminBillingController
      */
     public static function giftAll(): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         $data = Validate::body();
         $days = self::giftDays($data['days'] ?? null);
         if ($days === null) {
@@ -310,7 +310,7 @@ final class AdminBillingController
 
     public static function revenue(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.reports');
         Response::ok(self::revenueSummary());
     }
 
@@ -394,7 +394,7 @@ final class AdminBillingController
 
     public static function listDiscounts(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         $pdo = Database::connection();
         $plans = Cast::rows(
             $pdo->query('SELECT id, name, price_toman, is_active FROM plans ORDER BY price_toman ASC')->fetchAll(),
@@ -429,7 +429,7 @@ final class AdminBillingController
 
     public static function createDiscount(): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::discountsReady()) {
             return;
         }
@@ -452,7 +452,7 @@ final class AdminBillingController
 
     public static function updateDiscount(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::discountsReady()) {
             return;
         }
@@ -478,7 +478,7 @@ final class AdminBillingController
 
     public static function deleteDiscount(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::discountsReady()) {
             return;
         }

@@ -11,8 +11,9 @@ namespace Gymlic;
  *
  * The user is only looked up when a switch is actually in effect, so with
  * everything on this costs the one settings query and nothing else. The
- * same goes for plan tiers (Tiers): a section that every tier opens costs
- * nothing; one that some tier closes looks up the user's tier.
+ * same goes for plan tiers (Tiers): a section that every tier opens (and no
+ * account has switched off by hand) costs nothing; otherwise the user's tier
+ * and their own access (AccountAccess) are looked up.
  */
 final class Gate
 {
@@ -82,18 +83,24 @@ final class Gate
         }
 
         if ($tiered !== []) {
-            $tier = Tiers::effective(Database::connection(), $user);
+            $pdo = Database::connection();
+            $tier = Tiers::effective($pdo, $user);
             foreach ($tiered as $key) {
-                if (!Tiers::allows($tier, $key)) {
-                    Response::error(
-                        403,
-                        'tier_locked',
-                        $user['account_type'] === 'athlete'
-                            ? 'بخش «' . Features::label($key) . '» در پلن مربی شما فعال نیست.'
-                            : 'بخش «' . Features::label($key) . '» در پلن فعلی شما («' . Tiers::label($tier) . '») نیست. برای استفاده، پلن بالاتری تهیه کنید.'
-                    );
-                    exit;
+                if (Tiers::allowsUser($pdo, $user, $key)) {
+                    continue;
                 }
+                $label = Features::label($key);
+                Response::error(
+                    403,
+                    'tier_locked',
+                    match (true) {
+                        // Off by the admin for this account (or its trainer's), not by the plan.
+                        Tiers::allows($tier, $key) => 'بخش «' . $label . '» برای حساب شما فعال نیست. برای فعال‌شدن با پشتیبانی تماس بگیرید.',
+                        $user['account_type'] === 'athlete' => 'بخش «' . $label . '» در پلن مربی شما فعال نیست.',
+                        default => 'بخش «' . $label . '» در پلن فعلی شما («' . Tiers::label($tier) . '») نیست. برای استفاده، پلن بالاتری تهیه کنید.',
+                    }
+                );
+                exit;
             }
         }
     }

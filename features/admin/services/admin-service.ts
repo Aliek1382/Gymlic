@@ -140,6 +140,13 @@ export interface AdminClubDetail {
     recorded_by_admin: boolean;
     discount_toman?: number;
     discount_code?: string | null;
+    /** The receipt: only for an admin who reviews payments. */
+    tracking_code?: string | null;
+    card_last4?: string | null;
+    has_receipt?: boolean;
+    receipt_is_pdf?: boolean;
+    receipt_purged_at?: string | null;
+    receipt_expires_at?: string | null;
   }[];
 }
 

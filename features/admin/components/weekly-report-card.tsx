@@ -25,6 +25,7 @@ import {
   sendWeeklyReportNow,
   type ReportSettings,
 } from "../services/admin-ops-service";
+import { useIsSuperAdmin } from "../hooks/use-admin-access";
 import { parseSqlDate } from "../utils/format";
 
 const TEXTAREA_CLASS =
@@ -32,7 +33,11 @@ const TEXTAREA_CLASS =
 
 const HOURS = [6, 7, 8, 9, 10, 12, 14, 18];
 
-/** On the stats page: the Saturday email summary — who gets it, a preview, send now. */
+/**
+ * On the financial report page (it carries the revenue): the Saturday email
+ * summary — who gets it, a preview, send now. Only a super admin changes the
+ * recipients; the API refuses it to a role too.
+ */
 export function WeeklyReportCard() {
   const { data, isLoading } = useQuery({ queryKey: ["admin", "weekly-report"], queryFn: getWeeklyReport });
 
@@ -59,6 +64,7 @@ function ReportForm({ info }: { info: NonNullable<Awaited<ReturnType<typeof getW
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<ReportSettings>(info.settings);
   const [recipients, setRecipients] = useState(info.settings.recipients.join("\n"));
+  const isSuper = useIsSuperAdmin();
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -98,11 +104,14 @@ function ReportForm({ info }: { info: NonNullable<Awaited<ReturnType<typeof getW
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_10rem]">
           <div className="space-y-1.5">
-            <Label htmlFor="weekly-recipients">ایمیل گیرنده‌ها (هر خط یکی، حداکثر ۵)</Label>
+            <Label htmlFor="weekly-recipients">
+              ایمیل گیرنده‌ها (هر خط یکی، حداکثر ۵){!isSuper && " — تغییرش فقط با مدیر کل"}
+            </Label>
             <textarea
               id="weekly-recipients"
               dir="ltr"
               rows={3}
+              readOnly={!isSuper}
               className={TEXTAREA_CLASS}
               value={recipients}
               onChange={(e) => setRecipients(e.target.value)}

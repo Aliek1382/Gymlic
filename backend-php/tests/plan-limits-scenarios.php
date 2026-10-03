@@ -948,5 +948,51 @@ check(call('PUT', '/trainer/print-branding', ['watermark' => 'x'], $athleteToken
 [$status, $branding] = call('DELETE', '/trainer/print-branding/logo', null, $b1);
 check($status === 200 && $branding['logo_url'] === null, 'the logo can be removed (back to the photo)');
 
+// ---- Trainer birthdays and personal gift codes (admin) ----------------------
+
+echo "\nAdmin: trainer birthdays and personal gift codes\n";
+foreach (['trainer_discount_codes'] as $table) {
+    if (hasCol($table, 'for_trainer_id')) {
+        $pdo->exec('ALTER TABLE trainer_discount_codes DROP KEY idx_tdiscount_for_trainer, DROP COLUMN for_trainer_id');
+    }
+}
+[$g1, $g1Id] = account('gift1', 'trainer');
+[$g2] = account('gift2', 'trainer');
+$pdo->prepare('UPDATE profiles SET birth_date = :d WHERE id = :id')->execute(['d' => birthDateFor(35, 0), 'id' => $g1Id]);
+[$status, $bdays] = call('GET', '/admin/trainer-birthdays', null, $adminToken);
+$mine = array_values(array_filter($bdays['items'] ?? [], fn ($r) => $r['id'] === $g1Id))[0] ?? null;
+check($status === 200 && ($mine['days_left'] ?? null) === 0 && ($mine['age'] ?? null) === 35 && ($mine['gifted'] ?? null) === false,
+    "the admin sees today's trainer birthday", $mine);
+check(($bdays['ready'] ?? null) === false && call('POST', "/admin/trainers/{$g1Id}/gift-code", ['occasion' => 'birthday'], $adminToken)[0] === 503,
+    'before its update a gift code is refused (it could not be tied to one trainer)');
+[$status, $result] = call('POST', '/admin/system/migrations/trainer-discount-owner/run', null, $adminToken);
+check($status === 200 && ($result['ok'] ?? false), 'the update runs from the admin panel', $result);
+
+[$status, $gift] = call('POST', "/admin/trainers/{$g1Id}/gift-code", ['occasion' => 'birthday', 'percent' => 25, 'days' => 10], $adminToken);
+check($status === 201 && str_starts_with((string) ($gift['code'] ?? ''), 'BDAY-') && ($gift['percent'] ?? 0) === 25, 'a birthday gift code is made', [$status, $gift]);
+$note = $pdo->prepare("SELECT body FROM notifications WHERE recipient_id = :t AND type = 'trainer_gift_code' ORDER BY created_at DESC LIMIT 1");
+$note->execute(['t' => $g1Id]);
+check(str_contains((string) $note->fetchColumn(), (string) ($gift['code'] ?? '?')), 'and sent to the trainer as a notification');
+check(call('POST', "/admin/trainers/{$g1Id}/gift-code", ['occasion' => 'birthday'], $adminToken)[0] === 409, 'a second birthday gift this year is refused');
+[, $bdays] = call('GET', '/admin/trainer-birthdays', null, $adminToken);
+$mine = array_values(array_filter($bdays['items'] ?? [], fn ($r) => $r['id'] === $g1Id))[0] ?? null;
+check(($mine['gifted'] ?? null) === true, 'the list shows it was sent');
+[$status, $quote] = call('POST', '/trainer-billing/discount-check', ['plan_id' => $tPlan['طلایی'], 'code' => $gift['code'] ?? ''], $g2);
+check($status !== 200 && ($quote['error']['code'] ?? '') === 'invalid_code', 'another trainer cannot use it', [$status, $quote]);
+[$status, $quote] = call('POST', '/trainer-billing/discount-check', ['plan_id' => $tPlan['طلایی'], 'code' => strtolower((string) ($gift['code'] ?? ''))], $g1);
+check($status === 200, 'its trainer can', [$status, $quote]);
+check(call('POST', "/admin/trainers/{$g1Id}/gift-code", ['occasion' => 'gift', 'percent' => 101], $adminToken)[0] === 400, 'an invalid percent is refused');
+[$status] = call('POST', "/admin/trainers/{$g1Id}/gift-code", ['occasion' => 'gift', 'percent' => 10, 'days' => 5], $adminToken);
+check($status === 201, 'a gift for another occasion can be sent any time');
+
+$g1Email = $pdo->query("SELECT email FROM profiles WHERE id = '{$g1Id}'")->fetchColumn();
+[$status] = call('POST', '/admin/trainer-discounts', ['code' => 'ONLY' . strtoupper($run), 'kind' => 'percent', 'value' => 15, 'for_trainer' => $g1Email], $adminToken);
+check($status === 201, 'the admin makes a personal code from the discount page (by email)', $status);
+[, $codes] = call('GET', '/admin/trainer-discounts', null, $adminToken);
+$row = array_values(array_filter($codes['items'] ?? [], fn ($c) => $c['code'] === 'ONLY' . strtoupper($run)))[0] ?? null;
+check(($row['for_trainer_id'] ?? null) === $g1Id && ($codes['personal'] ?? false) === true, 'the list shows whose it is', $row);
+check(call('POST', '/admin/trainer-discounts', ['code' => 'NOONE' . strtoupper($run), 'kind' => 'percent', 'value' => 5, 'for_trainer' => 'nobody@example.test'], $adminToken)[0] === 404,
+    'an unknown trainer is refused');
+
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);

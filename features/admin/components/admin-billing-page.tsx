@@ -22,6 +22,7 @@ import {
   saveBillingSettings,
   type BillingSettings,
 } from "../services/admin-billing-service";
+import { useAdminCan, useIsSuperAdmin } from "../hooks/use-admin-access";
 import { SettingsStorageNotice } from "./settings-storage-notice";
 
 const QUERY_KEY = ["admin", "billing-settings"] as const;
@@ -68,6 +69,9 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
   });
   const [saving, setSaving] = useState(false);
   const patch = (next: Partial<BillingSettings>) => setDraft((d) => ({ ...d, ...next }));
+  // Where the money goes is a super admin's to change (the API refuses a role too).
+  const isSuper = useIsSuperAdmin();
+  const destinationLocked = locked || !isSuper;
 
   const value: BillingSettings = {
     ...draft,
@@ -130,6 +134,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
           <CardDescription>
             شماره کارت و شبا پیش از ذخیره بررسی می‌شوند تا اشتباه تایپی پول باشگاه‌ها و مربی‌ها را
             جای دیگری نفرستد.
+            {!isSuper && " تغییر کارت، شبا، نام صاحب حساب و بانک فقط با مدیر کل است."}
           </CardDescription>
         </div>
         <div className="space-y-4 px-6">
@@ -139,7 +144,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
               id="billing-card"
               dir="ltr"
               inputMode="numeric"
-              disabled={locked}
+              disabled={destinationLocked}
               value={draft.card_number}
               placeholder="6037-9900-0000-0000"
               onChange={(e) => patch({ card_number: formatCardNumber(digitsOnly(e.target.value).slice(0, 16)) })}
@@ -153,7 +158,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
                 id="billing-sheba"
                 dir="ltr"
                 inputMode="numeric"
-                disabled={locked}
+                disabled={destinationLocked}
                 value={draft.sheba}
                 placeholder="۲۴ رقم"
                 onChange={(e) => patch({ sheba: digitsOnly(e.target.value).slice(0, 24) })}
@@ -165,7 +170,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
               <Label htmlFor="billing-holder">به نام</Label>
               <Input
                 id="billing-holder"
-                disabled={locked}
+                disabled={destinationLocked}
                 maxLength={100}
                 value={draft.account_holder}
                 onChange={(e) => patch({ account_holder: e.target.value })}
@@ -175,7 +180,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
               <Label htmlFor="billing-bank">بانک</Label>
               <Input
                 id="billing-bank"
-                disabled={locked}
+                disabled={destinationLocked}
                 maxLength={60}
                 value={draft.bank_name}
                 placeholder="مثلاً: ملت"
@@ -376,6 +381,7 @@ const formatMegabytes = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)
 function ReceiptStorage() {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["admin", "receipt-stats"], queryFn: getReceiptStats });
+  const canPurge = useAdminCan()("finance.payments");
   const [purging, setPurging] = useState(false);
 
   if (!data) return null;
@@ -409,10 +415,12 @@ function ReceiptStorage() {
       <p className="text-sm text-muted-foreground">
         الان {data.count} فایل رسید ذخیره است ({formatMegabytes(data.bytes)}).
       </p>
-      <Button type="button" size="sm" variant="outline" onClick={purge} disabled={purging}>
-        {purging ? <Loader2 className="animate-spin" /> : <Trash2 />}
-        پاکسازی رسیدهای منقضی
-      </Button>
+      {canPurge && (
+        <Button type="button" size="sm" variant="outline" onClick={purge} disabled={purging}>
+          {purging ? <Loader2 className="animate-spin" /> : <Trash2 />}
+          پاکسازی رسیدهای منقضی
+        </Button>
+      )}
     </div>
   );
 }

@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ReceiptText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
 import { useQuery } from "@tanstack/react-query";
@@ -19,6 +23,9 @@ import { useQuery } from "@tanstack/react-query";
 import { listPaymentRequests, type AdminPaymentRequestRow } from "../services/admin-service";
 import { ExportButton } from "./export-button";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
+import { ErrorState } from "@/features/dashboard/components/shared/error-state";
+import { TrainerRequestsTable } from "@/features/trainer-billing/components/trainer-payment-requests";
+import { listTrainerRequests } from "@/features/trainer-billing/services/trainer-billing-service";
 import { PaymentRequestActions } from "@/features/admin/components/payment-request-actions";
 import { waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
@@ -39,6 +46,7 @@ const STATUS_VARIANT: Record<PaymentRequestStatus, "warning" | "success" | "dest
 type RequestRow = Pick<
   AdminPaymentRequestRow,
   | "id"
+  | "club_id"
   | "amount_toman"
   | "reference_note"
   | "status"
@@ -94,7 +102,9 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
         {rows.map((request) => (
           <TableRow key={request.id}>
             <TableCell className="font-medium text-foreground">
-              {request.club_name}
+              <Link href={`/admin/clubs/detail?id=${request.club_id}`} className="hover:underline">
+                {request.club_name}
+              </Link>
             </TableCell>
             <TableCell className="text-muted-foreground">
               {request.plan_name}
@@ -184,8 +194,18 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
   );
 }
 
+type Who = "clubs" | "trainers";
+
+/**
+ * Every payment to the platform waiting on a review, clubs' and trainers'
+ * side by side: the receipt, the tracking code, approve or reject.
+ * ?tab=trainers opens on the trainers' (the link from «اشتراک مربیان»).
+ */
 export function AdminPaymentsPage() {
-  const { data } = useQuery({
+  const initial: Who = useSearchParams().get("tab") === "trainers" ? "trainers" : "clubs";
+  const [who, setWho] = useState<Who>(initial);
+
+  const clubs = useQuery({
     queryKey: ["admin", "payments"],
     queryFn: async () => {
       const rows = await listPaymentRequests();
@@ -197,45 +217,90 @@ export function AdminPaymentsPage() {
       };
     },
   });
+  const trainers = useQuery({ queryKey: ["admin", "trainer-requests"], queryFn: () => listTrainerRequests() });
 
-  const pending = data?.pending ?? [];
-  const reviewed = data?.reviewed ?? [];
+  const pending = clubs.data?.pending ?? [];
+  const reviewed = clubs.data?.reviewed ?? [];
+  const trainerRows = trainers.data?.items ?? [];
+  const trainerPending = trainerRows.filter((request) => request.status === "pending");
+  const trainerReviewed = trainerRows.filter((request) => request.status !== "pending");
 
   return (
-
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">درخواست‌های پرداخت</h1>
           <p className="text-sm text-muted-foreground">
-            بررسی و تایید واریزی‌هایی که باشگاه‌ها برای فعال‌سازی اشتراک ثبت کرده‌اند.
+            بررسی و تأیید واریزی‌هایی که باشگاه‌ها و مربیان برای خرید یا تمدید اشتراک ثبت کرده‌اند، با رسید و کد
+            پیگیری هرکدام. با تأیید، اشتراک همان لحظه فعال یا تمدید می‌شود.
           </p>
         </div>
-        <ExportButton kind="payments" />
+        <ExportButton
+          kind={who === "trainers" ? "trainer-payments" : "payments"}
+          label={who === "trainers" ? "خروجی پرداخت‌های مربیان" : "خروجی پرداخت‌های باشگاه‌ها"}
+        />
       </div>
 
-      <Card className="gap-4 py-5">
-        <Tabs defaultValue="pending">
-          <div className="px-6">
-            <CardTitle className="sr-only">درخواست‌های پرداخت</CardTitle>
-            <TabsList>
-              <TabsTrigger value="pending">
-                در انتظار ({formatNumber(pending.length)})
-              </TabsTrigger>
-              <TabsTrigger value="reviewed">
-                بررسی‌شده ({formatNumber(reviewed.length)})
-              </TabsTrigger>
-            </TabsList>
-          </div>
+      <Tabs value={who} onValueChange={(value) => setWho(value as Who)} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="clubs">باشگاه‌ها ({formatNumber(pending.length)} در انتظار)</TabsTrigger>
+          <TabsTrigger value="trainers">مربیان ({formatNumber(trainerPending.length)} در انتظار)</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="pending">
-            <RequestsTable rows={pending} showActions />
-          </TabsContent>
-          <TabsContent value="reviewed">
-            <RequestsTable rows={reviewed} showActions={false} />
-          </TabsContent>
-        </Tabs>
-      </Card>
+        <TabsContent value="clubs">
+          <Card className="gap-4 py-5">
+            <Tabs defaultValue="pending">
+              <div className="px-6">
+                <CardTitle className="sr-only">پرداخت‌های باشگاه‌ها</CardTitle>
+                <TabsList>
+                  <TabsTrigger value="pending">در انتظار ({formatNumber(pending.length)})</TabsTrigger>
+                  <TabsTrigger value="reviewed">بررسی‌شده ({formatNumber(reviewed.length)})</TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="pending">
+                <RequestsTable rows={pending} showActions />
+              </TabsContent>
+              <TabsContent value="reviewed">
+                <RequestsTable rows={reviewed} showActions={false} />
+              </TabsContent>
+            </Tabs>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="trainers">
+          <Card className="gap-4 py-5">
+            {trainers.isLoading ? (
+              <Skeleton className="mx-6 h-32" />
+            ) : trainers.isError ? (
+              <div className="px-6">
+                <ErrorState message="دریافت پرداخت‌های مربیان ناموفق بود." />
+              </div>
+            ) : trainers.data && !trainers.data.ready ? (
+              <p className="px-6 text-sm text-muted-foreground">
+                اشتراک مربی هنوز فعال نشده است: به‌روزرسانی «اشتراک و پرداخت کارت‌به‌کارت مربی به پلتفرم» را از صفحهٔ
+                پایگاه‌داده اجرا کنید.
+              </p>
+            ) : (
+              <Tabs defaultValue="pending">
+                <div className="px-6">
+                  <CardTitle className="sr-only">پرداخت‌های مربیان</CardTitle>
+                  <TabsList>
+                    <TabsTrigger value="pending">در انتظار ({formatNumber(trainerPending.length)})</TabsTrigger>
+                    <TabsTrigger value="reviewed">بررسی‌شده ({formatNumber(trainerReviewed.length)})</TabsTrigger>
+                  </TabsList>
+                </div>
+                <TabsContent value="pending">
+                  <TrainerRequestsTable rows={trainerPending} showActions />
+                </TabsContent>
+                <TabsContent value="reviewed">
+                  <TrainerRequestsTable rows={trainerReviewed} showActions={false} />
+                </TabsContent>
+              </Tabs>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

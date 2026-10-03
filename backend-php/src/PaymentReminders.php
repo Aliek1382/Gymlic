@@ -68,7 +68,7 @@ final class PaymentReminders
 
             foreach ($stmt->fetchAll() as $row) {
                 if ($source['reviewers'] === 'admin') {
-                    $admins ??= AdminAccess::holders($pdo, 'finance');
+                    $admins ??= AdminAccess::holders($pdo, 'finance.payments');
                     $reviewers = $admins;
                 } else {
                     $reviewers = $row['reviewer_id'] === null ? [] : [$row['reviewer_id']];

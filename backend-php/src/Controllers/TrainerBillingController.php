@@ -220,7 +220,7 @@ final class TrainerBillingController
         }
 
         try {
-            foreach (AdminAccess::holders($pdo, 'finance') as $adminId) {
+            foreach (AdminAccess::holders($pdo, 'finance.payments') as $adminId) {
                 Templates::notify(
                     $pdo,
                     'trainer_payment_submitted',
@@ -290,7 +290,7 @@ final class TrainerBillingController
             $stmt = Database::connection()->prepare('SELECT trainer_id, receipt_path FROM trainer_payment_requests WHERE id = :id');
             $stmt->execute(['id' => $params['id']]);
             $row = $stmt->fetch();
-            if ($row !== false && ($row['trainer_id'] === $user['id'] || AdminAccess::can($user, 'finance'))) {
+            if ($row !== false && ($row['trainer_id'] === $user['id'] || AdminAccess::can($user, 'finance.payments'))) {
                 $path = Receipts::path($row['receipt_path']);
             }
         }
@@ -400,10 +400,11 @@ final class TrainerBillingController
 
     // ---- Admin: payment requests -----------------------------------------
 
-    /** GET /admin/trainer-billing/requests */
+    /** GET /admin/trainer-billing/requests[?trainer_id=] — every trainer's, or one trainer's (their admin page). */
     public static function adminRequests(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.payments');
+        $trainerId = isset($_GET['trainer_id']) && is_string($_GET['trainer_id']) ? $_GET['trainer_id'] : null;
         if (!TrainerBilling::ready()) {
             Response::ok(['ready' => false, 'items' => []]);
             return;
@@ -413,7 +414,7 @@ final class TrainerBillingController
         PaymentReminders::sendIfDue($pdo);
         $discounts = TrainerDiscounts::ready();
         $paidCol = Database::hasColumn('trainer_payment_requests', 'paid_amount_toman');
-        $rows = $pdo->query(
+        $stmt = $pdo->prepare(
             "SELECT r.id, r.trainer_id, r.plan_id, r.amount_toman, r.reference_note, r.tracking_code, r.card_last4,
                     r.paid_at, r.status, r.admin_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE '%.pdf') AS receipt_is_pdf,
@@ -424,9 +425,12 @@ final class TrainerBillingController
              FROM trainer_payment_requests r
              JOIN trainer_plans p ON p.id = r.plan_id
              JOIN profiles t ON t.id = r.trainer_id"
-            . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '') . "
+            . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '')
+            . ($trainerId !== null ? ' WHERE r.trainer_id = :trainer_id' : '') . "
              ORDER BY r.created_at DESC LIMIT 500"
-        )->fetchAll();
+        );
+        $stmt->execute($trainerId !== null ? ['trainer_id' => $trainerId] : []);
+        $rows = $stmt->fetchAll();
         $rows = Cast::rows($rows, [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']);
 
         // When the file goes: the retention days after the review.
@@ -446,7 +450,7 @@ final class TrainerBillingController
     /** POST /admin/trainer-billing/requests/{id}/approve: starts or extends the subscription. */
     public static function approve(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.payments');
         if (!self::ready()) {
             return;
         }
@@ -517,7 +521,7 @@ final class TrainerBillingController
     /** POST /admin/trainer-billing/requests/{id}/reject */
     public static function reject(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.payments');
         if (!self::ready()) {
             return;
         }
@@ -559,7 +563,7 @@ final class TrainerBillingController
     /** DELETE /admin/trainer-billing/requests/{id}/receipt: remove one file now. */
     public static function deleteReceipt(array $params): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.payments');
         if (!self::ready()) {
             return;
         }
@@ -585,7 +589,7 @@ final class TrainerBillingController
     /** GET /admin/trainer-plans */
     public static function adminPlans(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!TrainerBilling::ready()) {
             Response::ok(['ready' => false, 'items' => []]);
             return;
@@ -614,7 +618,7 @@ final class TrainerBillingController
     /** POST /admin/trainer-plans */
     public static function createPlan(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -636,7 +640,7 @@ final class TrainerBillingController
     /** PATCH /admin/trainer-plans/{id} */
     public static function updatePlan(array $params): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -677,7 +681,7 @@ final class TrainerBillingController
     /** GET /admin/trainer-billing/subscriptions: every trainer account with their subscription. */
     public static function adminSubscriptions(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!TrainerBilling::ready()) {
             Response::ok(['ready' => false, 'items' => []]);
             return;
@@ -709,7 +713,7 @@ final class TrainerBillingController
     /** POST /admin/trainer-billing/subscriptions/{trainerId}/grant {days, plan_id?}: free days, or a plan by hand. */
     public static function grant(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }

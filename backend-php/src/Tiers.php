@@ -25,6 +25,10 @@ use Throwable;
  *
  * Free-tier caps (athletes per trainer, members per club) apply only to
  * those with no running subscription; a plan's own cap applies otherwise.
+ *
+ * On top of all this, the admin may set one trainer's or club's access by
+ * hand (AccountAccess): a fixed tier, which wins over the subscription's,
+ * and sections switched on or off one by one, which win over the tier.
  */
 final class Tiers
 {
@@ -116,7 +120,10 @@ final class Tiers
         }
     }
 
-    /** Whether some tier has this section switched off (else nobody needs looking up). */
+    /**
+     * Whether some tier, or some account's own access, has this section
+     * switched off (else nobody needs looking up).
+     */
     public static function restricts(string $feature): bool
     {
         $config = Settings::get('tiers');
@@ -125,7 +132,83 @@ final class Tiers
                 return true;
             }
         }
-        return false;
+        return AccountAccess::closesAnywhere(Database::connection(), $feature);
+    }
+
+    /**
+     * Whether this user may open the section: the first account in their
+     * chain (subjects) that has it switched on or off by hand decides;
+     * otherwise their tier. Admins always may.
+     */
+    public static function allowsUser(PDO $pdo, array $user, string $feature): bool
+    {
+        foreach (self::subjects($pdo, $user) as [$kind, $id]) {
+            $set = AccountAccess::feature($pdo, $kind, $id, $feature);
+            if ($set !== null) {
+                return $set;
+            }
+        }
+        return self::allows(self::effective($pdo, $user), $feature);
+    }
+
+    /**
+     * Every section the user's accounts have set by hand, resolved as
+     * allowsUser does: for the panel to show and hide the same things.
+     *
+     * @return array<string, bool>
+     */
+    public static function accessFor(PDO $pdo, array $user): array
+    {
+        $out = [];
+        foreach (array_reverse(self::subjects($pdo, $user)) as [$kind, $id]) {
+            $out = array_merge($out, AccountAccess::get($pdo, $kind, $id)['features'] ?? []);
+        }
+        return $out;
+    }
+
+    /**
+     * The accounts whose access applies to this user, nearest first:
+     * a trainer and their club; an athlete's trainer and that trainer's
+     * club, or the athlete's club; a club owner's club. None for admins.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    public static function subjects(PDO $pdo, array $user): array
+    {
+        if (AdminAccess::of($user) !== null) {
+            return [];
+        }
+        $id = (string) $user['id'];
+        try {
+            switch ($user['account_type'] ?? null) {
+                case 'trainer':
+                    return self::trainerChain($pdo, $id);
+                case 'club':
+                    $club = self::ownedClub($pdo, $id);
+                    return $club !== null ? [['club', $club]] : [];
+                case 'athlete':
+                    $trainerId = self::athleteTrainer($pdo, $id);
+                    if ($trainerId !== null) {
+                        return self::trainerChain($pdo, $trainerId);
+                    }
+                    $club = self::memberClub($pdo, $id, null);
+                    return $club !== null ? [['club', $club]] : [];
+            }
+        } catch (Throwable $e) {
+            error_log('Tiers::subjects: ' . $e->getMessage());
+        }
+        return [];
+    }
+
+    /** @return list<array{0: string, 1: string}> */
+    private static function trainerChain(PDO $pdo, string $trainerId): array
+    {
+        $chain = [['trainer', $trainerId]];
+        $club = self::memberClub($pdo, $trainerId, 'trainer');
+        if ($club !== null) {
+            $chain[] = ['club', $club];
+        }
+        return $chain;
     }
 
     /** null (not limited) opens everything. */
@@ -143,8 +226,25 @@ final class Tiers
         return Settings::get('tiers')['free_limits'][$kind] ?? null;
     }
 
-    private static function trainerTier(PDO $pdo, string $trainerId): ?string
+    /**
+     * The tier the account's plan gives (its club's, for a trainer without
+     * one of their own), leaving out a tier the admin fixed for the account
+     * itself: what "as the plan says" means on the admin's access screen.
+     */
+    public static function fromPlan(PDO $pdo, string $kind, string $id): ?string
     {
+        if (!self::ready()) {
+            return null;
+        }
+        return $kind === 'trainer' ? self::trainerTier($pdo, $id, false) : self::clubTier($pdo, $id, false);
+    }
+
+    private static function trainerTier(PDO $pdo, string $trainerId, bool $useFixed = true): ?string
+    {
+        $fixed = $useFixed ? (AccountAccess::get($pdo, 'trainer', $trainerId)['tier'] ?? null) : null;
+        if ($fixed !== null) {
+            return $fixed;
+        }
         if (Database::hasTable('trainer_subscriptions')) {
             $stmt = $pdo->prepare('SELECT tier, expires_at FROM trainer_subscriptions WHERE trainer_id = :id');
             $stmt->execute(['id' => $trainerId]);
@@ -153,43 +253,66 @@ final class Tiers
                 return self::valid($row['tier']) ? $row['tier'] : null;
             }
         }
-        $club = $pdo->prepare(
-            "SELECT club_id FROM memberships WHERE user_id = :id AND role = 'trainer' AND status = 'active' ORDER BY joined_at LIMIT 1"
-        );
-        $club->execute(['id' => $trainerId]);
-        $clubId = $club->fetchColumn();
-        return $clubId !== false ? self::clubTier($pdo, (string) $clubId) : 'free';
+        $clubId = self::memberClub($pdo, $trainerId, 'trainer');
+        return $clubId !== null ? self::clubTier($pdo, $clubId) : 'free';
     }
 
     private static function ownerTier(PDO $pdo, string $ownerId): ?string
     {
-        $stmt = $pdo->prepare('SELECT id FROM clubs WHERE owner_id = :id ORDER BY created_at LIMIT 1');
-        $stmt->execute(['id' => $ownerId]);
-        $clubId = $stmt->fetchColumn();
-        return $clubId !== false ? self::clubTier($pdo, (string) $clubId) : 'free';
+        $clubId = self::ownedClub($pdo, $ownerId);
+        return $clubId !== null ? self::clubTier($pdo, $clubId) : 'free';
     }
 
     private static function athleteTier(PDO $pdo, string $athleteId): ?string
+    {
+        $trainerId = self::athleteTrainer($pdo, $athleteId);
+        if ($trainerId !== null) {
+            return self::trainerTier($pdo, $trainerId);
+        }
+        $clubId = self::memberClub($pdo, $athleteId, null);
+        return $clubId !== null ? self::clubTier($pdo, $clubId) : 'free';
+    }
+
+    /** The club the user is an active member of ($role: as a trainer; null: any role), first joined. */
+    private static function memberClub(PDO $pdo, string $userId, ?string $role): ?string
+    {
+        $stmt = $pdo->prepare(
+            "SELECT club_id FROM memberships WHERE user_id = :id AND status = 'active'"
+            . ($role !== null ? ' AND role = :role' : '') . ' ORDER BY joined_at LIMIT 1'
+        );
+        $stmt->execute(['id' => $userId] + ($role !== null ? ['role' => $role] : []));
+        $clubId = $stmt->fetchColumn();
+        return $clubId !== false ? (string) $clubId : null;
+    }
+
+    private static function ownedClub(PDO $pdo, string $ownerId): ?string
+    {
+        $stmt = $pdo->prepare('SELECT id FROM clubs WHERE owner_id = :id ORDER BY created_at LIMIT 1');
+        $stmt->execute(['id' => $ownerId]);
+        $clubId = $stmt->fetchColumn();
+        return $clubId !== false ? (string) $clubId : null;
+    }
+
+    private static function athleteTrainer(PDO $pdo, string $athleteId): ?string
     {
         $stmt = $pdo->prepare(
             "SELECT trainer_id FROM trainer_athletes WHERE athlete_id = :id AND status = 'active' ORDER BY created_at LIMIT 1"
         );
         $stmt->execute(['id' => $athleteId]);
         $trainerId = $stmt->fetchColumn();
-        if ($trainerId !== false) {
-            return self::trainerTier($pdo, (string) $trainerId);
-        }
-        $club = $pdo->prepare(
-            "SELECT club_id FROM memberships WHERE user_id = :id AND status = 'active' ORDER BY joined_at LIMIT 1"
-        );
-        $club->execute(['id' => $athleteId]);
-        $clubId = $club->fetchColumn();
-        return $clubId !== false ? self::clubTier($pdo, (string) $clubId) : 'free';
+        return $trainerId !== false ? (string) $trainerId : null;
     }
 
-    /** The club's running subscription's tier; free with none running. */
-    public static function clubTier(PDO $pdo, string $clubId): ?string
+    /**
+     * The club's tier: the one the admin fixed for it (AccountAccess), else
+     * its running subscription's; free with none running.
+     */
+    public static function clubTier(PDO $pdo, string $clubId, bool $useFixed = true): ?string
     {
+        $fixed = $useFixed ? (AccountAccess::get($pdo, 'club', $clubId)['tier'] ?? null) : null;
+        if ($fixed !== null) {
+            return $fixed;
+        }
         $stmt = $pdo->prepare('SELECT tier, expires_at FROM subscriptions WHERE club_id = :id ORDER BY expires_at DESC LIMIT 1');
         $stmt->execute(['id' => $clubId]);
         $row = $stmt->fetch();

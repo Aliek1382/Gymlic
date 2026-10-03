@@ -773,6 +773,7 @@ CREATE TABLE trainer_discount_codes (
   kind             ENUM('percent','amount') NOT NULL,
   value            BIGINT NOT NULL,                  -- 1..100 for percent, toman for amount
   plan_id          CHAR(36) NULL,                    -- NULL = any trainer plan
+  for_trainer_id   CHAR(36) NULL,                    -- NULL = any trainer; else only this one (trainer-discount-owner-update.sql)
   max_uses         INT NULL,                         -- NULL = unlimited, pending and approved requests count
   once_per_trainer TINYINT(1) NOT NULL DEFAULT 0,
   expires_at       DATETIME NULL,
@@ -782,6 +783,7 @@ CREATE TABLE trainer_discount_codes (
   created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_tdiscount_code (code),
+  KEY idx_tdiscount_for_trainer (for_trainer_id),
   CONSTRAINT fk_tdiscount_plan FOREIGN KEY (plan_id) REFERENCES trainer_plans(id) ON DELETE CASCADE,
   CONSTRAINT fk_tdiscount_creator FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL,
   CONSTRAINT chk_tdiscount_value CHECK (value > 0)
@@ -1447,3 +1449,28 @@ INSERT INTO plans (id, name, price_toman, duration_days, max_members, max_traine
   ('7c000000-0000-4000-8000-000000000002', 'نقره‌ای', 990000, 30, 100, 3, 'silver'),
   ('7c000000-0000-4000-8000-000000000003', 'طلایی', 1800000, 30, 300, 8, 'gold'),
   ('7c000000-0000-4000-8000-000000000004', 'الماسی', 2900000, 30, NULL, NULL, 'diamond');
+
+-- Access set by hand for one trainer or one club (account-access-update.sql).
+CREATE TABLE trainer_access (
+  trainer_id CHAR(36) NOT NULL PRIMARY KEY,
+  tier       VARCHAR(20) NULL,
+  features   TEXT NULL,
+  limits     TEXT NULL,
+  note       VARCHAR(500) NULL,
+  updated_by CHAR(36) NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_trainer_access_trainer FOREIGN KEY (trainer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_trainer_access_admin FOREIGN KEY (updated_by) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE club_access (
+  club_id    CHAR(36) NOT NULL PRIMARY KEY,
+  tier       VARCHAR(20) NULL,
+  features   TEXT NULL,
+  limits     TEXT NULL,
+  note       VARCHAR(500) NULL,
+  updated_by CHAR(36) NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_club_access_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_club_access_admin FOREIGN KEY (updated_by) REFERENCES profiles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

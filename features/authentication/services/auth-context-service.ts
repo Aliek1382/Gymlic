@@ -1,5 +1,6 @@
 import { ApiError, api, fullName } from "@/lib/api/client";
 import type { TierKey } from "@/features/site-settings/services/site-settings-service";
+import type { FeatureKey } from "@/features/site-settings/constants";
 import type {
   AccountType,
   ClubStatus,
@@ -16,7 +17,10 @@ import type {
 export type AdminPermission =
   | "users.view"
   | "users.manage"
-  | "finance"
+  | "users.verify"
+  | "finance.payments"
+  | "finance.plans"
+  | "finance.reports"
   | "content"
   | "notifications"
   | "support"
@@ -59,8 +63,12 @@ export interface AuthContext {
   trainerAvatarUrl: string | null;
   /** The athlete's trainer has the «مربی تأییدشده» badge. */
   trainerVerified: boolean;
-  /** The plan tier that decides which sections open; null = not limited. */
-  tier: { key: TierKey; label: string } | null;
+  /**
+   * Which sections the user's plan opens: the tier (null = not limited by
+   * one), and sections the admin switched on or off for this account by hand,
+   * which win over the tier. null = nothing limits them.
+   */
+  tier: UserTier | null;
   /** On a printed plan: the trainer's logo (null = their photo) and watermark (null = «جیم‌لیک — name»). */
   printLogoUrl: string | null;
   printWatermark: string | null;
@@ -94,7 +102,7 @@ interface MeResponse {
     is_verified?: boolean;
   } | null;
   /** Absent from a backend older than plan tiers. */
-  tier?: { key: TierKey; label: string } | null;
+  tier?: UserTier | null;
   /**
    * A printed plan's logo and watermark: the trainer's own, or an athlete's
    * trainer's. Null before its database update; absent from an older backend.
@@ -164,10 +172,19 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   };
 }
 
+export interface UserTier {
+  key: TierKey | null;
+  label: string;
+  access?: Partial<Record<FeatureKey, boolean>>;
+}
+
 export const ALL_PERMISSIONS: AdminPermission[] = [
   "users.view",
   "users.manage",
-  "finance",
+  "users.verify",
+  "finance.payments",
+  "finance.plans",
+  "finance.reports",
   "content",
   "notifications",
   "support",

@@ -23,6 +23,9 @@ import { Button } from "@/components/ui/button";
 import { getAdminClubDetail, listCatalogPlans } from "../services/admin-service";
 import { useAdminCan } from "../hooks/use-admin-access";
 import { useSearchParams } from "next/navigation";
+import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
+import { PlanCard } from "./account-finance-section";
+import { PaymentRequestActions } from "./payment-request-actions";
 import { SubscriptionDialog } from "./subscription-dialog";
 import { SubscriptionStatusBadge } from "./subscription-status-badge";
 
@@ -73,7 +76,8 @@ export function AdminClubDetailPage() {
     queryFn: () => getAdminClubDetail(id),
   });
   const can = useAdminCan();
-  const canManageSubscription = can("finance");
+  const canManageSubscription = can("finance.plans");
+  const canReview = can("finance.payments");
   const queryClient = useQueryClient();
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -181,6 +185,8 @@ export function AdminClubDetailPage() {
         </Card>
       </div>
 
+      {canManageSubscription && <PlanCard kind="club" id={club.id} name={club.name} accessOnly />}
+
       <Card className="gap-4 py-5">
         <div className="px-6">
           <CardTitle className="text-base">
@@ -248,8 +254,10 @@ export function AdminClubDetailPage() {
               <TableRow>
                 <TableHead>پلن</TableHead>
                 <TableHead>مبلغ</TableHead>
+                {canReview && <TableHead>رسید</TableHead>}
                 <TableHead>وضعیت</TableHead>
                 <TableHead>تاریخ ثبت</TableHead>
+                {canReview && <TableHead />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -270,6 +278,27 @@ export function AdminClubDetailPage() {
                       </p>
                     )}
                   </TableCell>
+                  {canReview && (
+                    <TableCell className="text-muted-foreground">
+                      {request.tracking_code && (
+                        <p dir="ltr" className="text-end font-mono text-xs text-foreground">
+                          {request.tracking_code}
+                        </p>
+                      )}
+                      {request.has_receipt ? (
+                        <ReceiptViewer
+                          requestId={request.id}
+                          isPdf={!!request.receipt_is_pdf}
+                          expiresAt={request.receipt_expires_at ?? null}
+                          canDelete
+                        />
+                      ) : request.receipt_purged_at ? (
+                        <span className="text-xs">حذف شده</span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge variant={REQUEST_STATUS_VARIANT[request.status as PaymentRequestStatus]}>
                       {REQUEST_STATUS_LABEL[request.status as PaymentRequestStatus]}
@@ -278,6 +307,9 @@ export function AdminClubDetailPage() {
                   <TableCell className="text-muted-foreground">
                     {formatPersianDate(new Date(request.created_at))}
                   </TableCell>
+                  {canReview && (
+                    <TableCell>{request.status === "pending" && <PaymentRequestActions requestId={request.id} />}</TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

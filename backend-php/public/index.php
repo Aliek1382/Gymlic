@@ -24,6 +24,7 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use Gymlic\Controllers\AthleteController;
+use Gymlic\Controllers\AccountAccessController;
 use Gymlic\Controllers\AdminController;
 use Gymlic\Controllers\AdminContentController;
 use Gymlic\Controllers\AdminExerciseMediaController;
@@ -71,6 +72,7 @@ use Gymlic\Controllers\SupportController;
 use Gymlic\Controllers\TechniqueController;
 use Gymlic\Controllers\TrainerBillingController;
 use Gymlic\Controllers\TrainerDiscountController;
+use Gymlic\Controllers\TrainerGiftController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
@@ -369,6 +371,9 @@ $router->delete('/admin/trainer-billing/requests/{id}/receipt', fn (array $p) =>
 $router->get('/admin/trainer-billing/subscriptions', fn () => TrainerBillingController::adminSubscriptions());
 $router->post('/admin/trainer-billing/subscriptions/{trainerId}/grant', fn (array $p) => TrainerBillingController::grant($p));
 $router->get('/admin/trainer-discounts', fn () => TrainerDiscountController::list());
+// A discount code only one trainer can use, sent to them (a birthday gift).
+$router->get('/admin/trainer-birthdays', fn () => TrainerGiftController::birthdays());
+$router->post('/admin/trainers/{id}/gift-code', fn (array $p) => TrainerGiftController::create($p));
 $router->post('/admin/trainer-discounts', fn () => TrainerDiscountController::create());
 $router->patch('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::update($p));
 $router->delete('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::delete($p));
@@ -378,6 +383,8 @@ $router->patch('/admin/trainer-plans/{id}', fn (array $p) => TrainerBillingContr
 $router->get('/admin/plan-accounts', fn () => PlanAccountsController::list());
 $router->get('/admin/plan-accounts/{kind}/{id}', fn (array $p) => PlanAccountsController::detail($p));
 $router->post('/admin/plan-accounts/{kind}/{id}', fn (array $p) => PlanAccountsController::update($p));
+$router->get('/admin/account-access/{kind}/{id}', fn (array $p) => AccountAccessController::get($p));
+$router->put('/admin/account-access/{kind}/{id}', fn (array $p) => AccountAccessController::update($p));
 $router->delete('/admin/payment-requests/{id}/receipt', fn (array $p) => ReceiptController::remove($p));
 $router->get('/admin/receipts/stats', fn () => ReceiptController::stats());
 $router->post('/admin/receipts/purge', fn () => ReceiptController::purge());

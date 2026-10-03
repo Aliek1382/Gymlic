@@ -158,7 +158,7 @@ final class AdminController
     private static function notifyFinance(PDO $pdo, string $actorId, string $clubName, int $amount): void
     {
         try {
-            foreach (AdminAccess::holders($pdo, 'finance') as $adminId) {
+            foreach (AdminAccess::holders($pdo, 'finance.payments') as $adminId) {
                 Templates::notify(
                     $pdo,
                     'payment_submitted',
@@ -201,8 +201,8 @@ final class AdminController
     public static function listPaymentRequests(): void
     {
         $user = Auth::requireUser();
-        // A finance role reviews every club's requests, like a super admin.
-        $isAdmin = AdminAccess::can($user, 'finance');
+        // A role that reviews payments sees every club's requests, like a super admin.
+        $isAdmin = AdminAccess::can($user, 'finance.payments');
         if ($isAdmin) {
             PaymentReminders::sendIfDue(Database::connection());
         }
@@ -280,7 +280,7 @@ final class AdminController
      */
     public static function approvePaymentRequest(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.payments');
         $data = Validate::body();
 
         $pdo = Database::connection();
@@ -353,7 +353,7 @@ final class AdminController
 
     public static function rejectPaymentRequest(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.payments');
         $data = Validate::body();
         $pdo = Database::connection();
 
@@ -545,7 +545,7 @@ final class AdminController
 
     public static function createPlan(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         $data = Validate::required(Validate::body(), ['name', 'price_toman', 'duration_days']);
 
         $id = Uuid::v4();
@@ -574,7 +574,7 @@ final class AdminController
 
     public static function updatePlan(array $params): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         $data = Validate::body();
 
         $fields = [];
@@ -683,9 +683,13 @@ final class AdminController
             }
         }
 
-        // Money is the finance permission's: a role without it gets the counts only.
-        if (!AdminAccess::can($admin, 'finance')) {
-            unset($counts['pending_requests_count'], $counts['total_revenue']);
+        // Money is the finance permissions': waiting payments for those who
+        // review them, revenue for those who see the reports.
+        if (!AdminAccess::can($admin, 'finance.payments')) {
+            unset($counts['pending_requests_count']);
+        }
+        if (!AdminAccess::can($admin, 'finance.reports')) {
+            unset($counts['total_revenue']);
         }
 
         Response::ok(Cast::row($counts, [], array_keys($counts)));
@@ -725,7 +729,7 @@ final class AdminController
     /** One club's whole file: the club, its active members, and its payment history. */
     public static function clubDetail(array $params): void
     {
-        Auth::requireAdmin('users.view');
+        $admin = Auth::requireAdmin('users.view');
         $pdo = Database::connection();
 
         $stmt = $pdo->prepare(
@@ -756,11 +760,15 @@ final class AdminController
         );
         $members->execute(['club_id' => $params['id']]);
 
+        $receipts = Receipts::ready() && AdminAccess::can($admin, 'finance.payments');
         $requests = $pdo->prepare(
             'SELECT pr.id, pr.amount_toman, pr.reference_note, pr.status, pr.admin_note,
                     pr.created_at, pr.reviewed_at, p.name AS plan_name,
                     (pr.submitted_by <> c.owner_id) AS recorded_by_admin'
-            . (Discounts::ready() ? ', pr.discount_toman, d.code AS discount_code' : '') . '
+            . (Discounts::ready() ? ', pr.discount_toman, d.code AS discount_code' : '')
+            // The receipt, for an admin who reviews payments (on the club's page as in /admin/payments).
+            . ($receipts ? ', pr.tracking_code, pr.card_last4, pr.paid_at, pr.receipt_purged_at,
+                (pr.receipt_path IS NOT NULL) AS has_receipt, (pr.receipt_path LIKE \'%.pdf\') AS receipt_is_pdf' : '') . '
              FROM payment_requests pr
              JOIN plans p ON p.id = pr.plan_id
              JOIN clubs c ON c.id = pr.club_id'
@@ -769,11 +777,21 @@ final class AdminController
              ORDER BY pr.created_at DESC'
         );
         $requests->execute(['club_id' => $params['id']]);
+        $rows = Cast::rows($requests->fetchAll(), [], ['amount_toman', 'discount_toman'], ['recorded_by_admin', 'has_receipt', 'receipt_is_pdf']);
+        if ($receipts) {
+            $days = Settings::get('billing')['receipt_retention_days'];
+            foreach ($rows as &$row) {
+                $row['receipt_expires_at'] = ($row['has_receipt'] && $days > 0 && $row['reviewed_at'] !== null)
+                    ? date('Y-m-d H:i:s', (int) strtotime($row['reviewed_at']) + $days * 86400)
+                    : null;
+            }
+            unset($row);
+        }
 
         Response::ok([
             'club'             => self::withSubscription([Cast::row($club, [], ['member_capacity'])])[0],
             'members'          => $members->fetchAll(),
-            'payment_requests' => Cast::rows($requests->fetchAll(), [], ['amount_toman', 'discount_toman'], ['recorded_by_admin']),
+            'payment_requests' => $rows,
         ]);
     }
 

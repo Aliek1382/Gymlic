@@ -26,7 +26,7 @@ final class TrainerDiscountController
     /** GET /admin/trainer-discounts */
     public static function list(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!TrainerBilling::ready()) {
             Response::ok(['ready' => false, 'items' => [], 'plans' => []]);
             return;
@@ -44,29 +44,36 @@ final class TrainerDiscountController
             return;
         }
 
+        $personal = TrainerDiscounts::personalReady();
         $rows = $pdo->query(
-            "SELECT d.id, d.code, d.kind, d.value, d.plan_id, p.name AS plan_name, d.max_uses,
+            "SELECT d.id, d.code, d.kind, d.value, d.plan_id, p.name AS plan_name, d.max_uses,"
+            . ($personal
+                ? " d.for_trainer_id, TRIM(CONCAT_WS(' ', ft.first_name, ft.last_name)) AS for_trainer_name, COALESCE(ft.phone, ft.email) AS for_trainer_contact,"
+                : ' NULL AS for_trainer_id, NULL AS for_trainer_name, NULL AS for_trainer_contact,') . "
                     d.once_per_trainer, d.expires_at, d.is_active, d.note, d.created_at,
                     (SELECT COUNT(*) FROM trainer_payment_requests r
                       WHERE r.discount_code_id = d.id AND r.status IN ('pending', 'approved')) AS uses,
                     (SELECT COALESCE(SUM(r.discount_toman), 0) FROM trainer_payment_requests r
                       WHERE r.discount_code_id = d.id AND r.status = 'approved') AS total_discount
              FROM trainer_discount_codes d
-             LEFT JOIN trainer_plans p ON p.id = d.plan_id
-             ORDER BY d.created_at DESC"
+             LEFT JOIN trainer_plans p ON p.id = d.plan_id"
+            . ($personal ? ' LEFT JOIN profiles ft ON ft.id = d.for_trainer_id' : '') . '
+             ORDER BY d.created_at DESC'
         )->fetchAll();
 
         Response::ok([
             'ready' => true,
             'items' => Cast::rows($rows, [], ['value', 'max_uses', 'uses', 'total_discount'], ['once_per_trainer', 'is_active']),
             'plans' => $plans,
+            // Whether a code can be tied to one trainer yet (its database update).
+            'personal' => $personal,
         ]);
     }
 
     /** POST /admin/trainer-discounts */
     public static function create(): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -90,7 +97,7 @@ final class TrainerDiscountController
     /** PATCH /admin/trainer-discounts/{id} */
     public static function update(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -116,7 +123,7 @@ final class TrainerDiscountController
     /** DELETE /admin/trainer-discounts/{id}: only a code nobody has used. */
     public static function delete(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -214,7 +221,22 @@ final class TrainerDiscountController
             $expires .= ' 23:59:59';
         }
 
-        return [
+        // Only one trainer may use it: given by their mobile number or email.
+        $forTrainer = null;
+        $who = Validate::nullableString(isset($data['for_trainer']) ? trim((string) $data['for_trainer']) : null);
+        if ($who !== null && $who !== '') {
+            if (!TrainerDiscounts::personalReady()) {
+                Response::error(503, 'update_required', 'کد اختصاصی بعد از به‌روزرسانی «کد تخفیف اختصاصی یک مربی» در دسترس است.');
+                return null;
+            }
+            $forTrainer = self::trainerByContact($pdo, $who);
+            if ($forTrainer === null) {
+                Response::error(404, 'trainer_not_found', 'مربی‌ای با این شماره یا ایمیل پیدا نشد.');
+                return null;
+            }
+        }
+
+        return (TrainerDiscounts::personalReady() ? ['for_trainer_id' => $forTrainer] : []) + [
             'code'             => $code,
             'kind'             => $kind,
             'value'            => (int) $value,
@@ -225,5 +247,17 @@ final class TrainerDiscountController
             'is_active'        => !array_key_exists('is_active', $data) || !empty($data['is_active']) ? 1 : 0,
             'note'             => Validate::nullableString(mb_substr(trim((string) ($data['note'] ?? '')), 0, 255)),
         ];
+    }
+
+    /** A trainer's id by their mobile number or email, or null. */
+    public static function trainerByContact(PDO $pdo, string $contact): ?string
+    {
+        $contact = strtr(trim($contact), ['۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9']);
+        $stmt = $pdo->prepare(
+            "SELECT id FROM profiles WHERE account_type = 'trainer' AND (phone = :p OR LOWER(email) = LOWER(:e)) LIMIT 1"
+        );
+        $stmt->execute(['p' => $contact, 'e' => $contact]);
+        $id = $stmt->fetchColumn();
+        return $id === false ? null : (string) $id;
     }
 }

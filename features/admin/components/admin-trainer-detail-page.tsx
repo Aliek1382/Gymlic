@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { Gift } from "lucide-react";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import {
@@ -20,13 +24,18 @@ import { useSearchParams } from "next/navigation";
 
 import { NotFoundNotice } from "@/components/not-found-notice";
 import { RouteLoading } from "@/components/layout/route-loading";
+import { TrainerFinanceSection } from "./account-finance-section";
 import { AdminProfileEditForm } from "./admin-profile-edit-form";
 import { SuspendToggle } from "./suspend-toggle";
+import { TrainerGiftDialog } from "./trainer-gift-dialog";
+import { useAdminCan } from "../hooks/use-admin-access";
 
 export function AdminTrainerDetailPage() {
   // Was /admin/trainers/[id] — see AdminClubDetailPage for why the id moved
   // into the query string.
   const id = useSearchParams().get("id") ?? "";
+  const can = useAdminCan();
+  const [gifting, setGifting] = useState(false);
 
   const { data, isPending } = useQuery({
     queryKey: ["admin", "trainer", id],
@@ -68,7 +77,21 @@ export function AdminTrainerDetailPage() {
             </p>
           </div>
         </div>
-        <SuspendToggle userId={trainer.id} isSuspended={trainer.is_suspended} />
+        <div className="flex flex-wrap items-center gap-2">
+          {can("finance.plans") && (
+            <Button variant="outline" size="sm" onClick={() => setGifting(true)}>
+              <Gift />
+              کد تخفیف اختصاصی
+            </Button>
+          )}
+          <SuspendToggle userId={trainer.id} isSuspended={trainer.is_suspended} />
+        </div>
+        <TrainerGiftDialog
+          key={gifting ? "open" : "closed"}
+          trainer={gifting ? { id: trainer.id, name } : null}
+          occasion="gift"
+          onClose={() => setGifting(false)}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -99,6 +122,8 @@ export function AdminTrainerDetailPage() {
           </div>
         </Card>
       </div>
+
+      <TrainerFinanceSection trainerId={trainer.id} name={name} />
 
       <AdminProfileEditForm
         userId={trainer.id}

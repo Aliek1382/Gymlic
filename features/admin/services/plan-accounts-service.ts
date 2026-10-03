@@ -1,6 +1,7 @@
 import { api } from "@/lib/api/client";
 import type { SubscriptionStatus } from "@/types/database.types";
 import type { TrainerLimits } from "@/features/trainer-billing/services/trainer-billing-service";
+import type { FeatureCatalogEntry, FeatureKey, TierKey } from "@/features/site-settings";
 
 /** A club's plan as it stands (server: Limits::forClub). */
 export interface ClubLimits {
@@ -91,7 +92,7 @@ export interface HistoryEntry {
 export async function getPlanAccount(
   kind: PlanAccount["kind"],
   id: string
-): Promise<{ account: PlanAccount; history: HistoryEntry[] }> {
+): Promise<{ account: PlanAccount; history: HistoryEntry[]; plans?: AccountPlanOption[] }> {
   return api.get(`/admin/plan-accounts/${kind}/${id}`);
 }
 
@@ -125,4 +126,60 @@ export async function previewPlanAccount(
   change: PlanAccountChange
 ): Promise<{ before: TrainerLimits | ClubLimits; after: TrainerLimits | ClubLimits }> {
   return api.post(`/admin/plan-accounts/${kind}/${id}`, { ...change, preview: true });
+}
+
+// ---- Access set by hand (server: AccountAccess) ----------------------------
+
+export type ReportLevel = "count" | "basic" | "full" | "full_excel";
+
+/** A trainer's caps set by hand; a number, -1 for no limit; missing = the plan's. */
+export interface AccessLimits {
+  max_custom_exercises?: number;
+  max_templates?: number;
+  history_months?: number;
+  report_level?: ReportLevel;
+}
+
+export interface AccountAccess {
+  tier: TierKey | null;
+  features: Partial<Record<FeatureKey, boolean>>;
+  limits: AccessLimits;
+  note: string | null;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface AccountAccessInfo {
+  /** False until the account-access database update has run. */
+  ready: boolean;
+  tiers_ready: boolean;
+  enforcing: boolean;
+  account: { id: string; name: string };
+  access: AccountAccess | null;
+  /** The tier the plan gives without the fixed one; null = not limited. */
+  plan_tier: TierKey | null;
+  tier_labels: Record<TierKey, string>;
+  plan_features: Record<FeatureKey, boolean>;
+  /** Trainers: the plan's caps (null = none). */
+  plan_limits: {
+    max_custom_exercises: number | null;
+    max_templates: number | null;
+    history_months: number | null;
+    report_level: ReportLevel | null;
+    plan_name: string | null;
+    via_club: boolean;
+  } | null;
+  catalog: FeatureCatalogEntry[];
+}
+
+export async function getAccountAccess(kind: PlanAccount["kind"], id: string): Promise<AccountAccessInfo> {
+  return api.get(`/admin/account-access/${kind}/${id}`);
+}
+
+export async function saveAccountAccess(
+  kind: PlanAccount["kind"],
+  id: string,
+  value: { tier: TierKey | null; features: Partial<Record<FeatureKey, boolean>>; limits: AccessLimits; note: string }
+): Promise<void> {
+  await api.put(`/admin/account-access/${kind}/${id}`, value);
 }
