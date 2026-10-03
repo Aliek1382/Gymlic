@@ -7,6 +7,7 @@ use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
+use Gymlic\TelegramAlerts;
 use Gymlic\Templates;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -100,6 +101,8 @@ final class SupportController
             throw $e;
         }
 
+        TelegramAlerts::support('new', $user, ['id' => $id, 'number' => $number, 'category' => $category, 'subject' => $subject], $body);
+
         Response::ok(['id' => $id, 'ticket_number' => $number], 201);
     }
 
@@ -151,6 +154,9 @@ final class SupportController
             $pdo->rollBack();
             throw $e;
         }
+        TelegramAlerts::support('reply', $user, [
+            'id' => $ticket['id'], 'number' => $ticket['ticket_number'], 'category' => $ticket['category'], 'subject' => $ticket['subject'],
+        ], $body);
         Response::ok(['ok' => true], 201);
     }
 
@@ -160,10 +166,20 @@ final class SupportController
         if (!self::requireReady()) {
             return;
         }
-        $stmt = Database::connection()->prepare(
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare(
             "UPDATE support_tickets SET status = 'closed', closed_at = NOW() WHERE id = :id AND user_id = :user_id AND status <> 'closed'"
         );
         $stmt->execute(['id' => $params['id'], 'user_id' => $user['id']]);
+        // Only a ticket that was really open is announced, not a second click.
+        if ($stmt->rowCount() > 0) {
+            $ticket = self::ticket($pdo, $params['id']);
+            if ($ticket !== null) {
+                TelegramAlerts::support('closed', $user, [
+                    'id' => $ticket['id'], 'number' => $ticket['ticket_number'], 'category' => $ticket['category'], 'subject' => $ticket['subject'],
+                ]);
+            }
+        }
         Response::ok(['ok' => true]);
     }
 

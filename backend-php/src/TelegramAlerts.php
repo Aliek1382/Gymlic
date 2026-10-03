@@ -93,6 +93,60 @@ final class TelegramAlerts
         }
     }
 
+    private const CATEGORIES = [
+        'bug' => 'مشکل فنی', 'billing' => 'مالی و اشتراک', 'account' => 'حساب کاربری',
+        'suggestion' => 'پیشنهاد', 'other' => 'سایر',
+    ];
+    private const ROLES = ['club' => 'صاحب باشگاه', 'trainer' => 'مربی', 'athlete' => 'ورزشکار'];
+
+    /**
+     * A support ticket event from a user: 'new' (a ticket was opened), 'reply'
+     * (the user wrote again, which reopens it) or 'closed' (the user closed it).
+     * The admin's own replies are not announced: they wrote them.
+     *
+     * @param array<string, mixed> $user    the signed-in user's profile row
+     * @param array{id: string, number: int|string, category?: string, subject: string} $ticket
+     */
+    public static function support(string $event, array $user, array $ticket, string $text = ''): void
+    {
+        try {
+            if (!TelegramGateway::configured()) {
+                return;
+            }
+
+            $title = ['new' => '🎫 <b>تیکت پشتیبانی جدید</b>', 'reply' => '💬 <b>پاسخ جدید کاربر در تیکت</b>', 'closed' => '✅ <b>تیکت توسط کاربر بسته شد</b>'][$event] ?? null;
+            if ($title === null) {
+                return;
+            }
+
+            $name = trim(((string) ($user['first_name'] ?? '')) . ' ' . ((string) ($user['last_name'] ?? '')));
+            $name = $name !== '' ? $name : (string) ($user['email'] ?? '');
+            $role = self::ROLES[(string) ($user['account_type'] ?? '')] ?? '';
+
+            $lines = [$title, '', 'شمارهٔ تیکت: ' . strtr((string) $ticket['number'], ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹'])];
+            $lines[] = 'از: ' . TelegramGateway::esc($name) . ($role !== '' ? ' (' . $role . ')' : '');
+            if (($user['phone'] ?? '') !== '') {
+                $lines[] = 'تلفن: <code>' . TelegramGateway::esc((string) $user['phone']) . '</code>';
+            }
+            if (($ticket['category'] ?? '') !== '') {
+                $lines[] = 'دسته: ' . (self::CATEGORIES[$ticket['category']] ?? TelegramGateway::esc($ticket['category']));
+            }
+            $lines[] = 'موضوع: ' . TelegramGateway::esc($ticket['subject']);
+            if ($text !== '') {
+                $lines[] = '';
+                $lines[] = TelegramGateway::esc(mb_strlen($text) > 500 ? mb_substr($text, 0, 500) . '…' : $text);
+            }
+            $lines[] = '';
+            $lines[] = '<a href="' . self::SITE . '/admin/support?id=' . rawurlencode($ticket['id']) . '">باز کردن در پنل</a>';
+
+            if (!TelegramGateway::send(implode("\n", $lines))) {
+                error_log('telegram support alert: ' . TelegramGateway::lastError());
+            }
+        } catch (\Throwable $e) {
+            error_log('telegram support alert: ' . $e->getMessage());
+        }
+    }
+
     private static function toman(int $amount): string
     {
         return strtr(number_format($amount), ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹'])
