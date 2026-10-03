@@ -64,6 +64,7 @@ use Gymlic\Controllers\PagesController;
 use Gymlic\Controllers\PlanAccountsController;
 use Gymlic\Controllers\PlanController;
 use Gymlic\Controllers\PointsController;
+use Gymlic\Controllers\PrintBrandingController;
 use Gymlic\Controllers\ReceiptController;
 use Gymlic\Controllers\SessionPackageController;
 use Gymlic\Controllers\SupplementController;
@@ -71,6 +72,7 @@ use Gymlic\Controllers\SupportController;
 use Gymlic\Controllers\TechniqueController;
 use Gymlic\Controllers\TrainerBillingController;
 use Gymlic\Controllers\TrainerDiscountController;
+use Gymlic\Controllers\TrainerGiftController;
 use Gymlic\Controllers\TrainerController;
 use Gymlic\Controllers\WorkoutLogController;
 use Gymlic\Controllers\HealthController;
@@ -297,6 +299,11 @@ $router->get('/reports/trainer/completion-rates', fn () => ReportController::com
 $router->get('/reports/trainer/excel', fn () => ReportExportController::excel());
 // All of the trainer's own data as one file: every plan, free included.
 $router->get('/trainer/data-export', fn () => TrainerDataExportController::download());
+// The trainer's logo and watermark on a printed plan.
+$router->get('/trainer/print-branding', fn () => PrintBrandingController::get());
+$router->put('/trainer/print-branding', fn () => PrintBrandingController::update());
+$router->post('/trainer/print-branding/logo', fn () => PrintBrandingController::uploadLogo());
+$router->delete('/trainer/print-branding/logo', fn () => PrintBrandingController::removeLogo());
 $router->get('/reports/financial-summary', fn () => ReportController::financialSummary());
 $router->get('/athletes/{id}/completed-plans', fn (array $p) => ReportController::completedPlans($p));
 
@@ -360,6 +367,9 @@ $router->delete('/admin/trainer-billing/requests/{id}/receipt', fn (array $p) =>
 $router->get('/admin/trainer-billing/subscriptions', fn () => TrainerBillingController::adminSubscriptions());
 $router->post('/admin/trainer-billing/subscriptions/{trainerId}/grant', fn (array $p) => TrainerBillingController::grant($p));
 $router->get('/admin/trainer-discounts', fn () => TrainerDiscountController::list());
+// A discount code only one trainer can use, sent to them (a birthday gift).
+$router->get('/admin/trainer-birthdays', fn () => TrainerGiftController::birthdays());
+$router->post('/admin/trainers/{id}/gift-code', fn (array $p) => TrainerGiftController::create($p));
 $router->post('/admin/trainer-discounts', fn () => TrainerDiscountController::create());
 $router->patch('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::update($p));
 $router->delete('/admin/trainer-discounts/{id}', fn (array $p) => TrainerDiscountController::delete($p));

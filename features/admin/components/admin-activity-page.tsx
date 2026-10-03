@@ -92,6 +92,7 @@ const ADMIN_ACTIONS = [
   // Written by the trainer, not an admin: each file they download.
   "report_excel_export",
   "trainer_data_export",
+  "trainer_gift_code",
 ];
 
 const ACTION_LABEL: Record<string, string> = {

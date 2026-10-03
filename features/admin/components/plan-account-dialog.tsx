@@ -28,7 +28,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { toIsoDate } from "@/lib/iso-date";
+import { parseIsoDate, toIsoDate } from "@/lib/iso-date";
 import { formatNumber, formatPersianDate, formatToman, parseLocaleNumber } from "@/lib/persian";
 import type { TrainerLimits } from "@/features/trainer-billing/services/trainer-billing-service";
 import {
@@ -68,6 +68,7 @@ export const PLAN_ACTION_LABEL: Record<string, string> = {
   subscription_set: "تنظیم دستی اشتراک باشگاه",
   report_excel_export: "خروجی اکسل گزارش (مربی)",
   trainer_data_export: "دریافت همه‌ی اطلاعات (مربی)",
+  trainer_gift_code: "کد تخفیف هدیه (مثلاً تولد)",
 };
 
 /** The plan, dates and caps of one trainer or club, changed by hand. */
@@ -262,6 +263,15 @@ function AccountForm({
             <JalaliDateField id="pa-start" label="تاریخ شروع (امروز یا قبل)" value={startedAt} onChange={setStartedAt} />
             <JalaliDateField id="pa-end" label="تاریخ پایان" value={expiresAt} onChange={setExpiresAt} futureYears={3} />
           </div>
+          {/* A yearly subscription is sold on the site; here it is one year from the start. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">مدت:</span>
+            {LENGTHS.map(([label, n]) => (
+              <Button key={label} type="button" size="sm" variant="outline" onClick={() => setExpiresAt(addDays(startedAt, n))}>
+                {label}
+              </Button>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-2">
             {[30, 90, 180, 365].map((n) => (
               <Button
@@ -305,7 +315,14 @@ function AccountForm({
           </p>
           <div className="space-y-2">
             <Label htmlFor="pa-days">تعداد روز</Label>
-            <Input id="pa-days" dir="ltr" inputMode="numeric" className="w-28" value={days} onChange={(e) => setDays(e.target.value)} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Input id="pa-days" dir="ltr" inputMode="numeric" className="w-28" value={days} onChange={(e) => setDays(e.target.value)} />
+              {LENGTHS.map(([label, n]) => (
+                <Button key={label} type="button" size="sm" variant="outline" onClick={() => setDays(String(n))}>
+                  {label}
+                </Button>
+              ))}
+            </div>
           </div>
         </TabsContent>
 
@@ -410,6 +427,21 @@ function AccountForm({
       )}
     </>
   );
+}
+
+/** Quick lengths for a subscription, in days. */
+const LENGTHS: [string, number][] = [
+  ["یک ماه", 30],
+  ["سه ماه", 90],
+  ["شش ماه", 180],
+  ["یک سال", 365],
+];
+
+/** An ISO date $days days after another. */
+function addDays(iso: string, days: number): string {
+  const date = parseIsoDate(iso);
+  date.setDate(date.getDate() + days);
+  return toIsoDate(date);
 }
 
 function capText(value: number | null | undefined): string {

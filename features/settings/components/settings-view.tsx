@@ -11,6 +11,7 @@ import { PasswordForm } from "./password-form";
 import { ProfileInfoForm } from "./profile-info-form";
 import { SignOutSection } from "./sign-out-section";
 import { TrainerDataExportCard } from "./trainer-data-export";
+import { PrintBrandingCard } from "./print-branding-card";
 
 export function SettingsView() {
   const profile = useProfile();
@@ -42,6 +43,11 @@ export function SettingsView() {
         <NutritionGoalCard profile={profile.data} />
       )}
       {profile.data.accountType === "trainer" && <TrainerPaymentInfoCard />}
+      {profile.data.accountType === "trainer" && (
+        <PrintBrandingCard
+          trainerName={[profile.data.firstName, profile.data.lastName].filter(Boolean).join(" ")}
+        />
+      )}
       <NotificationChannelsCard profile={profile.data} />
       <EmailForm currentEmail={profile.data.email} />
       <PasswordForm />

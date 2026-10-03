@@ -18,6 +18,7 @@ import { formatNumber, formatToman } from "@/lib/persian";
 import { StatisticCard } from "@/features/dashboard/components/shared/statistic-card";
 import { StatisticsGrid } from "@/features/dashboard/components/shared/statistics-grid";
 import { SystemAlerts } from "./system-alerts";
+import { TrainerBirthdaysCard } from "./trainer-birthdays-card";
 
 export function AdminOverviewPage() {
   const { data } = useQuery({
@@ -50,6 +51,8 @@ export function AdminOverviewPage() {
       </div>
 
       <SystemAlerts />
+
+      <TrainerBirthdaysCard />
 
       <StatisticsGrid>
         <StatisticCard

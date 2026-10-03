@@ -369,6 +369,29 @@ allows; every cap is checked on the server.
   platform's plans; it was called `plan_tier` until
   `membership-level-update.sql`. Until that SQL runs, the invitation code
   falls back to the old name (`InvitationController::levelColumn`).
+- **Birthday reminder** (`Birthdays`). An athlete's birthday is their Jalali
+  month and day (Esfand 30 falls on Esfand 29 in a common year). The
+  trainer's dashboard lists the coming week's; on the day, from 8 am Tehran,
+  the trainer gets the `athlete_birthday` notification once per athlete per
+  year: sent by `cron/calendar-reminders.php`, and also when the trainer
+  opens the dashboard, so it works on a host without that cron. Active
+  athletes only (not suspended).
+- **Personal trainer codes and birthday gifts** (`TrainerGiftController`,
+  `trainer-discount-owner-update.sql`). A trainer-plan discount code can
+  belong to one trainer (`for_trainer_id`): any other trainer gets «کد
+  تخفیف معتبر نیست». The admin's discount page sets it by mobile or email;
+  the overview lists the coming week's trainer birthdays with «هدیه‌ی
+  تولد», and a trainer's page has «کد تخفیف اختصاصی»: a one-use code
+  (BDAY-… / GIFT-…) only that trainer can use, sent as the
+  `trainer_gift_code` notification and logged. One birthday gift per trainer
+  per Jalali year. Until the SQL runs no such code is made (it couldn't be
+  tied to one trainer).
+- **Print logo and watermark** (`PrintBrandingController`,
+  `trainer-print-branding-update.sql`): the trainer's own logo and watermark
+  text on a printed / PDF plan, theirs and their athletes'. /auth/me carries
+  them (`print`); until the SQL runs the print keeps the profile photo and
+  «جیم‌لیک — name». Uploaded images are laid on white before the JPEG
+  re-encode, so a transparent logo (or avatar) no longer turns black.
 - **Tiers** (`Tiers`, /admin/tiers) still decide which panel sections each
   plan opens; the seven plans carry their tier (free/silver/gold/diamond),
   and a plan counts as running for tiers through its grace days too. The

@@ -260,6 +260,14 @@ final class UploadController
             exit;
         }
 
+        // JPEG has no transparency: a transparent PNG (a logo, usually)
+        // would turn black, so it is laid on white first.
+        $flat = imagecreatetruecolor(imagesx($image), imagesy($image));
+        imagefill($flat, 0, 0, (int) imagecolorallocate($flat, 255, 255, 255));
+        imagecopy($flat, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
+        imagedestroy($image);
+        $image = $flat;
+
         $resized = imagescale($image, ...self::fitWithin(imagesx($image), imagesy($image)));
         imagedestroy($image);
         if ($resized === false) {

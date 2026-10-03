@@ -61,6 +61,7 @@ const DISCOUNT_CONFIG = {
   onceBadge: "یک بار برای هر مربی",
   notReady: "به‌روزرسانی «کد تخفیف و یادآور پایان اشتراک مربی» را از صفحهٔ «به‌روزرسانی دیتابیس» اجرا کنید.",
   emptyText: "با «کد جدید» اولین کد را بسازید.",
+  personalLabel: "فقط برای یک مربی",
 };
 
 const parseDate = (value: string) => new Date(value.replace(" ", "T"));

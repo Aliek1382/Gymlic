@@ -247,6 +247,10 @@ final class AuthController
         if ($trainer !== null) {
             $trainer['is_verified'] = (bool) $trainer['is_verified'];
         }
+        // The logo and watermark on a printed plan: the trainer's own, or for
+        // an athlete their trainer's. Null before its database update.
+        $printTrainer = $user['account_type'] === 'trainer' ? $user['id'] : ($trainer['id'] ?? null);
+        $print = $printTrainer !== null ? PrintBrandingController::of($pdo, $printTrainer) : null;
 
         // What the panel shows of /admin: null for a regular user, and for
         // an admin's read-only view of someone's panel.
@@ -274,6 +278,7 @@ final class AuthController
             ],
             'membership'  => $membership,
             'trainer'     => $trainer,
+            'print'       => $print,
             'view_as'     => $viewAs,
             // The plan tier that decides which sections open (Tiers), and the
             // sections the admin set by hand for this account; null = not limited.

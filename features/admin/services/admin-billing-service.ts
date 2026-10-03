@@ -184,6 +184,11 @@ export interface DiscountCodeRow {
   uses: number;
   /** Toman off across approved requests. */
   total_discount: number;
+  /** A trainer code only one trainer can use (birthday gifts); absent for other codes. */
+  for_trainer_id?: string | null;
+  for_trainer_name?: string | null;
+  /** Their mobile number, or email. */
+  for_trainer_contact?: string | null;
 }
 
 export interface DiscountCodeInput {
@@ -197,6 +202,8 @@ export interface DiscountCodeInput {
   expires_at: string | null;
   is_active: boolean;
   note: string;
+  /** A trainer code for one trainer only: their mobile number or email; null = any. */
+  for_trainer?: string | null;
 }
 
 export async function listDiscountCodes(): Promise<{
