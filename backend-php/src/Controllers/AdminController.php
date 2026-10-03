@@ -25,6 +25,7 @@ use Gymlic\Tiers;
 use Gymlic\TrainerBilling;
 use Gymlic\TrainerVerification;
 use Gymlic\Uuid;
+use Gymlic\TelegramAlerts;
 use Gymlic\Validate;
 use PDO;
 use Throwable;
@@ -148,6 +149,21 @@ final class AdminController
         }
 
         self::notifyFinance($pdo, $user['id'], (string) $clubRow['name'], $amount);
+        TelegramAlerts::paymentSubmitted([
+            'kind'          => 'club',
+            'who'           => (string) $clubRow['name'],
+            'owner'         => trim($user['first_name'] . ' ' . $user['last_name']),
+            'plan'          => (string) $planRow['name'],
+            'amount'        => $amount,
+            'paid_amount'   => isset($row['paid_amount_toman']) ? (int) $row['paid_amount_toman'] : null,
+            'discount'      => (int) ($row['discount_toman'] ?? 0),
+            'discount_code' => $code,
+            'tracking_code' => $row['tracking_code'] ?? null,
+            'card_last4'    => $row['card_last4'] ?? null,
+            'paid_at'       => $row['paid_at'] ?? null,
+            'note'          => $row['reference_note'],
+            'receipt'       => $receiptFile,
+        ]);
         if ($receiptFile !== null) {
             Receipts::purgeIfDue($pdo);
         }
