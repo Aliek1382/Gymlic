@@ -301,6 +301,12 @@ final class Migrations
             'title' => 'دسترسی اختصاصی هر مربی و باشگاه: سطح، بخش‌ها و سقف‌ها مستقل از پلن',
             'check' => [['table', 'trainer_access'], ['table', 'club_access']],
         ],
+        [
+            'id'    => 'club-free-plan',
+            'file'  => 'club-free-plan-update.sql',
+            'title' => 'پلن رایگان باشگاه و ثبت‌نام باشگاه بدون تأیید ادمین',
+            'check' => [['column', 'plans', 'is_free'], ['row', 'plans', '7c000000-0000-4000-8000-000000000001']],
+        ],
     ];
 
     /**

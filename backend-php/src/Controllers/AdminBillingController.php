@@ -6,6 +6,7 @@ namespace Gymlic\Controllers;
 use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Response;
@@ -35,7 +36,8 @@ final class AdminBillingController
     {
         Auth::requireAdmin('finance.plans');
         $plans = Database::connection()->query(
-            'SELECT id, name, price_toman, duration_days, max_members, is_active FROM plans ORDER BY price_toman ASC'
+            'SELECT id, name, price_toman, duration_days, max_members, is_active FROM plans WHERE 1 = 1'
+            . Limits::notFreeClubPlan() . ' ORDER BY price_toman ASC'
         )->fetchAll();
 
         Response::ok([
@@ -115,7 +117,7 @@ final class AdminBillingController
     /** @return array<string, mixed> */
     private static function renew(PDO $pdo, array $club, array $data, ?string $note, string $adminId): array
     {
-        $plan = $pdo->prepare('SELECT id, name, duration_days, max_members FROM plans WHERE id = :id');
+        $plan = $pdo->prepare('SELECT id, name, duration_days, max_members FROM plans WHERE id = :id' . Limits::notFreeClubPlan());
         $plan->execute(['id' => (string) ($data['plan_id'] ?? '')]);
         $plan = $plan->fetch();
         if ($plan === false) {
@@ -397,7 +399,7 @@ final class AdminBillingController
         Auth::requireAdmin('finance.plans');
         $pdo = Database::connection();
         $plans = Cast::rows(
-            $pdo->query('SELECT id, name, price_toman, is_active FROM plans ORDER BY price_toman ASC')->fetchAll(),
+            $pdo->query('SELECT id, name, price_toman, is_active FROM plans WHERE 1 = 1' . Limits::notFreeClubPlan() . ' ORDER BY price_toman ASC')->fetchAll(),
             [],
             ['price_toman'],
             ['is_active']

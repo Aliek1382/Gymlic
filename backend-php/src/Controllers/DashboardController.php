@@ -250,6 +250,8 @@ final class DashboardController
             'plan_distribution' => Cast::rows($planDistribution->fetchAll(), [], ['member_count']),
             'subscription'      => $subscriptionRow,
             'limits'            => $limits,
+            // No paid plan running: the free club plan, with its caps.
+            'free_plan'         => !empty($limits['is_free']) ? Limits::freeClubPlan() : null,
             'recent_members'    => $recentMembers->fetchAll(),
             'trainers'          => $trainers->fetchAll(),
         ]);

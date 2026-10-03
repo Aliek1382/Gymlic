@@ -273,6 +273,8 @@ export interface CatalogPlanRow {
   /** Present once the plan-limits database update has run; null = unlimited. */
   max_trainers?: number | null;
   subscriber_count?: number;
+  /** The free club plan: never sold, always on (present once its database update has run). */
+  is_free?: boolean;
 }
 
 export async function listCatalogPlans(): Promise<CatalogPlanRow[]> {

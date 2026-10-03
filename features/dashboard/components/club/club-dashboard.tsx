@@ -9,7 +9,7 @@ import { useDashboardStatistics } from "../../hooks/use-dashboard-statistics";
 import { useMemberDistribution } from "../../hooks/use-member-distribution";
 import { useRevenueSeries } from "../../hooks/use-revenue-series";
 import { useRecentActivities } from "../../hooks/use-recent-activities";
-import { useSubscription } from "../../hooks/use-subscription";
+import { useFreeClubPlan, useSubscription } from "../../hooks/use-subscription";
 import { WelcomeSection } from "../shared/welcome-section";
 import { StatisticsGrid } from "../shared/statistics-grid";
 import { StatisticCard } from "../shared/statistic-card";
@@ -60,6 +60,7 @@ export function ClubDashboard({
   const revenueSeries = useRevenueSeries(clubId, Number(revenueRange));
   const recentActivities = useRecentActivities(clubId);
   const subscription = useSubscription(clubId);
+  const freePlan = useFreeClubPlan(clubId);
 
   return (
     <div className="space-y-6">
@@ -199,7 +200,7 @@ export function ClubDashboard({
         ) : subscription.isError ? (
           <ErrorState message="خطا در دریافت وضعیت اشتراک" />
         ) : (
-          <SubscriptionCard subscription={subscription.data ?? null} />
+          <SubscriptionCard subscription={subscription.data ?? null} freePlan={freePlan.data ?? null} />
         )}
       </div>
     </div>

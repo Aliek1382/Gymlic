@@ -70,7 +70,14 @@ export function AdminPlansPage() {
             <TableBody>
               {rows.map((plan) => (
                 <TableRow key={plan.id}>
-                  <TableCell className="font-medium text-foreground">{plan.name}</TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    {plan.name}
+                    {plan.is_free && (
+                      <p className="text-xs font-normal text-muted-foreground">
+                        رایگان: پلن هر باشگاهی که اشتراک ندارد
+                      </p>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatToman(plan.price_toman)} تومان
                   </TableCell>
@@ -90,7 +97,11 @@ export function AdminPlansPage() {
                         : "بدون محدودیت"}
                   </TableCell>
                   <TableCell>
-                    <PlanActiveToggle planId={plan.id} isActive={plan.is_active} />
+                    {plan.is_free ? (
+                      <span className="text-xs text-muted-foreground">همیشه</span>
+                    ) : (
+                      <PlanActiveToggle planId={plan.id} isActive={plan.is_active} />
+                    )}
                   </TableCell>
                   <TableCell>
                     <PlanFormDialog

@@ -5,6 +5,7 @@ namespace Gymlic\Controllers;
 
 use Gymlic\Auth;
 use Gymlic\Database;
+use Gymlic\Limits;
 use Gymlic\Discounts;
 use Gymlic\Receipts;
 use Gymlic\Response;
@@ -59,7 +60,7 @@ final class BillingController
             return;
         }
 
-        $plan = $pdo->prepare('SELECT id, name, price_toman FROM plans WHERE id = :id AND is_active = 1');
+        $plan = $pdo->prepare('SELECT id, name, price_toman FROM plans WHERE id = :id AND is_active = 1' . Limits::notFreeClubPlan());
         $plan->execute(['id' => (string) $data['plan_id']]);
         $plan = $plan->fetch();
         if ($plan === false) {

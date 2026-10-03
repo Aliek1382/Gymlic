@@ -559,10 +559,23 @@ final class Limits
         $enforcing = self::enforcing();
         $running = in_array($status, ['active', 'expiring', 'grace'], true);
 
-        // While enforcement is off, a club with no plan running still gets
-        // the free tier's member cap when the admin set one (Tiers).
-        $freeCap = Tiers::freeCap('max_members');
-        if (!$enforcing && !$running && $freeCap !== null) {
+        // No paid plan running (never bought, or ended and past its grace
+        // days): the free club plan (club-free-plan-update.sql), like a
+        // trainer's. Members and trainers above its caps stay; only new
+        // invites are held to them; and, like every plan cap, only while
+        // enforcement is on.
+        $free = !$running ? self::freeClubPlan() : null;
+        if ($free !== null) {
+            $hasPlan = true;
+            $row['plan_id'] = $free['id'];
+            $row['p_name'] = $free['name'];
+        }
+        if ($free !== null && $enforcing) {
+            $maxMembers = $free['max_members'];
+            $maxTrainers = $free['max_trainers'];
+        } elseif (!$enforcing && !$running && ($freeCap = Tiers::freeCap('max_members')) !== null) {
+            // Before that update, while enforcement is off, a club with no
+            // plan running still gets the free tier's member cap (Tiers).
             $maxMembers = $maxMembers === null ? $freeCap : min($maxMembers, $freeCap);
         }
 
@@ -582,11 +595,51 @@ final class Limits
             'override_on'  => $ready && (int) ($row['override_on'] ?? 0) === 1,
             'override_max_members'  => $ready ? self::intOrNull($row['override_max_members'] ?? null) : null,
             'override_max_trainers' => $ready ? self::intOrNull($row['override_max_trainers'] ?? null) : null,
-            'can_invite'   => !$enforcing || $running,
+            'is_free'      => $free !== null,
+            'can_invite'   => !$enforcing || $running || $free !== null,
             'usage'        => $usage,
             'over_cap'     => ($maxMembers !== null && $usage['members'] > $maxMembers)
                 || ($maxTrainers !== null && $usage['trainers'] > $maxTrainers),
         ];
+    }
+
+    /** The free club plan's id, fixed by club-free-plan-update.sql. */
+    public const FREE_CLUB_PLAN_ID = '7c000000-0000-4000-8000-000000000001';
+
+    /** @var array{id: string, name: string, max_members: ?int, max_trainers: ?int}|false|null */
+    private static array|false|null $freeClubPlan = null;
+
+    /**
+     * The free club plan, or null before club-free-plan-update.sql (a club
+     * without a paid plan then can't invite while enforcing, as before).
+     *
+     * @return array{id: string, name: string, max_members: ?int, max_trainers: ?int}|null
+     */
+    public static function freeClubPlan(): ?array
+    {
+        if (self::$freeClubPlan === null) {
+            self::$freeClubPlan = false;
+            if (self::ready() && Database::hasColumn('plans', 'is_free')) {
+                $row = Database::connection()->query(
+                    'SELECT id, name, max_members, max_trainers FROM plans WHERE is_free = 1 ORDER BY created_at ASC LIMIT 1'
+                )->fetch();
+                if ($row !== false) {
+                    self::$freeClubPlan = [
+                        'id'           => (string) $row['id'],
+                        'name'         => (string) $row['name'],
+                        'max_members'  => self::intOrNull($row['max_members']),
+                        'max_trainers' => self::intOrNull($row['max_trainers']),
+                    ];
+                }
+            }
+        }
+        return self::$freeClubPlan === false ? null : self::$freeClubPlan;
+    }
+
+    /** " AND the plan isn't the free club plan", once there is one. For lists of plans to buy. */
+    public static function notFreeClubPlan(string $alias = ''): string
+    {
+        return Database::hasColumn('plans', 'is_free') ? " AND {$alias}is_free = 0" : '';
     }
 
     /** @return array{members: int, pending_member_invites: int, trainers: int, pending_trainer_invites: int} */
