@@ -22,7 +22,7 @@ use Throwable;
  */
 final class ExpiryAlerts
 {
-    private const KEY = 'telegram.expiry';
+    private const STATE = 'expiry';
     private const FROM_HOUR = 9;
     private const MAX_PER_GROUP = 15;
 
@@ -38,7 +38,7 @@ final class ExpiryAlerts
                 return null;
             }
 
-            $state = self::load($pdo);
+            $state = AlertState::load($pdo, self::STATE);
             $today = date('Y-m-d');
             if (($state['day'] ?? '') === $today) {
                 return null;
@@ -76,7 +76,7 @@ final class ExpiryAlerts
                     $remembered[$key] = $expires;
                 }
             }
-            self::save($pdo, ['day' => $today, 'sent' => $remembered]);
+            AlertState::save($pdo, self::STATE, ['day' => $today, 'sent' => $remembered]);
 
             return $text !== null && $ok ? 'expiry alert: ' . count($listed) . ' announced' : null;
         } catch (Throwable $e) {
@@ -157,24 +157,5 @@ final class ExpiryAlerts
             static fn (array $row): array => $row + ['name' => $row['name'] !== '' ? $row['name'] : '—'],
             $stmt->fetchAll()
         );
-    }
-
-    /** @return array<string, mixed> */
-    private static function load(PDO $pdo): array
-    {
-        $stmt = $pdo->prepare('SELECT value FROM app_settings WHERE setting_key = :key');
-        $stmt->execute(['key' => self::KEY]);
-        $decoded = json_decode((string) $stmt->fetchColumn(), true);
-
-        return is_array($decoded) ? $decoded : [];
-    }
-
-    /** @param array<string, mixed> $state */
-    private static function save(PDO $pdo, array $state): void
-    {
-        $pdo->prepare(
-            'INSERT INTO app_settings (setting_key, value) VALUES (:key, :value)
-             ON DUPLICATE KEY UPDATE value = VALUES(value)'
-        )->execute(['key' => self::KEY, 'value' => json_encode($state, JSON_UNESCAPED_UNICODE)]);
     }
 }

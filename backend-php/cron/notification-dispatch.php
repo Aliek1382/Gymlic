@@ -33,6 +33,7 @@ spl_autoload_register(static function (string $class): void {
 // Warnings and crashes also show up in the admin's error log.
 Gymlic\ErrorLog::registerCli();
 
+use Gymlic\BirthdayAlerts;
 use Gymlic\Broadcasts;
 use Gymlic\CronHeartbeat;
 use Gymlic\Database;
@@ -70,7 +71,9 @@ $weekly = WeeklyReport::sendIfDue($pdo);
 Trash::purgeIfDue($pdo);
 // And, once a day, the owner's Telegram note on subscriptions about to run out.
 $expiry = ExpiryAlerts::sendIfDue($pdo);
+// And the trainers' coming birthdays, for the gift code.
+$birthdays = BirthdayAlerts::sendIfDue($pdo);
 
-$summary = "broadcasts: {$broadcasts}, deliveries sent: {$ok}, failed: {$bad}" . ($weekly !== null ? ", {$weekly}" : '') . ($expiry !== null ? ", {$expiry}" : '');
+$summary = "broadcasts: {$broadcasts}, deliveries sent: {$ok}, failed: {$bad}" . ($weekly !== null ? ", {$weekly}" : '') . ($expiry !== null ? ", {$expiry}" : '') . ($birthdays !== null ? ", {$birthdays}" : '');
 CronHeartbeat::record('notification-dispatch', $summary);
 echo date('Y-m-d H:i:s'), " {$summary}\n";
