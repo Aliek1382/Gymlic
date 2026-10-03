@@ -49,7 +49,7 @@ export function useFeatureCheck(): (key: FeatureKey | null) => boolean {
   const { features, tiers } = usePublicSettings();
   const { data: context } = useAuthContext();
   const role = context?.accountType;
-  const tier = context?.tier?.key;
+  const tier = context?.tier;
   const isAdmin = !!context?.isPlatformAdmin;
 
   return useCallback(

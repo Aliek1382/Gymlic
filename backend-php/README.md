@@ -150,7 +150,7 @@ the payment dialog shows none of the new fields.
 - Files are stored in `public/uploads/receipts/` under random names. The
   folder gets its own `.htaccess` (`Require all denied`), so nothing there is
   readable by URL; `GET /payment-requests/{id}/receipt` streams a file to the
-  club that filed it and to admins with the finance permission.
+  club that filed it and to admins with the finance.payments permission.
 - Images are shrunk in the browser (max 1400px, about 400 KB) and re-encoded
   again in `src/Receipts.php` (JPEG, 1400px, quality 75, EXIF dropped). PDFs
   are kept as sent, up to the admin's size ceiling (default 3 MB).
@@ -207,10 +207,13 @@ answer `ready: false` / 409 and the pages hide the feature.
   (billing settings). A request carries the tracking code, last four card
   digits and a receipt, with the same size ceiling, shrinking and auto-delete
   as the club payments (`Receipts::SOURCES`). One waiting request per trainer.
-- Admins with the finance permission manage it at `/admin/trainer-billing`:
-  approve/reject requests (approving starts or extends the subscription,
-  counting from the current expiry while it runs), plans, and a per-trainer
-  "add days" (free days keep the trainer's plan, or pick one).
+- Admins review trainers' payments with the clubs' in `/admin/payments`
+  (trainers tab; finance.payments): approving starts or extends the
+  subscription, counting from the current expiry while it runs. A trainer's
+  own admin page lists their payments and receipts too
+  (`GET /admin/trainer-billing/requests?trainer_id=`). Plans and a
+  per-trainer "add days" (free days keep the trainer's plan, or pick one)
+  are at `/admin/trainer-billing` (finance.plans).
 - **Nothing is enforced by default.** Switch on "الزام اشتراک مربی" in
   `/admin/billing` (`billing.trainer_enforce`) and a trainer outside a club
   needs an active subscription, within its athlete cap, to create an athlete
@@ -290,7 +293,7 @@ allows; every cap is checked on the server.
 - **Caps are checked when an invite is created and again when it is accepted**
   (with the trainer's or club's row locked). An invite that no longer fits is
   revoked and its sender notified.
-- **Admin** (`/admin/subscriptions`, finance permission): every trainer and
+- **Admin** (`/admin/subscriptions`, finance.plans permission): every trainer and
   club with plan, state, dates and usage; filters, search, CSV. Per account:
   activate a plan from a start date (today or earlier) to any end date, with
   an optional payment received outside the site; change the dates (an end
@@ -452,3 +455,25 @@ the code boxes and tabs are simply off.
   rejected one gives its use back. A code can never make a payment free (percent
   is capped at 99, and a code that would take the whole price is refused when
   used), and a used code can be switched off but not deleted.
+
+## Access set by hand per trainer or club (`schema/account-access-update.sql`)
+
+`src/AccountAccess.php`, `AccountAccessController`, tables `trainer_access`
+and `club_access` (one row per account the admin has touched, cascade-deleted
+with it). `GET/PUT /admin/account-access/{trainer|club}/{id}` (finance.plans):
+
+- `tier`: a fixed tier, which wins over the subscription's (`Tiers::effective`).
+- `features`: `{key: true|false}` per `Features::CATALOG` section; wins over the
+  tier (`Tiers::allowsUser`, used by `Gate`). A section switched off for
+  everyone in the features settings stays off.
+- `limits` (trainers): `max_custom_exercises`, `max_templates`,
+  `history_months` (a number, `-1` = none) and `report_level`; they replace
+  the plan's in `Limits::trainerShape`, even while the trainer's club has a
+  plan running, and like the plan's are enforced only with
+  `billing.trainer_enforce` on.
+
+Unlike a subscription's cap override, nothing here changes with a plan
+purchase or renewal. Who a row applies to: a trainer's own, then their
+club's; an athlete's trainer's chain, or their club's; a club owner's club's
+(`Tiers::subjects`). `/auth/me` sends the resolved sections as `tier.access`.
+Before the SQL has run every read finds nothing and `PUT` answers 409.

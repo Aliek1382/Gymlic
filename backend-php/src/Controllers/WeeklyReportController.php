@@ -10,7 +10,8 @@ use Gymlic\Settings;
 use Gymlic\WeeklyReport;
 
 /**
- * The weekly email report's admin side (settings permission): its settings,
+ * The weekly email report's admin side (finance.reports: it carries the
+ * revenue; changing its recipients is a super admin's): its settings,
  * a preview of what next Saturday's email would say right now, and "send
  * now". The settings themselves are saved as the "reports" settings group.
  */
@@ -18,7 +19,7 @@ final class WeeklyReportController
 {
     public static function get(): void
     {
-        Auth::requireAdmin('settings');
+        Auth::requireAdmin('finance.reports');
         $pdo = Database::connection();
         $report = WeeklyReport::build($pdo);
         Response::ok([
@@ -33,7 +34,7 @@ final class WeeklyReportController
     /** Sends it now to the saved recipients. */
     public static function sendNow(): void
     {
-        $admin = Auth::requireAdmin('settings');
+        $admin = Auth::requireAdmin('finance.reports');
         $recipients = Settings::get('reports')['recipients'];
         if ($recipients === []) {
             Response::error(400, 'no_recipients', 'اول دست‌کم یک ایمیل گیرنده ذخیره کنید.');

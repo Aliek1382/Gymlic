@@ -241,10 +241,19 @@ export async function sendTestMail(email: string) {
   await api.post("/admin/settings/test-mail", { email });
 }
 
-/** Whether the user's plan tier opens the section; a null tier (not limited) opens everything. */
-export function isTierAllowed(tiers: TiersSettings, key: FeatureKey, tier: TierKey | null | undefined): boolean {
-  if (!tier) return true;
-  return tiers[tier]?.features?.[key] !== false;
+/**
+ * Whether the user's plan opens the section: what the admin set for their
+ * account by hand wins; else their tier's (none = not limited) say.
+ */
+export function isTierAllowed(
+  tiers: TiersSettings,
+  key: FeatureKey,
+  tier: { key: TierKey | null; access?: Partial<Record<FeatureKey, boolean>> } | null | undefined
+): boolean {
+  const set = tier?.access?.[key];
+  if (set !== undefined) return set;
+  if (!tier?.key) return true;
+  return tiers[tier.key]?.features?.[key] !== false;
 }
 
 export function isFeatureEnabled(

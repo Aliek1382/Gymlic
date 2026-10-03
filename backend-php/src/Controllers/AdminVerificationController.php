@@ -11,7 +11,7 @@ use Gymlic\TrainerVerification;
 use Gymlic\Validate;
 
 /**
- * /admin/verifications (users.manage): trainers' certificates waiting for
+ * /admin/verifications (users.verify): trainers' certificates waiting for
  * review, and the ones already verified or rejected (see TrainerVerification).
  */
 final class AdminVerificationController
@@ -19,7 +19,7 @@ final class AdminVerificationController
     /** ?status=pending|verified|rejected|all — trainers with at least one certificate. */
     public static function list(): void
     {
-        Auth::requireAdmin('users.manage');
+        Auth::requireAdmin('users.verify');
         if (!TrainerVerification::ready()) {
             Response::ok(['ready' => false, 'items' => [], 'counts' => []]);
             return;
@@ -67,7 +67,7 @@ final class AdminVerificationController
     /** POST /admin/verifications/{trainerId} — {decision: verify|reject|revoke, note?} */
     public static function decide(array $params): void
     {
-        $admin = Auth::requireAdmin('users.manage');
+        $admin = Auth::requireAdmin('users.verify');
         if (!TrainerVerification::ready()) {
             Response::error(409, 'migration_required', 'تأیید مدارک هنوز فعال نیست. به‌روزرسانی «لاگ خطاها، سطل زباله و تأیید مدارک مربی (فاز ۱۰)» را از صفحهٔ «به‌روزرسانی دیتابیس» اجرا کنید.');
             return;

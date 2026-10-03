@@ -24,6 +24,7 @@ import { useSearchParams } from "next/navigation";
 
 import { NotFoundNotice } from "@/components/not-found-notice";
 import { RouteLoading } from "@/components/layout/route-loading";
+import { TrainerFinanceSection } from "./account-finance-section";
 import { AdminProfileEditForm } from "./admin-profile-edit-form";
 import { SuspendToggle } from "./suspend-toggle";
 import { TrainerGiftDialog } from "./trainer-gift-dialog";
@@ -77,7 +78,7 @@ export function AdminTrainerDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {can("finance") && (
+          {can("finance.plans") && (
             <Button variant="outline" size="sm" onClick={() => setGifting(true)}>
               <Gift />
               کد تخفیف اختصاصی
@@ -121,6 +122,8 @@ export function AdminTrainerDetailPage() {
           </div>
         </Card>
       </div>
+
+      <TrainerFinanceSection trainerId={trainer.id} name={name} />
 
       <AdminProfileEditForm
         userId={trainer.id}

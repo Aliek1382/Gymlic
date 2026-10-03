@@ -51,7 +51,7 @@ final class PlanAccountsController
         'plan_activate', 'plan_dates', 'plan_extend', 'plan_override', 'plan_reactivate', 'plan_revoke_invites',
         'trainer_payment_approved', 'trainer_payment_rejected', 'trainer_subscription_granted',
         'payment_request_approved', 'subscription_renewed', 'subscription_gifted', 'subscription_set',
-        'report_excel_export', 'trainer_data_export', 'trainer_gift_code',
+        'report_excel_export', 'trainer_data_export', 'trainer_gift_code', 'account_access_set',
     ];
 
     // ---- Reading ---------------------------------------------------------
@@ -59,7 +59,7 @@ final class PlanAccountsController
     /** GET /admin/plan-accounts */
     public static function list(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!Limits::ready()) {
             Response::ok(['ready' => false, 'trainers' => [], 'clubs' => []]);
             return;
@@ -83,7 +83,7 @@ final class PlanAccountsController
     /** GET /admin/plan-accounts/{kind}/{id}: one account and its history. */
     public static function detail(array $params): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }
@@ -115,7 +115,12 @@ final class PlanAccountsController
         }
         unset($entry);
 
-        Response::ok(['account' => $row, 'history' => $history]);
+        Response::ok([
+            'account' => $row,
+            'history' => $history,
+            // For the plan dialog opened from a trainer's or club's own admin page.
+            'plans'   => $kind === 'trainer' ? self::trainerPlans($pdo) : self::clubPlans($pdo),
+        ]);
     }
 
     /**
@@ -165,7 +170,8 @@ final class PlanAccountsController
                     'templates'    => (int) $r['u_templates'],
                     'club_running' => $r['club_id'] !== null
                         && in_array(Subscriptions::status($r['club_expires_at']), ['active', 'expiring', 'grace'], true),
-                ]
+                ],
+                (string) $r['id']
             );
             $out[] = [
                 'kind'       => 'trainer',
@@ -265,7 +271,7 @@ final class PlanAccountsController
     /** POST /admin/plan-accounts/{kind}/{id} {action, ..., note?, notify?, preview?} */
     public static function update(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!self::ready()) {
             return;
         }

@@ -3,13 +3,18 @@ declare(strict_types=1);
 
 namespace Gymlic\Controllers;
 
+use Gymlic\AdminAccess;
 use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Response;
 use Gymlic\Storage;
 use Gymlic\Validate;
 
-/** /admin/storage (system permission): space used per account, and removing files nothing points to (see Storage). */
+/**
+ * /admin/storage: space used per account (system permission), and removing
+ * files nothing points to (see Storage) — a super admin's, since a removed
+ * file can't be brought back.
+ */
 final class StorageController
 {
     public static function overview(): void
@@ -21,7 +26,7 @@ final class StorageController
     /** {paths: string[]} the chosen orphans, or {all: true} every orphan. */
     public static function clean(): void
     {
-        $admin = Auth::requireAdmin('system');
+        $admin = Auth::requireAdmin(AdminAccess::SUPER);
         $data = Validate::body();
         $all = ($data['all'] ?? false) === true;
         $paths = is_array($data['paths'] ?? null) ? array_slice($data['paths'], 0, 1000) : [];

@@ -24,6 +24,7 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use Gymlic\Controllers\AthleteController;
+use Gymlic\Controllers\AccountAccessController;
 use Gymlic\Controllers\AdminController;
 use Gymlic\Controllers\AdminContentController;
 use Gymlic\Controllers\AdminExerciseMediaController;
@@ -378,6 +379,8 @@ $router->patch('/admin/trainer-plans/{id}', fn (array $p) => TrainerBillingContr
 $router->get('/admin/plan-accounts', fn () => PlanAccountsController::list());
 $router->get('/admin/plan-accounts/{kind}/{id}', fn (array $p) => PlanAccountsController::detail($p));
 $router->post('/admin/plan-accounts/{kind}/{id}', fn (array $p) => PlanAccountsController::update($p));
+$router->get('/admin/account-access/{kind}/{id}', fn (array $p) => AccountAccessController::get($p));
+$router->put('/admin/account-access/{kind}/{id}', fn (array $p) => AccountAccessController::update($p));
 $router->delete('/admin/payment-requests/{id}/receipt', fn (array $p) => ReceiptController::remove($p));
 $router->get('/admin/receipts/stats', fn () => ReceiptController::stats());
 $router->post('/admin/receipts/purge', fn () => ReceiptController::purge());

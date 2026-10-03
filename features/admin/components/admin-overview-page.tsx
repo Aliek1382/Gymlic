@@ -78,11 +78,11 @@ export function AdminOverviewPage() {
             (pendingClubsCount ?? 0) > 0 ? "bg-warning-muted text-warning" : undefined
           }
         />
-        {showFinance && (
-          <>
+        {data?.pending_requests_count !== undefined && (
+          <Link href="/admin/payments" className="contents">
             <StatisticCard
               icon={ReceiptText}
-              title="درخواست پرداخت در انتظار"
+              title="پرداخت در انتظار (باشگاه و مربی)"
               value={formatNumber(pendingRequestsCount ?? 0)}
               iconClassName={
                 (pendingRequestsCount ?? 0) > 0
@@ -90,12 +90,14 @@ export function AdminOverviewPage() {
                   : undefined
               }
             />
-            <StatisticCard
-              icon={Banknote}
-              title="درآمد کل تاییدشده"
-              value={`${formatToman(totalRevenue)} تومان`}
-            />
-          </>
+          </Link>
+        )}
+        {showFinance && (
+          <StatisticCard
+            icon={Banknote}
+            title="درآمد کل تاییدشده"
+            value={`${formatToman(totalRevenue)} تومان`}
+          />
         )}
         {openSupport !== undefined && (
           <Link href="/admin/support" className="contents">

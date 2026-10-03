@@ -27,7 +27,7 @@ export function TrainerBirthdaysCard() {
   const [gifting, setGifting] = useState<{ id: string; name: string } | null>(null);
 
   if (!data || data.items.length === 0) return null;
-  const canGift = can("finance");
+  const canGift = can("finance.plans");
 
   return (
     <Card className="gap-3 py-5">

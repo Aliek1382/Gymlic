@@ -21,7 +21,7 @@ final class TiersController
 {
     public static function overview(): void
     {
-        Auth::requireAdmin('finance');
+        Auth::requireAdmin('finance.plans');
         $pdo = Database::connection();
         $ready = Tiers::ready();
 
@@ -74,7 +74,7 @@ final class TiersController
      */
     public static function setPlanTier(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!Tiers::ready()) {
             Response::error(409, 'migration_required', 'سطح پلن‌ها هنوز فعال نیست. به‌روزرسانی «سطح پلن‌ها: رایگان، نقره‌ای، طلایی و الماسی» را از صفحهٔ «به‌روزرسانی دیتابیس» اجرا کنید.');
             return;

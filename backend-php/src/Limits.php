@@ -99,7 +99,8 @@ final class Limits
             $row === false ? null : $row,
             self::trainerUsage($pdo, $trainerId),
             $club,
-            self::contentUsage($pdo, $trainerId) + ['club_running' => $club !== null && self::clubRunning($pdo, $club['club_id'])]
+            self::contentUsage($pdo, $trainerId) + ['club_running' => $club !== null && self::clubRunning($pdo, $club['club_id'])],
+            $trainerId
         );
     }
 
@@ -121,10 +122,14 @@ final class Limits
      * @param array{exercises: int, templates: int, club_running: bool}|null $content
      *        the trainer's own custom exercises and templates, and whether
      *        their club's plan is running (which lifts both caps)
+     * @param string|null $trainerId whose caps the admin may have set by hand
+     *        (AccountAccess limits), which win over the plan's and apply
+     *        even while the club's plan runs
      * @return array<string, mixed>
      */
-    public static function trainerShape(PDO $pdo, ?array $row, array $usage, ?array $club, ?array $content = null): array
+    public static function trainerShape(PDO $pdo, ?array $row, array $usage, ?array $club, ?array $content = null, ?string $trainerId = null): array
     {
+        $custom = $trainerId !== null ? (AccountAccess::get($pdo, 'trainer', $trainerId)['limits'] ?? []) : [];
         $free = self::freePlan($pdo);
         $plan = $free;
         $status = 'active';
@@ -162,7 +167,7 @@ final class Limits
 
         $cap = $override ? $subscription['override_max_athletes'] : $plan['max_athletes'];
         $enforcing = self::enforcing();
-        $contentShape = $content === null ? null : self::contentShape($plan, $content);
+        $contentShape = $content === null ? null : self::contentShape($plan, $content, $custom);
         // While a paid plan (or its grace days) still runs: how many would
         // be suspended once it ends, at today's numbers.
         $atRisk = 0;
@@ -186,8 +191,10 @@ final class Limits
             'suspend_after_grace' => $atRisk,
             'club'         => $club,
             'content'      => $contentShape,
-            'history'      => self::historyShape($plan, $content, $enforcing),
-            'reports'      => self::reportsShape($plan, $content, $enforcing),
+            'history'      => self::historyShape($plan, $content, $enforcing, $custom),
+            'reports'      => self::reportsShape($plan, $content, $enforcing, $custom),
+            // The caps the admin set by hand for this trainer (AccountAccess).
+            'custom'       => $custom === [] ? null : $custom,
         ];
     }
 
@@ -206,9 +213,11 @@ final class Limits
      * @param array{club_running: bool}|null $content
      * @return array{months: ?int, cutoff: ?string}
      */
-    private static function historyShape(array $plan, ?array $content, bool $enforcing): array
+    private static function historyShape(array $plan, ?array $content, bool $enforcing, array $custom = []): array
     {
-        $months = ($content === null || $content['club_running']) ? null : ($plan['history_months'] ?? null);
+        $months = array_key_exists('history_months', $custom)
+            ? self::customCap($custom['history_months'])
+            : (($content === null || $content['club_running']) ? null : ($plan['history_months'] ?? null));
         return [
             'months' => $months,
             'cutoff' => $enforcing && $months !== null ? date('Y-m-d H:i:s', (int) strtotime("-{$months} months")) : null,
@@ -287,9 +296,10 @@ final class Limits
      * @param array{club_running: bool}|null $content
      * @return array{level: ?string, effective: string}
      */
-    private static function reportsShape(array $plan, ?array $content, bool $enforcing): array
+    private static function reportsShape(array $plan, ?array $content, bool $enforcing, array $custom = []): array
     {
-        $level = ($content === null || $content['club_running']) ? null : ($plan['report_level'] ?? null);
+        $level = $custom['report_level']
+            ?? (($content === null || $content['club_running']) ? null : ($plan['report_level'] ?? null));
         if ($level !== null && !in_array($level, self::REPORT_LEVELS, true)) {
             $level = null;
         }
@@ -355,12 +365,14 @@ final class Limits
      * @param array{exercises: int, templates: int, club_running: bool} $content
      * @return array<string, mixed>
      */
-    private static function contentShape(array $plan, array $content): array
+    private static function contentShape(array $plan, array $content, array $custom = []): array
     {
         $viaClub = $content['club_running'];
         $out = ['via_club' => $viaClub];
         foreach (['exercises' => 'max_custom_exercises', 'templates' => 'max_templates'] as $key => $column) {
-            $max = $viaClub ? null : ($plan[$column] ?? null);
+            $max = array_key_exists($column, $custom)
+                ? self::customCap($custom[$column])
+                : ($viaClub ? null : ($plan[$column] ?? null));
             $out[$key] = ['used' => $content[$key], 'max' => $max, 'over' => $max !== null && $content[$key] > $max];
         }
         return $out;
@@ -378,6 +390,12 @@ final class Limits
         );
         $stmt->execute(['t1' => $trainerId, 't2' => $trainerId, 't3' => $trainerId]);
         return array_map('intval', $stmt->fetch());
+    }
+
+    /** A cap set by hand: -1 means none. */
+    private static function customCap(mixed $value): ?int
+    {
+        return is_int($value) && $value >= 0 ? $value : null;
     }
 
     /** Whether the club's subscription is running, grace days included. */

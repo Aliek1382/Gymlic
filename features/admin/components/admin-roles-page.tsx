@@ -175,9 +175,11 @@ function RoleDialog({
   function toggle(key: AdminPermission, on: boolean) {
     setPermissions((current) => {
       let next = on ? [...current, key] : current.filter((p) => p !== key);
-      // Managing users without seeing them makes no sense; the API adds it too.
-      if (key === "users.manage" && on && !next.includes("users.view")) next = [...next, "users.view"];
-      if (key === "users.view" && !on) next = next.filter((p) => p !== "users.manage");
+      // Managing or verifying users without seeing them makes no sense; the API adds it too.
+      if ((key === "users.manage" || key === "users.verify") && on && !next.includes("users.view")) {
+        next = [...next, "users.view"];
+      }
+      if (key === "users.view" && !on) next = next.filter((p) => p !== "users.manage" && p !== "users.verify");
       return next;
     });
   }

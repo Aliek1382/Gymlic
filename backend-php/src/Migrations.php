@@ -295,6 +295,12 @@ final class Migrations
             'title' => 'کد تخفیف اختصاصی یک مربی (هدیه‌ی تولد)',
             'check' => [['column', 'trainer_discount_codes', 'for_trainer_id']],
         ],
+        [
+            'id'    => 'account-access',
+            'file'  => 'account-access-update.sql',
+            'title' => 'دسترسی اختصاصی هر مربی و باشگاه: سطح، بخش‌ها و سقف‌ها مستقل از پلن',
+            'check' => [['table', 'trainer_access'], ['table', 'club_access']],
+        ],
     ];
 
     /**

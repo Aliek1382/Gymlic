@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getRevenueReport } from "../services/admin-billing-service";
 import { ExportButton } from "./export-button";
+import { WeeklyReportCard } from "./weekly-report-card";
 import { StatisticCard } from "@/features/dashboard/components/shared/statistic-card";
 import { StatisticsGrid } from "@/features/dashboard/components/shared/statistics-grid";
 
@@ -163,6 +164,8 @@ export function AdminReportsPage() {
           )}
         </Card>
       </div>
+
+      <WeeklyReportCard />
     </div>
   );
 }

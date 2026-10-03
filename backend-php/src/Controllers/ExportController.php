@@ -23,11 +23,11 @@ final class ExportController
 {
     private const KINDS = [
         'users'         => 'users.view',
-        'payments'      => 'finance',
-        'trainer-payments' => 'finance',
-        'subscriptions' => 'finance',
-        'trainer-subscriptions' => 'finance',
-        'revenue'       => 'finance',
+        'payments'      => ['finance.payments', 'finance.reports'],
+        'trainer-payments' => ['finance.payments', 'finance.reports'],
+        'subscriptions' => 'finance.plans',
+        'trainer-subscriptions' => 'finance.plans',
+        'revenue'       => 'finance.reports',
     ];
 
     private const ACCOUNT_TYPES = ['club' => 'باشگاه', 'trainer' => 'مربی', 'athlete' => 'ورزشکار'];

@@ -107,6 +107,8 @@ export interface TrainerLimits {
     exercises: ContentUsage;
     templates: ContentUsage;
   } | null;
+  /** Caps the admin set by hand for this trainer (a number, -1 = none); null = none set. */
+  custom?: Partial<Record<"max_custom_exercises" | "max_templates" | "history_months", number> & { report_level: ReportLevel }> | null;
 }
 
 export interface ContentUsage {
@@ -221,8 +223,13 @@ export interface AdminTrainerRequest extends TrainerPaymentRequest {
   receipt_expires_at: string | null;
 }
 
-export async function listTrainerRequests(): Promise<{ ready: boolean; items: AdminTrainerRequest[] }> {
-  return api.get("/admin/trainer-billing/requests");
+/** Every trainer's payments, or one trainer's. */
+export async function listTrainerRequests(trainerId?: string): Promise<{ ready: boolean; items: AdminTrainerRequest[] }> {
+  return api.get(
+    trainerId
+      ? `/admin/trainer-billing/requests?trainer_id=${encodeURIComponent(trainerId)}`
+      : "/admin/trainer-billing/requests"
+  );
 }
 
 export async function approveTrainerRequest(id: string, adminNote?: string): Promise<void> {

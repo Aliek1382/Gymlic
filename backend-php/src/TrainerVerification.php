@@ -7,7 +7,7 @@ use PDO;
 
 /**
  * The "verified trainer" badge: a trainer sends the certificates in their
- * résumé for review, an admin with users.manage looks at them and verifies
+ * résumé for review, an admin with users.verify looks at them and verifies
  * or rejects (with a reason), and can take the badge back later. Stored on
  * trainer_profiles (operations-update.sql); before that SQL nobody is
  * verified and nothing here does anything.

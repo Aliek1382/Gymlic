@@ -60,7 +60,7 @@ final class TrainerGiftController
      */
     public static function create(array $params): void
     {
-        $admin = Auth::requireAdmin('finance');
+        $admin = Auth::requireAdmin('finance.plans');
         if (!TrainerDiscounts::personalReady()) {
             Response::error(503, 'update_required', 'کد اختصاصی بعد از به‌روزرسانی «کد تخفیف اختصاصی یک مربی» در دسترس است.');
             return;
