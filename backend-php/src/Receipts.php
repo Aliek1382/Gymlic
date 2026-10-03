@@ -59,11 +59,12 @@ final class Receipts
 
     /**
      * The tracking code, last four card digits and optional payment time from
-     * a request, cleaned up (Persian digits become Latin).
+     * a request, cleaned up (Persian digits become Latin). With $withAmount the
+     * amount the payer says they transferred is required too (paid_amount_toman).
      *
      * @return array{row: array<string, mixed>}|array{error: array{0: string, 1: string}}
      */
-    public static function parseFields(array $data): array
+    public static function parseFields(array $data, bool $withAmount = false): array
     {
         $digits = static fn (mixed $v): string => strtr(trim((string) $v), [
             '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
@@ -91,7 +92,18 @@ final class Receipts
             $paidAt = date('Y-m-d H:i:s', $time);
         }
 
-        return ['row' => ['tracking_code' => $tracking, 'card_last4' => $last4, 'paid_at' => $paidAt]];
+        $row = ['tracking_code' => $tracking, 'card_last4' => $last4, 'paid_at' => $paidAt];
+
+        if ($withAmount) {
+            // Typed with separators and Persian digits: "۵۰۰٬۰۰۰" or "500,000".
+            $raw = preg_replace('/[\\s,٬،.]+/u', '', $digits($data['paid_amount'] ?? '')) ?? '';
+            if (preg_match('/^[0-9]{1,13}$/', $raw) !== 1 || (int) $raw < 1) {
+                return ['error' => ['invalid_paid_amount', 'مبلغی را که واریز کرده‌اید به تومان وارد کنید.']];
+            }
+            $row['paid_amount_toman'] = (int) $raw;
+        }
+
+        return ['row' => $row];
     }
 
     /**

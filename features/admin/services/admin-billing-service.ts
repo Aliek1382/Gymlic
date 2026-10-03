@@ -15,6 +15,8 @@ export interface BillingSettings {
   instructions: string;
   /** Days before expiry a subscription counts as running out. */
   expiring_days: number;
+  /** Days a payment may wait unanswered before its reviewer is reminded; 0 = no reminders. */
+  pending_remind_days: number;
   /** Whether a payment request must carry a receipt image/PDF. */
   receipt_required: boolean;
   /** Size ceiling for a receipt file, in MB. */
@@ -38,6 +40,7 @@ export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
   bank_name: "",
   instructions: "",
   expiring_days: 7,
+  pending_remind_days: 3,
   receipt_required: true,
   receipt_max_mb: 3,
   receipt_retention_days: 7,

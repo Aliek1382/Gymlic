@@ -79,6 +79,7 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
     sheba: digitsOnly(draft.sheba) ? `IR${digitsOnly(draft.sheba)}` : "",
     expiring_days: Number(digitsOnly(String(draft.expiring_days))) || 7,
     grace_days: Number(digitsOnly(String(draft.grace_days ?? 7))),
+    pending_remind_days: Number(digitsOnly(String(draft.pending_remind_days ?? 3))),
     receipt_max_mb: Number(digitsOnly(String(draft.receipt_max_mb))) || 0,
     receipt_retention_days: Number(digitsOnly(String(draft.receipt_retention_days))) || 0,
   };
@@ -98,6 +99,10 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
     }
     if (value.grace_days < 0 || value.grace_days > 60) {
       toast.error("مهلت پس از انقضا باید بین ۰ و ۶۰ روز باشد.");
+      return;
+    }
+    if (value.pending_remind_days > 30) {
+      toast.error("یادآور پرداخت بی‌پاسخ حداکثر ۳۰ روز است.");
       return;
     }
     if (value.receipt_max_mb < 1 || value.receipt_max_mb > 10) {
@@ -239,6 +244,24 @@ function BillingForm({ initial, locked }: { initial: BillingSettings; locked: bo
                 />
                 <span className="text-sm text-muted-foreground">روز</span>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="billing-remind">یادآور پرداخت بی‌پاسخ</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="billing-remind"
+                  dir="ltr"
+                  inputMode="numeric"
+                  disabled={locked}
+                  className="w-24"
+                  value={String(draft.pending_remind_days ?? 3)}
+                  onChange={(e) => patch({ pending_remind_days: Number(digitsOnly(e.target.value).slice(0, 2)) || 0 })}
+                />
+                <span className="text-sm text-muted-foreground">روز (۰ = خاموش)</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                اگر پرداختی این‌قدر بی‌پاسخ بماند، به بررسی‌کننده (مدیر، مربی یا باشگاه) یادآوری می‌شود.
+              </p>
             </div>
           </div>
         </div>

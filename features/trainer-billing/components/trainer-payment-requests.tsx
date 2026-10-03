@@ -27,9 +27,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
+import { PaymentFlags, waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { formatPersianDate, formatToman } from "@/lib/persian";
+import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
 import {
   approveTrainerRequest,
   rejectTrainerRequest,
@@ -162,6 +163,11 @@ export function TrainerRequestsTable({
                   {request.duplicate_tracking && (
                     <Badge variant="warning">کد پیگیری تکراری</Badge>
                   )}
+                  <PaymentFlags
+                    mismatch={request.amount_mismatch}
+                    paidAmount={request.paid_amount_toman}
+                    expected={request.amount_toman}
+                  />
                 </div>
               )}
             </TableCell>
@@ -182,6 +188,11 @@ export function TrainerRequestsTable({
             </TableCell>
             <TableCell className="text-muted-foreground">
               {formatPersianDate(parseDate(request.created_at))}
+              {request.status === "pending" && waitingDays(request.created_at) >= 1 && (
+                <p className="text-xs font-medium text-warning">
+                  {formatNumber(waitingDays(request.created_at))} روز در انتظار
+                </p>
+              )}
             </TableCell>
             <TableCell>
               <Badge variant={STATUS_VARIANT[request.status]}>

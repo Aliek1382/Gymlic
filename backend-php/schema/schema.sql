@@ -225,6 +225,7 @@ CREATE TABLE payment_requests (
   reviewed_by    CHAR(36) NULL,
   reviewed_at    DATETIME NULL,
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reminded_at    DATETIME NULL,          -- the "waiting for review" reminder was sent
   KEY idx_payreq_club (club_id, created_at DESC),
   KEY idx_payreq_status (status),
   KEY idx_payreq_tracking (tracking_code),
@@ -700,6 +701,7 @@ CREATE TABLE invoice_payment_claims (
   id                CHAR(36) NOT NULL PRIMARY KEY,
   invoice_id        CHAR(36) NOT NULL,
   athlete_id        CHAR(36) NOT NULL,
+  paid_amount_toman BIGINT NULL,            -- what the athlete says they transferred
   discount_code_id  CHAR(36) NULL,
   list_price_toman  BIGINT NULL,                -- the invoice amount when a code was used
   discount_toman    BIGINT NOT NULL DEFAULT 0,
@@ -713,6 +715,7 @@ CREATE TABLE invoice_payment_claims (
   trainer_note      VARCHAR(500) NULL,
   reviewed_at       DATETIME NULL,
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reminded_at       DATETIME NULL,
   KEY idx_claims_invoice (invoice_id, created_at DESC),
   KEY idx_claims_status (status),
   KEY idx_claims_tracking (tracking_code),
@@ -791,6 +794,7 @@ CREATE TABLE trainer_payment_requests (
   trainer_id        CHAR(36) NOT NULL,
   plan_id           CHAR(36) NOT NULL,
   amount_toman      BIGINT NOT NULL,
+  paid_amount_toman BIGINT NULL,            -- what the trainer says they transferred
   discount_code_id  CHAR(36) NULL,
   list_price_toman  BIGINT NULL,                -- the plan's price when a code was used
   discount_toman    BIGINT NOT NULL DEFAULT 0,
@@ -805,6 +809,7 @@ CREATE TABLE trainer_payment_requests (
   reviewed_by       CHAR(36) NULL,
   reviewed_at       DATETIME NULL,
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reminded_at       DATETIME NULL,
   KEY idx_tpay_trainer (trainer_id, created_at DESC),
   KEY idx_tpay_status (status),
   KEY idx_tpay_tracking (tracking_code),
@@ -860,6 +865,7 @@ CREATE TABLE membership_payment_requests (
   plan_name         VARCHAR(255) NOT NULL,
   duration_days     INT NOT NULL,
   amount_toman      BIGINT NOT NULL,
+  paid_amount_toman BIGINT NULL,            -- what the athlete says they transferred
   discount_code_id  CHAR(36) NULL,
   list_price_toman  BIGINT NULL,                -- the plan's price when a code was used
   discount_toman    BIGINT NOT NULL DEFAULT 0,
@@ -874,6 +880,7 @@ CREATE TABLE membership_payment_requests (
   reviewed_by       CHAR(36) NULL,
   reviewed_at       DATETIME NULL,
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reminded_at       DATETIME NULL,
   KEY idx_mpr_club (club_id, status, created_at DESC),
   KEY idx_mpr_athlete (athlete_id, created_at DESC),
   KEY idx_mpr_tracking (tracking_code),

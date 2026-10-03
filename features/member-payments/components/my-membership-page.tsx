@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { JalaliDateField } from "@/components/ui/jalali-date-field";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -31,12 +32,16 @@ import { SubscriptionStatusBadge } from "@/features/admin/components/subscriptio
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
+import { CancelRequestButton } from "@/features/finance/components/cancel-request-button";
+import { AmountToPay, PaidAmountField, parsePaidAmount } from "@/features/finance/components/payment-form-bits";
 import { PaymentInfoCard } from "@/features/finance/components/payment-info-card";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
+import { todayIso } from "@/lib/iso-date";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
 import {
+  cancelMemberPayment,
   checkMemberDiscount,
   getMyMembershipPayments,
   submitMemberPayment,
@@ -230,6 +235,14 @@ function ClubSection({
                   </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[request.status]}>{STATUS_LABEL[request.status]}</Badge>
+                    {request.status === "pending" && (
+                      <div className="pt-2">
+                        <CancelRequestButton
+                          onCancel={() => cancelMemberPayment(request.id)}
+                          queryKeys={[QUERY_KEY]}
+                        />
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     <div className="space-y-1">
@@ -316,7 +329,8 @@ function PayDialog({
   const queryClient = useQueryClient();
   const [trackingCode, setTrackingCode] = useState("");
   const [cardLast4, setCardLast4] = useState("");
-  const [paidAt, setPaidAt] = useState("");
+  const [paidAt, setPaidAt] = useState(todayIso());
+  const [paidAmount, setPaidAmount] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -352,6 +366,10 @@ function PayDialog({
       setError("چهار رقم آخر کارت خود را وارد کنید.");
       return;
     }
+    if (parsePaidAmount(paidAmount ?? String(price)) === null) {
+      setError("مبلغی را که واریز کرده‌اید به تومان وارد کنید.");
+      return;
+    }
     if (rules?.required !== false && !receipt) {
       setError("تصویر یا فایل رسید پرداخت را پیوست کنید.");
       return;
@@ -369,6 +387,7 @@ function PayDialog({
         trackingCode: code,
         cardLast4: last4,
         paidAt: paidAt || undefined,
+        paidAmount: parsePaidAmount(paidAmount ?? String(price)) ?? undefined,
         note: note.trim() || undefined,
         discountCode: quote?.code,
         receipt: prepared,
@@ -376,7 +395,8 @@ function PayDialog({
       toast.success("پرداخت شما ثبت شد و در انتظار تأیید باشگاه است.");
       setTrackingCode("");
       setCardLast4("");
-      setPaidAt("");
+      setPaidAt(todayIso());
+      setPaidAmount(null);
       setNote("");
       setReceipt(null);
       setDiscountText("");
@@ -460,6 +480,8 @@ function PayDialog({
             </div>
           )}
 
+          <AmountToPay amount={price} />
+
           <PaymentInfoCard
             info={
               club.pay_to
@@ -527,18 +549,14 @@ function PayDialog({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="mp-paid-at">
-              زمان واریز <span className="text-muted-foreground">(اختیاری)</span>
-            </Label>
-            <Input
-              id="mp-paid-at"
-              type="datetime-local"
-              dir="ltr"
-              value={paidAt}
-              onChange={(e) => setPaidAt(e.target.value)}
-            />
-          </div>
+          <PaidAmountField
+            id="mp-paid-amount"
+            value={paidAmount ?? String(price)}
+            onChange={setPaidAmount}
+            expected={price}
+          />
+
+          <JalaliDateField id="mp-paid-at" label="تاریخ واریز" value={paidAt} onChange={setPaidAt} />
 
           <div className="space-y-2">
             <Label htmlFor="mp-note">

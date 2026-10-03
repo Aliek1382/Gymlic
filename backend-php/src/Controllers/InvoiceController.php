@@ -8,7 +8,9 @@ use Gymlic\Auth;
 use Gymlic\Cast;
 use Gymlic\Database;
 use Gymlic\DiscountCodes;
+use Gymlic\PaymentReminders;
 use Gymlic\Receipts;
+use Gymlic\TrackingCodes;
 use Gymlic\Response;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -423,24 +425,28 @@ final class InvoiceController
             return $rows;
         }
 
+        if ($forTrainer) {
+            PaymentReminders::sendIfDue(Database::connection());
+        }
         $ids = array_column($rows, 'id');
         $marks = implode(',', array_fill(0, count($ids), '?'));
         $duplicate = $forTrainer
-            ? ', EXISTS (SELECT 1 FROM invoice_payment_claims o
-                         JOIN invoices oi ON oi.id = o.invoice_id
-                         JOIN invoices ci ON ci.id = c.invoice_id
-                         WHERE o.tracking_code = c.tracking_code AND o.invoice_id <> c.invoice_id
-                           AND oi.trainer_id = ci.trainer_id) AS duplicate_tracking'
+            ? ', ' . TrackingCodes::duplicateExpr('invoice_payment_claims', 'c') . ' AS duplicate_tracking'
             : ', 0 AS duplicate_tracking';
+        $paidCol = Database::hasColumn('invoice_payment_claims', 'paid_amount_toman');
         $discounts = DiscountCodes::trainerReady();
         $discountColumns = $discounts ? ', c.list_price_toman, c.discount_toman, dc.code AS discount_code' : '';
+        $owed = $discounts ? 'ci.amount_toman - COALESCE(c.discount_toman, 0)' : 'ci.amount_toman';
+        $paidColumns = $paidCol
+            ? ", c.paid_amount_toman, (c.paid_amount_toman IS NOT NULL AND c.paid_amount_toman <> {$owed}) AS amount_mismatch"
+            : '';
         $discountJoin = $discounts ? ' LEFT JOIN athlete_discount_codes dc ON dc.id = c.discount_code_id' : '';
         $stmt = Database::connection()->prepare(
             "SELECT c.id, c.invoice_id, c.status, c.tracking_code, c.card_last4, c.paid_at, c.note,
                     c.trainer_note, c.reviewed_at, c.created_at, c.receipt_purged_at,
                     (c.receipt_path IS NOT NULL) AS has_receipt,
-                    (c.receipt_path LIKE '%.pdf') AS receipt_is_pdf{$duplicate}{$discountColumns}
-             FROM invoice_payment_claims c{$discountJoin}
+                    (c.receipt_path LIKE '%.pdf') AS receipt_is_pdf{$duplicate}{$discountColumns}{$paidColumns}
+             FROM invoice_payment_claims c JOIN invoices ci ON ci.id = c.invoice_id{$discountJoin}
              WHERE c.invoice_id IN ({$marks}) ORDER BY c.created_at DESC"
         );
         $stmt->execute($ids);
@@ -448,7 +454,7 @@ final class InvoiceController
         $latest = [];
         foreach ($stmt->fetchAll() as $claim) {
             // Newest first, so the first one seen for an invoice is its latest.
-            $latest[$claim['invoice_id']] ??= Cast::row($claim, [], ['list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
+            $latest[$claim['invoice_id']] ??= Cast::row($claim, [], ['list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']);
         }
         foreach ($rows as &$row) {
             $row['claim'] = $latest[$row['id']] ?? null;

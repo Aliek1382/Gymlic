@@ -9,6 +9,7 @@ use Gymlic\CardInfo;
 use Gymlic\Database;
 use Gymlic\DiscountCodes;
 use Gymlic\Discounts;
+use Gymlic\PaymentCancel;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
@@ -139,7 +140,7 @@ final class InvoiceClaimController
             }
         }
 
-        $fields = Receipts::parseFields($data);
+        $fields = Receipts::parseFields($data, Database::hasColumn('invoice_payment_claims', 'paid_amount_toman'));
         if (isset($fields['error'])) {
             Response::error(400, $fields['error'][0], $fields['error'][1]);
             return;
@@ -171,6 +172,9 @@ final class InvoiceClaimController
             'note'          => self::text($data['note'] ?? '', 500),
             'receipt_path'  => $file,
         ];
+        if (isset($fields['row']['paid_amount_toman'])) {
+            $row['paid_amount_toman'] = $fields['row']['paid_amount_toman'];
+        }
 
         $pdo->beginTransaction();
         try {
@@ -263,6 +267,22 @@ final class InvoiceClaimController
     }
 
     // ---- Trainer: review -------------------------------------------------
+
+    /** DELETE /invoices/{id}/claim: the athlete takes back a claim the trainer has not answered. */
+    public static function cancel(array $params): void
+    {
+        $user = Auth::requireUser();
+        $stmt = Database::connection()->prepare(
+            "SELECT id FROM invoice_payment_claims WHERE invoice_id = :i AND athlete_id = :u AND status = 'pending' LIMIT 1"
+        );
+        $stmt->execute(['i' => $params['id'], 'u' => $user['id']]);
+        $claim = $stmt->fetchColumn();
+        if ($claim === false) {
+            Response::error(404, 'not_found', 'درخواست در انتظاری برای این فاکتور پیدا نشد.');
+            return;
+        }
+        PaymentCancel::respond(PaymentCancel::own('invoice_payment_claims', (string) $claim, $user['id']));
+    }
 
     /** POST /invoices/{id}/claim/approve: the money arrived; settles the invoice. */
     public static function approve(array $params): void

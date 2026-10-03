@@ -127,6 +127,8 @@ export interface TrainerPaymentRequest {
   tracking_code: string;
   card_last4: string;
   paid_at: string | null;
+  /** What the trainer says they transferred (after the payment-checks update). */
+  paid_amount_toman?: number | null;
   status: TrainerRequestStatus;
   admin_note: string | null;
   reviewed_at: string | null;
@@ -172,6 +174,7 @@ export async function submitTrainerPayment(input: {
   trackingCode?: string;
   cardLast4?: string;
   paidAt?: string;
+  paidAmount?: number;
   note?: string;
   discountCode?: string;
   receipt?: File | null;
@@ -180,6 +183,7 @@ export async function submitTrainerPayment(input: {
   if (input.trackingCode) fields.tracking_code = input.trackingCode;
   if (input.cardLast4) fields.card_last4 = input.cardLast4;
   if (input.paidAt) fields.paid_at = input.paidAt;
+  if (input.paidAmount) fields.paid_amount = String(input.paidAmount);
   if (input.note) fields.reference_note = input.note;
   if (input.discountCode) fields.discount_code = input.discountCode;
 
@@ -188,6 +192,11 @@ export async function submitTrainerPayment(input: {
   } else {
     await api.post("/trainer-billing/requests", fields);
   }
+}
+
+/** The trainer takes back a payment nobody has answered yet. */
+export async function cancelTrainerPayment(id: string): Promise<void> {
+  await api.delete(`/trainer-billing/requests/${id}`);
 }
 
 export interface KeepListAthlete {
@@ -220,6 +229,7 @@ export interface AdminTrainerRequest extends TrainerPaymentRequest {
   last_name: string | null;
   phone: string | null;
   duplicate_tracking: boolean;
+  amount_mismatch?: boolean;
   receipt_expires_at: string | null;
 }
 

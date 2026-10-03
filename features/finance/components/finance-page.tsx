@@ -22,6 +22,8 @@ import {
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { SubscriptionCard } from "@/features/dashboard/components/shared/subscription-card";
+import { CancelRequestButton } from "./cancel-request-button";
+import { cancelPaymentRequest } from "../services/finance-service";
 import { ReceiptViewer } from "./receipt-viewer";
 import { SubmitPaymentRequestDialog } from "./submit-payment-request-dialog";
 import { ClubRevenueSection } from "@/features/revenue";
@@ -165,6 +167,14 @@ export function FinancePage() {
                           <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>
                             {REQUEST_STATUS_LABEL[request.status]}
                           </Badge>
+                          {request.status === "pending" && (
+                            <div className="pt-2">
+                              <CancelRequestButton
+                                onCancel={() => cancelPaymentRequest(request.id)}
+                                queryKeys={[["finance"]]}
+                              />
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {request.tracking_code ? (

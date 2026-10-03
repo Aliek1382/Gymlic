@@ -24,6 +24,7 @@ export interface MyMemberPayment {
   tracking_code: string;
   card_last4: string;
   paid_at: string | null;
+  paid_amount_toman?: number | null;
   note: string | null;
   status: MemberPaymentStatus;
   review_note: string | null;
@@ -76,6 +77,7 @@ export async function submitMemberPayment(input: {
   trackingCode: string;
   cardLast4: string;
   paidAt?: string;
+  paidAmount?: number;
   note?: string;
   discountCode?: string;
   receipt?: File | null;
@@ -86,6 +88,7 @@ export async function submitMemberPayment(input: {
     card_last4: input.cardLast4,
   };
   if (input.paidAt) fields.paid_at = input.paidAt;
+  if (input.paidAmount) fields.paid_amount = String(input.paidAmount);
   if (input.note) fields.note = input.note;
   if (input.discountCode) fields.discount_code = input.discountCode;
 
@@ -94,6 +97,11 @@ export async function submitMemberPayment(input: {
   } else {
     await api.post("/member-payments", fields);
   }
+}
+
+/** The athlete takes back a payment the club has not answered yet. */
+export async function cancelMemberPayment(id: string): Promise<void> {
+  await api.delete(`/member-payments/${id}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +115,7 @@ export interface ClubMemberPayment extends MyMemberPayment {
   last_name: string | null;
   phone: string | null;
   duplicate_tracking: boolean;
+  amount_mismatch?: boolean;
   receipt_expires_at: string | null;
 }
 

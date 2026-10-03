@@ -192,6 +192,9 @@ final class Settings
                 'receipt_required'       => self::bool($v['receipt_required'] ?? null, true),
                 'receipt_max_mb'         => self::int($v['receipt_max_mb'] ?? null, 3, 1, 10),
                 'receipt_retention_days' => self::int($v['receipt_retention_days'] ?? null, 7, 0, 365),
+                // A payment waiting this many days for its reviewer sends the
+                // reviewer one reminder (0 = no reminders). See PaymentReminders.
+                'pending_remind_days'    => self::int($v['pending_remind_days'] ?? null, 3, 0, 30),
                 // Plan limits (Limits): when on, every cap of the trainer and
                 // club plans is enforced: invites and their acceptance, the
                 // free plan for a trainer without a paid one, and suspending

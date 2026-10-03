@@ -183,6 +183,17 @@ final class Migrations
             ],
         ],
         [
+            'id'    => 'payment-checks',
+            'file'  => 'payment-checks-update.sql',
+            'title' => 'مبلغ واریزی اعلام‌شده و یادآور پرداخت‌های بی‌پاسخ',
+            'check' => [
+                ['column', 'trainer_payment_requests', 'paid_amount_toman'],
+                ['column', 'invoice_payment_claims', 'paid_amount_toman'],
+                ['column', 'membership_payment_requests', 'paid_amount_toman'],
+                ['column', 'payment_requests', 'reminded_at'],
+            ],
+        ],
+        [
             'id'    => 'communication',
             'file'  => 'communication-update.sql',
             'title' => 'اعلان همگانی، تیکت پشتیبانی و صفحه‌های متنی (فاز ۷)',
