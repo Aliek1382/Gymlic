@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { JalaliDateField } from "@/components/ui/jalali-date-field";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -25,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { todayIso } from "@/lib/iso-date";
 import { formatToman, toAsciiDigits } from "@/lib/persian";
 import { getErrorMessage } from "@/lib/get-error-message";
 import {
@@ -39,6 +41,7 @@ import {
   type PaymentRequestFormInput,
   type PaymentRequestFormValues,
 } from "../validators/finance-schemas";
+import { AmountToPay } from "./payment-form-bits";
 import { hasPaymentInfo, PaymentInfoCard, PaymentInfoMissing } from "./payment-info-card";
 
 interface Plan {
@@ -70,7 +73,7 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
       referenceNote: "",
       trackingCode: "",
       cardLast4: "",
-      paidAt: "",
+      paidAt: todayIso(),
     },
   });
   const rules = billing?.receipts ?? null;
@@ -157,7 +160,7 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
         referenceNote: "",
         trackingCode: "",
         cardLast4: "",
-        paidAt: "",
+        paidAt: todayIso(),
       });
       setReceipt(null);
       setCode("");
@@ -264,6 +267,8 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
             <PaymentInfoCard info={billing?.payment} />
           )}
 
+          {plan && <AmountToPay amount={quote ? quote.final_toman : plan.priceToman} />}
+
           <div className="space-y-2">
             <Label htmlFor="payment-amount">مبلغ واریزی (تومان)</Label>
             <Input
@@ -345,17 +350,18 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="payment-paid-at">
-                  زمان واریز <span className="text-muted-foreground">(اختیاری)</span>
-                </Label>
-                <Input
-                  id="payment-paid-at"
-                  type="datetime-local"
-                  dir="ltr"
-                  {...form.register("paidAt")}
-                />
-              </div>
+              <Controller
+                control={form.control}
+                name="paidAt"
+                render={({ field }) => (
+                  <JalaliDateField
+                    id="payment-paid-at"
+                    label="تاریخ واریز"
+                    value={field.value ?? todayIso()}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
             </>
           )}
 

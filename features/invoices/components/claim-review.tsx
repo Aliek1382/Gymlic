@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaymentFlags, waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate } from "@/lib/persian";
@@ -73,6 +74,11 @@ export function ClaimReview({ invoice }: { invoice: Invoice }) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="warning">ورزشکار پرداخت را ثبت کرد</Badge>
         {claim.duplicateTracking && <Badge variant="destructive">کد پیگیری تکراری</Badge>}
+        <PaymentFlags
+          mismatch={claim.amountMismatch}
+          paidAmount={claim.paidAmountToman}
+          expected={claim.discountToman > 0 && claim.listPriceToman != null ? claim.listPriceToman - claim.discountToman : invoice.amountToman}
+        />
       </div>
       <div className="space-y-0.5 text-xs text-muted-foreground">
         <p>
@@ -91,6 +97,9 @@ export function ClaimReview({ invoice }: { invoice: Invoice }) {
           مبلغ فاکتور: {formatNumber(invoice.amountToman)} تومان
           {claim.paidAt && <> · واریز: {formatPersianDate(new Date(claim.paidAt.replace(" ", "T")))}</>}
         </p>
+        {waitingDays(claim.createdAt) >= 1 && (
+          <p className="font-medium text-warning">{formatNumber(waitingDays(claim.createdAt))} روز است که منتظر پاسخ شما است</p>
+        )}
         {claim.note && <p>توضیح ورزشکار: {claim.note}</p>}
         {!claim.hasReceipt && claim.receiptPurged && <p>فایل رسید حذف شده است.</p>}
       </div>

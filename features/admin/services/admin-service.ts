@@ -231,6 +231,9 @@ export interface AdminPaymentRequestRow {
   receipt_expires_at?: string | null;
   /** Another request used the same tracking code (admins only). */
   duplicate_tracking?: boolean;
+  /** The amount typed differs from the plan's price (the club typed it). */
+  amount_mismatch?: boolean;
+  plan_price_toman?: number;
 }
 
 export async function listPaymentRequests(): Promise<AdminPaymentRequestRow[]> {

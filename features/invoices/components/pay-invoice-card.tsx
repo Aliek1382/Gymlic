@@ -16,13 +16,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { JalaliDateField } from "@/components/ui/jalali-date-field";
 import { Label } from "@/components/ui/label";
+import { CancelRequestButton } from "@/features/finance/components/cancel-request-button";
+import { AmountToPay, PaidAmountField, parsePaidAmount } from "@/features/finance/components/payment-form-bits";
 import { PaymentInfoCard } from "@/features/finance/components/payment-info-card";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { getBillingInfo, prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
+import { todayIso } from "@/lib/iso-date";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
-import { useSubmitInvoiceClaim } from "../hooks/use-invoice-claims";
+import { useCancelInvoiceClaim, useSubmitInvoiceClaim } from "../hooks/use-invoice-claims";
 import { useMyInvoices } from "../hooks/use-my-invoices";
 import { checkInvoiceDiscount } from "../services/invoice-service";
 
@@ -35,6 +39,7 @@ import { checkInvoiceDiscount } from "../services/invoice-service";
 export function PayInvoiceCard({ invoiceId }: { invoiceId: string }) {
   const mine = useMyInvoices();
   const [open, setOpen] = useState(false);
+  const cancel = useCancelInvoiceClaim();
 
   const invoice = mine.data?.invoices.find((row) => row.id === invoiceId);
   if (!invoice || invoice.status !== "pending") return null;
@@ -47,6 +52,8 @@ export function PayInvoiceCard({ invoiceId }: { invoiceId: string }) {
 
   return (
     <div className="space-y-3 text-start">
+      {hasAccount && !waiting && <AmountToPay amount={invoice.amountToman} />}
+
       {hasAccount ? (
         <PaymentInfoCard
           info={{
@@ -80,6 +87,7 @@ export function PayInvoiceCard({ invoiceId }: { invoiceId: string }) {
           {claim.hasReceipt && (
             <ReceiptViewer requestId={claim.id} kind="invoice-claim" isPdf={claim.receiptIsPdf} />
           )}
+          <CancelRequestButton onCancel={() => cancel.mutateAsync(invoiceId)} queryKeys={[]} />
         </div>
       )}
 
@@ -129,13 +137,15 @@ function ClaimDialog({
   const submit = useSubmitInvoiceClaim();
   const [trackingCode, setTrackingCode] = useState("");
   const [cardLast4, setCardLast4] = useState("");
-  const [paidAt, setPaidAt] = useState("");
+  const [paidAt, setPaidAt] = useState(todayIso());
+  const [paidAmount, setPaidAmount] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [discountText, setDiscountText] = useState("");
   const [quote, setQuote] = useState<DiscountQuote | null>(null);
   const [checking, setChecking] = useState(false);
+  const price = quote ? quote.final_toman : amount;
 
   async function applyCode() {
     if (!discountText.trim()) return;
@@ -170,6 +180,10 @@ function ClaimDialog({
       setError("چهار رقم آخر کارت خود را وارد کنید.");
       return;
     }
+    if (parsePaidAmount(paidAmount ?? String(price)) === null) {
+      setError("مبلغی را که واریز کرده‌اید به تومان وارد کنید.");
+      return;
+    }
     if (rules?.required !== false && !receipt) {
       setError("تصویر یا فایل رسید پرداخت را پیوست کنید.");
       return;
@@ -187,6 +201,7 @@ function ClaimDialog({
         trackingCode: code,
         cardLast4: last4,
         paidAt: paidAt || undefined,
+        paidAmount: parsePaidAmount(paidAmount ?? String(price)) ?? undefined,
         note: note.trim() || undefined,
         discountCode: quote?.code,
         receipt: prepared,
@@ -194,7 +209,8 @@ function ClaimDialog({
       toast.success("پرداخت شما ثبت شد و در انتظار تأیید مربی است.");
       setTrackingCode("");
       setCardLast4("");
-      setPaidAt("");
+      setPaidAt(todayIso());
+      setPaidAmount(null);
       setNote("");
       setReceipt(null);
       setDiscountText("");
@@ -276,6 +292,8 @@ function ClaimDialog({
             </div>
           )}
 
+          <AmountToPay amount={price} />
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="claim-tracking">کد پیگیری واریز</Label>
@@ -333,18 +351,14 @@ function ClaimDialog({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="claim-paid-at">
-              زمان واریز <span className="text-muted-foreground">(اختیاری)</span>
-            </Label>
-            <Input
-              id="claim-paid-at"
-              type="datetime-local"
-              dir="ltr"
-              value={paidAt}
-              onChange={(e) => setPaidAt(e.target.value)}
-            />
-          </div>
+          <PaidAmountField
+            id="claim-paid-amount"
+            value={paidAmount ?? String(price)}
+            onChange={setPaidAmount}
+            expected={price}
+          />
+
+          <JalaliDateField id="claim-paid-at" label="تاریخ واریز" value={paidAt} onChange={setPaidAt} />
 
           <div className="space-y-2">
             <Label htmlFor="claim-note">

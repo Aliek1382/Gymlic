@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   approveInvoiceClaim,
+  cancelInvoiceClaim,
   rejectInvoiceClaim,
   submitInvoiceClaim,
 } from "../services/invoice-service";
@@ -15,6 +16,16 @@ export function useSubmitInvoiceClaim() {
 
   return useMutation({
     mutationFn: submitInvoiceClaim,
+    onSuccess: () => invalidateInvoiceViews(queryClient),
+  });
+}
+
+/** Athlete: takes the claim back while the trainer has not answered it. */
+export function useCancelInvoiceClaim() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: cancelInvoiceClaim,
     onSuccess: () => invalidateInvoiceViews(queryClient),
   });
 }

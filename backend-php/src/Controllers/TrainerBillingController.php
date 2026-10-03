@@ -10,6 +10,8 @@ use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Limits;
+use Gymlic\PaymentCancel;
+use Gymlic\PaymentReminders;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
@@ -17,6 +19,7 @@ use Gymlic\Subscriptions;
 use Gymlic\Templates;
 use Gymlic\Tiers;
 use Gymlic\TrainerBilling;
+use Gymlic\TrackingCodes;
 use Gymlic\TrainerDiscounts;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -58,11 +61,13 @@ final class TrainerBillingController
         )->fetchAll();
 
         $discounts = TrainerDiscounts::ready();
+        $paidCol = Database::hasColumn('trainer_payment_requests', 'paid_amount_toman');
         $stmt = $pdo->prepare(
             'SELECT r.id, r.plan_id, r.amount_toman, r.reference_note, r.tracking_code, r.card_last4, r.paid_at,
                     r.status, r.admin_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE \'%.pdf\') AS receipt_is_pdf,
                     p.name AS plan_name'
+            . ($paidCol ? ', r.paid_amount_toman' : '')
             . ($discounts ? ', r.list_price_toman, r.discount_toman, dc.code AS discount_code' : '') . '
              FROM trainer_payment_requests r JOIN trainer_plans p ON p.id = r.plan_id'
             . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '') . '
@@ -79,7 +84,7 @@ final class TrainerBillingController
             'limits'       => Limits::forTrainer($pdo, $user['id']),
             'plans'        => Cast::rows($plans, [], ['price_toman', 'duration_days', 'max_athletes', 'max_custom_exercises', 'max_templates', 'history_months']),
             'discounts_enabled' => $discounts,
-            'requests'     => Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf']),
+            'requests'     => Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf']),
             'receipts'     => [
                 'required'       => $billing['receipt_required'],
                 'max_mb'         => $billing['receipt_max_mb'],
@@ -146,7 +151,7 @@ final class TrainerBillingController
         if ($free) {
             $fields = ['row' => ['tracking_code' => 'DISCOUNT', 'card_last4' => '0000', 'paid_at' => null]];
         } else {
-            $fields = Receipts::parseFields($data);
+            $fields = Receipts::parseFields($data, Database::hasColumn('trainer_payment_requests', 'paid_amount_toman'));
             if (isset($fields['error'])) {
                 Response::error(400, $fields['error'][0], $fields['error'][1]);
                 return;
@@ -179,6 +184,9 @@ final class TrainerBillingController
             'paid_at'       => $fields['row']['paid_at'],
             'receipt_path'  => $file,
         ];
+        if (isset($fields['row']['paid_amount_toman'])) {
+            $row['paid_amount_toman'] = $fields['row']['paid_amount_toman'];
+        }
 
         $pdo->beginTransaction();
         try {
@@ -300,6 +308,13 @@ final class TrainerBillingController
         readfile($path);
     }
 
+    /** DELETE /trainer-billing/requests/{id}: the trainer takes back a request nobody has answered. */
+    public static function cancel(array $params): void
+    {
+        $user = Auth::requireUser();
+        PaymentCancel::respond(PaymentCancel::own('trainer_payment_requests', $params['id'], $user['id']));
+    }
+
     /**
      * GET /trainer-billing/athletes: the athletes the trainer coaches outside
      * a club, for choosing which stay active on the free plan.
@@ -395,14 +410,16 @@ final class TrainerBillingController
         }
 
         $pdo = Database::connection();
+        PaymentReminders::sendIfDue($pdo);
         $discounts = TrainerDiscounts::ready();
+        $paidCol = Database::hasColumn('trainer_payment_requests', 'paid_amount_toman');
         $rows = $pdo->query(
             "SELECT r.id, r.trainer_id, r.plan_id, r.amount_toman, r.reference_note, r.tracking_code, r.card_last4,
                     r.paid_at, r.status, r.admin_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE '%.pdf') AS receipt_is_pdf,
                     p.name AS plan_name, t.first_name, t.last_name, t.phone,
-                    (r.tracking_code <> 'DISCOUNT' AND EXISTS (SELECT 1 FROM trainer_payment_requests o
-                            WHERE o.tracking_code = r.tracking_code AND o.id <> r.id)) AS duplicate_tracking"
+                    " . TrackingCodes::duplicateExpr('trainer_payment_requests', 'r') . " AS duplicate_tracking"
+            . ($paidCol ? ', r.paid_amount_toman, (r.paid_amount_toman IS NOT NULL AND r.paid_amount_toman <> r.amount_toman) AS amount_mismatch' : '')
             . ($discounts ? ', r.list_price_toman, r.discount_toman, dc.code AS discount_code' : '') . "
              FROM trainer_payment_requests r
              JOIN trainer_plans p ON p.id = r.plan_id
@@ -410,7 +427,7 @@ final class TrainerBillingController
             . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '') . "
              ORDER BY r.created_at DESC LIMIT 500"
         )->fetchAll();
-        $rows = Cast::rows($rows, [], ['amount_toman', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
+        $rows = Cast::rows($rows, [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']);
 
         // When the file goes: the retention days after the review.
         $days = Settings::get('billing')['receipt_retention_days'];

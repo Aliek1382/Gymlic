@@ -11,10 +11,13 @@ use Gymlic\Database;
 use Gymlic\DiscountCodes;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
+use Gymlic\PaymentCancel;
+use Gymlic\PaymentReminders;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Subscriptions;
+use Gymlic\TrackingCodes;
 use Gymlic\Templates;
 use Gymlic\Uuid;
 use Gymlic\Validate;
@@ -146,10 +149,12 @@ final class MemberPaymentController
             );
             $plans->execute(['id' => $row['club_id']]);
 
+            $paidCol = Database::hasColumn('membership_payment_requests', 'paid_amount_toman');
             $requests = $pdo->prepare(
                 "SELECT r.id, r.plan_name, r.amount_toman, r.tracking_code, r.card_last4, r.paid_at, r.note, r.status,
                         r.review_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                         (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE '%.pdf') AS receipt_is_pdf"
+                . ($paidCol ? ', r.paid_amount_toman' : '')
                 . ($discounts ? ', r.list_price_toman, r.discount_toman, d.code AS discount_code' : '') . "
                  FROM membership_payment_requests r"
                 . ($discounts ? ' LEFT JOIN club_discount_codes d ON d.id = r.discount_code_id' : '') . "
@@ -157,7 +162,7 @@ final class MemberPaymentController
                  ORDER BY r.created_at DESC LIMIT 20"
             );
             $requests->execute(['club' => $row['club_id'], 'athlete' => $user['id']]);
-            $requests = Cast::rows($requests->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf']);
+            $requests = Cast::rows($requests->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf']);
 
             $expires = $row['expires_at'];
             $clubs[] = [
@@ -293,7 +298,7 @@ final class MemberPaymentController
             }
         }
 
-        $fields = Receipts::parseFields($data);
+        $fields = Receipts::parseFields($data, Database::hasColumn('membership_payment_requests', 'paid_amount_toman'));
         if (isset($fields['error'])) {
             Response::error(400, $fields['error'][0], $fields['error'][1]);
             return;
@@ -330,6 +335,9 @@ final class MemberPaymentController
             'note'          => self::text($data['note'] ?? '', 500),
             'receipt_path'  => $file,
         ];
+        if (isset($fields['row']['paid_amount_toman'])) {
+            $row['paid_amount_toman'] = $fields['row']['paid_amount_toman'];
+        }
 
         $pdo->beginTransaction();
         try {
@@ -428,14 +436,16 @@ final class MemberPaymentController
         }
 
         $pdo = Database::connection();
+        PaymentReminders::sendIfDue($pdo);
         $discounts = DiscountCodes::clubReady();
+        $paidCol = Database::hasColumn('membership_payment_requests', 'paid_amount_toman');
         $stmt = $pdo->prepare(
             "SELECT r.id, r.athlete_id, r.plan_name, r.duration_days, r.amount_toman, r.tracking_code, r.card_last4,
                     r.paid_at, r.note, r.status, r.review_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE '%.pdf') AS receipt_is_pdf,
                     a.first_name, a.last_name, a.phone,
-                    EXISTS (SELECT 1 FROM membership_payment_requests o
-                            WHERE o.club_id = r.club_id AND o.tracking_code = r.tracking_code AND o.id <> r.id) AS duplicate_tracking"
+                    " . TrackingCodes::duplicateExpr('membership_payment_requests', 'r') . " AS duplicate_tracking"
+            . ($paidCol ? ', r.paid_amount_toman, (r.paid_amount_toman IS NOT NULL AND r.paid_amount_toman <> r.amount_toman) AS amount_mismatch' : '')
             . ($discounts ? ', r.list_price_toman, r.discount_toman, d.code AS discount_code' : '') . "
              FROM membership_payment_requests r
              JOIN profiles a ON a.id = r.athlete_id"
@@ -443,7 +453,7 @@ final class MemberPaymentController
              WHERE r.club_id = :club ORDER BY r.created_at DESC LIMIT 500"
         );
         $stmt->execute(['club' => $params['id']]);
-        $rows = Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'duration_days', 'list_price_toman', 'discount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking']);
+        $rows = Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'duration_days', 'list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']);
 
         // When the file goes: the retention days after the review.
         $days = Settings::get('billing')['receipt_retention_days'];
@@ -598,6 +608,13 @@ final class MemberPaymentController
         );
 
         Response::ok(['ok' => true]);
+    }
+
+    /** DELETE /member-payments/{id}: the athlete takes back a request the club has not answered. */
+    public static function cancel(array $params): void
+    {
+        $user = Auth::requireUser();
+        PaymentCancel::respond(PaymentCancel::own('membership_payment_requests', $params['id'], $user['id']));
     }
 
     /** DELETE /member-payments/{id}/receipt: remove one file now. */

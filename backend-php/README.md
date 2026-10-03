@@ -256,6 +256,33 @@ simply off.
   the club/trainer split), its CSV, the overview's total revenue and pending
   count, and a new CSV `GET /admin/export/trainer-payments`.
 
+### Payment checks (`schema/payment-checks-update.sql`)
+
+Applies to all four card-to-card paths; each part degrades to the old behaviour
+until the SQL has run.
+
+- **Amount transferred**: the payer types what they actually sent
+  (`paid_amount_toman` on trainer, member and invoice payments; the club's
+  subscription request already has its typed amount). It is required once the
+  column exists. The reviewer's list flags `amount_mismatch` when it differs
+  from what was owed (for a club request: from the plan price).
+- **Duplicate tracking codes**: `src/TrackingCodes.php` flags a code that also
+  sits on another pending or approved request in any of the four tables. It is
+  a warning only; banks do reuse short codes.
+- **Cancel**: the payer may delete their own pending request and its receipt
+  (`DELETE /payment-requests/{id}`, `/trainer-billing/requests/{id}`,
+  `/member-payments/{id}`, `/invoices/{id}/claim`; `src/PaymentCancel.php`).
+  Approved or rejected requests stay.
+- **Reminders** (`cron/payment-review-reminders.php`, once a day): one
+  `payment_review_waiting` notification per reviewer (finance admins, club
+  owner, trainer) for requests pending longer than the billing setting
+  `pending_remind_days` (default 3, 0 = off), repeated after another full
+  interval (`reminded_at`). Without cron it also runs at most every six hours
+  when a reviewer opens a payment list.
+  ```
+  45 8 * * * php /home/USER/path/to/backend-php/cron/payment-review-reminders.php
+  ```
+
 ### Plans and limits for trainers and clubs (phase 1)
 
 The database step is `schema/plan-limits-update.sql` (after the two trainer

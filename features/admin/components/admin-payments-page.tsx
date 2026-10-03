@@ -20,6 +20,7 @@ import { listPaymentRequests, type AdminPaymentRequestRow } from "../services/ad
 import { ExportButton } from "./export-button";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { PaymentRequestActions } from "@/features/admin/components/payment-request-actions";
+import { waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import type { PaymentRequestStatus } from "@/types/database.types";
 
@@ -57,6 +58,8 @@ type RequestRow = Pick<
   | "receipt_purged_at"
   | "receipt_expires_at"
   | "duplicate_tracking"
+  | "amount_mismatch"
+  | "plan_price_toman"
 >;
 
 function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions: boolean }) {
@@ -98,6 +101,11 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
             </TableCell>
             <TableCell className="text-muted-foreground">
               {formatToman(request.amount_toman)} تومان
+              {request.amount_mismatch && request.status === "pending" && (
+                <p className="text-xs font-medium text-warning">
+                  با قیمت پلن ({formatNumber(request.plan_price_toman ?? 0)} تومان) فرق دارد
+                </p>
+              )}
               {!!request.discount_toman && request.discount_toman > 0 && (
                 <p className="text-xs">
                   {request.list_price_toman != null && (
@@ -153,6 +161,11 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
             </TableCell>
             <TableCell className="text-muted-foreground">
               {formatPersianDate(new Date(request.created_at))}
+              {request.status === "pending" && waitingDays(request.created_at) >= 1 && (
+                <p className="text-xs font-medium text-warning">
+                  {formatNumber(waitingDays(request.created_at))} روز در انتظار
+                </p>
+              )}
             </TableCell>
             <TableCell>
               <Badge variant={STATUS_VARIANT[request.status]}>

@@ -48,6 +48,8 @@ interface ClaimRow {
   receipt_is_pdf: boolean;
   receipt_purged_at: string | null;
   duplicate_tracking: boolean;
+  paid_amount_toman?: number | null;
+  amount_mismatch?: boolean;
   discount_code?: string | null;
   list_price_toman?: number | null;
   discount_toman?: number;
@@ -77,6 +79,8 @@ function toClaim(row: ClaimRow | null | undefined): InvoiceClaim | null {
     receiptIsPdf: row.receipt_is_pdf,
     receiptPurged: row.receipt_purged_at !== null,
     duplicateTracking: row.duplicate_tracking,
+    paidAmountToman: row.paid_amount_toman ?? null,
+    amountMismatch: row.amount_mismatch ?? false,
     discountCode: row.discount_code ?? null,
     listPriceToman: row.list_price_toman ?? null,
     discountToman: row.discount_toman ?? 0,
@@ -178,6 +182,7 @@ export async function submitInvoiceClaim(input: {
   trackingCode: string;
   cardLast4: string;
   paidAt?: string;
+  paidAmount?: number;
   note?: string;
   discountCode?: string;
   receipt?: File | null;
@@ -187,6 +192,7 @@ export async function submitInvoiceClaim(input: {
     card_last4: input.cardLast4,
   };
   if (input.paidAt) fields.paid_at = input.paidAt;
+  if (input.paidAmount) fields.paid_amount = String(input.paidAmount);
   if (input.note) fields.note = input.note;
   if (input.discountCode) fields.discount_code = input.discountCode;
 
@@ -196,6 +202,11 @@ export async function submitInvoiceClaim(input: {
   } else {
     await api.post(path, fields);
   }
+}
+
+/** The athlete takes back a claim the trainer has not answered yet. */
+export async function cancelInvoiceClaim(invoiceId: string): Promise<void> {
+  await api.delete(`/invoices/${invoiceId}/claim`);
 }
 
 /** The money arrived: settles the invoice and opens the plan for the athlete. */

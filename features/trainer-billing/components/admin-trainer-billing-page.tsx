@@ -32,6 +32,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
+import { PaymentFlags, waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman, toAsciiDigits } from "@/lib/persian";
@@ -230,6 +231,11 @@ function RequestsTab({ rows }: { rows: AdminTrainerRequest[] }) {
                       <p className="text-xs">واریز: {formatPersianDate(parseDate(request.paid_at))}</p>
                     )}
                     {request.duplicate_tracking && <Badge variant="warning">کد پیگیری تکراری</Badge>}
+                    <PaymentFlags
+                      mismatch={request.amount_mismatch}
+                      paidAmount={request.paid_amount_toman}
+                      expected={request.amount_toman}
+                    />
                   </div>
                   )}
                 </TableCell>
@@ -250,6 +256,11 @@ function RequestsTab({ rows }: { rows: AdminTrainerRequest[] }) {
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatPersianDate(parseDate(request.created_at))}
+                  {request.status === "pending" && waitingDays(request.created_at) >= 1 && (
+                    <p className="text-xs font-medium text-warning">
+                      {formatNumber(waitingDays(request.created_at))} روز در انتظار
+                    </p>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[request.status]}>{STATUS_LABEL[request.status]}</Badge>

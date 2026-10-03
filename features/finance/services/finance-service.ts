@@ -40,6 +40,11 @@ export async function submitPaymentRequest(input: SubmitPaymentRequestInput) {
   await api.upload("/payment-requests", input.receipt, text, "receipt");
 }
 
+/** The club takes back a request the admin has not answered yet. */
+export async function cancelPaymentRequest(id: string): Promise<void> {
+  await api.delete(`/payment-requests/${id}`);
+}
+
 /**
  * Shrinks a receipt photo in the browser before it is sent (the server
  * shrinks it again, but this keeps the upload small on a slow phone

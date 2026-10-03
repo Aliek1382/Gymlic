@@ -33,6 +33,7 @@ import { RoleGate } from "@/features/authentication/components/role-gate";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
 import { ErrorState } from "@/features/dashboard/components/shared/error-state";
+import { PaymentFlags, waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
@@ -228,6 +229,11 @@ function PaymentRow({
           </p>
           {payment.paid_at && <p className="text-xs">واریز: {formatPersianDate(parseDate(payment.paid_at))}</p>}
           {payment.duplicate_tracking && <Badge variant="warning">کد پیگیری تکراری</Badge>}
+          <PaymentFlags
+            mismatch={payment.amount_mismatch}
+            paidAmount={payment.paid_amount_toman}
+            expected={payment.amount_toman}
+          />
         </div>
       </TableCell>
       <TableCell className="text-muted-foreground">
@@ -245,7 +251,14 @@ function PaymentRow({
           "—"
         )}
       </TableCell>
-      <TableCell className="text-muted-foreground">{formatPersianDate(parseDate(payment.created_at))}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {formatPersianDate(parseDate(payment.created_at))}
+        {payment.status === "pending" && waitingDays(payment.created_at) >= 1 && (
+          <p className="text-xs font-medium text-warning">
+            {formatNumber(waitingDays(payment.created_at))} روز در انتظار
+          </p>
+        )}
+      </TableCell>
       <TableCell>
         <Badge variant={STATUS_VARIANT[payment.status]}>{STATUS_LABEL[payment.status]}</Badge>
         {payment.review_note && <p className="mt-1 max-w-40 truncate text-xs text-muted-foreground">{payment.review_note}</p>}

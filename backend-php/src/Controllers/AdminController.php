@@ -11,6 +11,8 @@ use Gymlic\Database;
 use Gymlic\Discounts;
 use Gymlic\Jalali;
 use Gymlic\Limits;
+use Gymlic\PaymentCancel;
+use Gymlic\PaymentReminders;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Security;
@@ -18,6 +20,7 @@ use Gymlic\Settings;
 use Gymlic\SmsGateway;
 use Gymlic\Subscriptions;
 use Gymlic\Templates;
+use Gymlic\TrackingCodes;
 use Gymlic\Tiers;
 use Gymlic\TrainerBilling;
 use Gymlic\TrainerVerification;
@@ -29,6 +32,13 @@ use Throwable;
 final class AdminController
 {
     // ---- Club-side: filing a payment claim -------------------------------
+
+    /** DELETE /payment-requests/{id}: the club owner takes back a request nobody has answered. */
+    public static function cancelPaymentRequest(array $params): void
+    {
+        $user = Auth::requireUser();
+        PaymentCancel::respond(PaymentCancel::own('payment_requests', $params['id'], $user['id']));
+    }
 
     /** submit_payment_request (0023): a club owner files an offline payment. */
     public static function submitPaymentRequest(): void
@@ -193,6 +203,9 @@ final class AdminController
         $user = Auth::requireUser();
         // A finance role reviews every club's requests, like a super admin.
         $isAdmin = AdminAccess::can($user, 'finance');
+        if ($isAdmin) {
+            PaymentReminders::sendIfDue(Database::connection());
+        }
 
         $discounts = Discounts::ready();
         $receipts = Receipts::ready();
@@ -206,11 +219,13 @@ final class AdminController
                 ? ', pr.tracking_code, pr.card_last4, pr.paid_at, pr.receipt_purged_at,
                     (pr.receipt_path IS NOT NULL) AS has_receipt,
                     (pr.receipt_path LIKE \'%.pdf\') AS receipt_is_pdf,
-                    (pr.tracking_code IS NOT NULL AND EXISTS (
-                        SELECT 1 FROM payment_requests o
-                        WHERE o.tracking_code = pr.tracking_code AND o.id <> pr.id
-                    )) AS duplicate_tracking'
-                : '') . '
+                    ' . TrackingCodes::duplicateExpr('payment_requests', 'pr') . ' AS duplicate_tracking'
+                : '')
+            // The club typed the amount: flag it when it is not what the plan
+            // costs (with any discount), unless an admin recorded it by hand.
+            . ', (pr.submitted_by = c.owner_id AND pr.amount_toman <> '
+            . ($discounts ? 'COALESCE(pr.list_price_toman, p.price_toman) - pr.discount_toman' : 'p.price_toman')
+            . ') AS amount_mismatch, p.price_toman AS plan_price_toman
              FROM payment_requests pr
              JOIN clubs c ON c.id = pr.club_id
              JOIN plans p ON p.id = pr.plan_id'
@@ -229,8 +244,8 @@ final class AdminController
         $rows = Cast::rows(
             $stmt->fetchAll(),
             [],
-            ['amount_toman', 'list_price_toman', 'discount_toman'],
-            ['recorded_by_admin', 'has_receipt', 'receipt_is_pdf', 'duplicate_tracking']
+            ['amount_toman', 'list_price_toman', 'discount_toman', 'plan_price_toman'],
+            ['recorded_by_admin', 'has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']
         );
 
         if ($receipts) {

@@ -23,6 +23,9 @@ export interface InvoiceClaim {
   receiptPurged: boolean;
   /** Another claim to the same trainer used this tracking code (trainer's view). */
   duplicateTracking: boolean;
+  /** What the athlete says they transferred, and whether it differs from what was owed. */
+  paidAmountToman: number | null;
+  amountMismatch: boolean;
   /** The trainer's discount code the athlete paid with, and what it took off. */
   discountCode: string | null;
   listPriceToman: number | null;
