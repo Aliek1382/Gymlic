@@ -5,6 +5,7 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { OfflineBanner } from "@/components/pwa/offline-banner";
 import { OfflineSync } from "@/components/pwa/offline-sync";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { BrandTheme } from "@/components/brand/brand-theme";
 import { ErrorReporter } from "@/components/providers/error-reporter";
 import { ViewAsBanner } from "@/features/view-as/components/view-as-banner";
@@ -79,6 +80,10 @@ export default function RootLayout({
           {children}
           <Toaster position="top-center" richColors dir="rtl" />
         </QueryProvider>
+        {/* Outside QueryProvider, which renders nothing until the offline
+            cache is restored: the eNamad crawler reads the seal from the
+            static HTML and never runs the app. */}
+        <SiteFooter />
       </body>
     </html>
   );
