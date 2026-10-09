@@ -3,6 +3,7 @@ import { compressImageToBlob } from "@/lib/image-compression";
 
 export interface SubmitPaymentRequestInput {
   planId: string;
+  /** Only read by an older backend: the server sets the amount. */
   amountToman: number;
   referenceNote?: string;
   discountCode?: string;
@@ -109,10 +110,40 @@ export interface PaymentInfo {
   instructions: string;
 }
 
+/**
+ * What buying one plan costs now. While a paid plan runs, a dearer plan is an
+ * upgrade at only the difference of the two prices (the end date stays); a
+ * cheaper or same-price one is locked until the period ends.
+ */
+export type PlanPurchase =
+  | { kind: "new" | "renew" | "upgrade"; price_toman: number }
+  | { kind: "locked"; message: string };
+
+export interface PurchaseOptions {
+  /** False until the plan-upgrade database update: a dearer plan is then sold as before. */
+  ready: boolean;
+  /** The paid plan running now (before its end date), with its price now. */
+  current: { plan_id: string | null; plan_name: string; price_toman: number | null; expires_at: string } | null;
+  /** By plan id. */
+  plans: Record<string, PlanPurchase>;
+}
+
+/** Kind of a payment request, once the plan-upgrade update has run. */
+export type PurchaseKind = "new" | "renew" | "upgrade" | "switch";
+
+export const PURCHASE_KIND_LABEL: Record<PurchaseKind, string> = {
+  new: "خرید",
+  renew: "تمدید",
+  upgrade: "ارتقا",
+  switch: "تغییر پلن توسط مدیریت",
+};
+
 export interface BillingInfo {
   payment: PaymentInfo;
   /** False until the database has the discount-code tables. */
   discounts_enabled: boolean;
+  /** For a club owner: what each plan costs now. Absent from an older backend. */
+  purchase?: PurchaseOptions | null;
   /** What the dialog asks for besides the amount; null until the receipts database update has run. */
   receipts: ReceiptRules | null;
 }

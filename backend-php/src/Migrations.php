@@ -318,6 +318,15 @@ final class Migrations
             'title' => 'پلن رایگان باشگاه و ثبت‌نام باشگاه بدون تأیید ادمین',
             'check' => [['column', 'plans', 'is_free'], ['row', 'plans', '7c000000-0000-4000-8000-000000000001']],
         ],
+        [
+            'id'    => 'plan-upgrade',
+            'file'  => 'plan-upgrade-update.sql',
+            'title' => 'ارتقای پلن با پرداخت تفاوت قیمت',
+            'check' => [
+                ['column', 'payment_requests', 'purchase_kind'], ['column', 'payment_requests', 'from_price_toman'],
+                ['column', 'trainer_payment_requests', 'purchase_kind'], ['column', 'trainer_payment_requests', 'from_price_toman'],
+            ],
+        ],
     ];
 
     /**

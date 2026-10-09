@@ -24,6 +24,7 @@ import { useAuthContext } from "@/features/authentication/hooks/use-auth-context
 import { SubscriptionCard } from "@/features/dashboard/components/shared/subscription-card";
 import { CancelRequestButton } from "./cancel-request-button";
 import { cancelPaymentRequest } from "../services/finance-service";
+import { PurchaseKindNote } from "./payment-form-bits";
 import { ReceiptViewer } from "./receipt-viewer";
 import { SubmitPaymentRequestDialog } from "./submit-payment-request-dialog";
 import { ClubRevenueSection } from "@/features/revenue";
@@ -120,7 +121,10 @@ export function FinancePage() {
               <p className="text-sm text-muted-foreground">
                 اشتراک باشگاه شما در جیم‌لیک و تاریخچه‌ی درخواست‌های پرداخت آن.
               </p>
-              <SubmitPaymentRequestDialog plans={availablePlans} />
+              <SubmitPaymentRequestDialog
+                plans={availablePlans}
+                waiting={requestRows.some((request) => request.status === "pending")}
+              />
             </div>
 
             <SubscriptionCard
@@ -162,6 +166,7 @@ export function FinancePage() {
                       <TableRow key={request.id}>
                         <TableCell className="text-foreground">
                           {request.plan_name}
+                          <PurchaseKindNote kind={request.purchase_kind} from={request.from_plan_name} />
                           {request.recorded_by_admin && (
                             <p className="text-xs text-muted-foreground">ثبت توسط مدیریت</p>
                           )}

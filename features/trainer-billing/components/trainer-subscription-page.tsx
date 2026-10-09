@@ -39,7 +39,7 @@ import {
   PaymentInfoMissing,
 } from "@/features/finance/components/payment-info-card";
 import { CancelRequestButton } from "@/features/finance/components/cancel-request-button";
-import { AmountToPay, PaidAmountField, parsePaidAmount } from "@/features/finance/components/payment-form-bits";
+import { AmountToPay, PaidAmountField, parsePaidAmount, PurchaseKindNote, UpgradeNote } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { prepareReceipt, type DiscountQuote } from "@/features/finance/services/finance-service";
 import { todayIso } from "@/lib/iso-date";
@@ -122,8 +122,10 @@ function Content({ data }: { data: TrainerBillingOverview }) {
             <CardTitle className="text-base">پلن‌ها</CardTitle>
             <CardDescription>
               پلن را انتخاب و به کارت پلتفرم واریز کنید، بعد کد پیگیری و رسید را ثبت کنید. بعد از
-              تأیید مدیریت، تمدید همان پلن به روزهای باقی‌ماندهٔ قبلی اضافه می‌شود؛ پلن دیگری از همان
-              روز تأیید با مدت کامل شروع می‌شود.
+              تأیید مدیریت، تمدید همان پلن به روزهای باقی‌ماندهٔ قبلی اضافه می‌شود.{" "}
+              {data.purchase?.ready
+                ? "تا پلن فعلی تمام نشده، ارتقا به پلن گران‌تر فقط تفاوت قیمت دو پلن را دارد و تاریخ پایان همان می‌ماند؛ پلن ارزان‌تر را بعد از پایان دوره می‌توانید بخرید."
+                : "پلن دیگری از همان روز تأیید با مدت کامل شروع می‌شود."}
             </CardDescription>
           </div>
           {plans.length === 0 ? (
@@ -170,7 +172,10 @@ function Content({ data }: { data: TrainerBillingOverview }) {
             <TableBody>
               {requests.map((request) => (
                 <TableRow key={request.id}>
-                  <TableCell className="text-foreground">{request.plan_name}</TableCell>
+                  <TableCell className="text-foreground">
+                    {request.plan_name}
+                    <PurchaseKindNote kind={request.purchase_kind} from={request.from_plan_name} />
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatToman(request.amount_toman)} تومان
                     {!!request.discount_toman && request.discount_toman > 0 && (
@@ -356,12 +361,20 @@ function PlanCard({
   const current = data.limits?.ready
     ? data.limits.plan.id === plan.id && data.limits.status !== "expired"
     : data.subscription?.plan_name === plan.name && data.subscription.status !== "expired";
+  const purchase = data.purchase?.plans[plan.id];
+  const locked = purchase?.kind === "locked";
+  const upgrade = purchase?.kind === "upgrade";
 
   return (
     <div className="flex flex-col justify-between gap-3 rounded-xl border border-border p-4">
       <div className="space-y-1">
         <p className="font-medium text-foreground">{plan.name}</p>
         <p className="text-lg font-bold text-foreground">{formatToman(plan.price_toman)} تومان</p>
+        {upgrade && (
+          <p className="text-xs font-medium text-success">
+            ارتقا از «{data.purchase?.current?.plan_name}»: فقط {formatToman(purchase.price_toman)} تومان
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {formatNumber(plan.duration_days)} روز ·{" "}
           {plan.max_athletes != null ? `تا ${formatNumber(plan.max_athletes)} ورزشکار` : "ورزشکار نامحدود"}
@@ -375,8 +388,9 @@ function PlanCard({
           </ul>
         )}
       </div>
-      <Button size="sm" disabled={disabled} onClick={() => setOpen(true)}>
-        {current ? "تمدید" : "خرید"}
+      {locked && <p className="text-xs text-muted-foreground">{purchase.message}</p>}
+      <Button size="sm" disabled={disabled || locked} onClick={() => setOpen(true)}>
+        {locked ? "پس از پایان دوره" : upgrade ? "ارتقا" : current || purchase?.kind === "renew" ? "تمدید" : "خرید"}
       </Button>
       <PaymentDialog plan={plan} data={data} open={open} onOpenChange={setOpen} />
     </div>
@@ -408,9 +422,13 @@ function PaymentDialog({
   const [quote, setQuote] = useState<DiscountQuote | null>(null);
   const [checking, setChecking] = useState(false);
 
+  // An upgrade costs only the difference of the two prices (the server's quote).
+  const purchase = data.purchase?.plans[plan.id];
+  const upgrade = purchase?.kind === "upgrade";
+  const listPrice = purchase && purchase.kind !== "locked" ? purchase.price_toman : plan.price_toman;
   // A code that covers the whole price leaves nothing to pay: no card, code or receipt.
   const free = quote !== null && quote.final_toman === 0;
-  const price = quote ? quote.final_toman : plan.price_toman;
+  const price = quote ? quote.final_toman : listPrice;
 
   async function applyCode() {
     if (!discountText.trim()) return;
@@ -488,12 +506,21 @@ function PaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>ثبت پرداخت پلن «{plan.name}»</DialogTitle>
+          <DialogTitle>{upgrade ? `ارتقا به پلن «${plan.name}»` : `ثبت پرداخت پلن «${plan.name}»`}</DialogTitle>
           <DialogDescription>
             {free
               ? "با این کد تخفیف چیزی برای پرداخت نمی‌ماند؛ درخواست را ثبت کنید تا مدیریت تأیید کند."
               : `مبلغ ${formatToman(price)} تومان را به کارت زیر واریز کنید و بعد اطلاعات پرداخت را ثبت کنید.`}
           </DialogDescription>
+          {upgrade && data.purchase?.current && (
+            <UpgradeNote
+              from={data.purchase.current.plan_name}
+              fromPrice={data.purchase.current.price_toman ?? 0}
+              to={plan.name}
+              toPrice={plan.price_toman}
+              expiresAt={data.purchase.current.expires_at}
+            />
+          )}
         </DialogHeader>
 
         <div className="space-y-4">

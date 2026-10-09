@@ -128,6 +128,26 @@ final class Subscriptions
     }
 
     /**
+     * Moves the club's subscription to another plan, its start and end
+     * dates as they are: an upgrade paid by the price difference, or the
+     * admin's «تغییر پلن». The plan's member cap and tier come with it, an
+     * admin's override goes. Returns the end date, or null when the club has
+     * no subscription to move. Call inside a transaction.
+     */
+    public static function switchPlan(PDO $pdo, string $clubId, string $planId, string $planName): ?string
+    {
+        $current = self::latest($pdo, $clubId, true);
+        if ($current === null) {
+            return null;
+        }
+        self::write($pdo, $clubId, $current, $planName, $planId, null, (string) $current['expires_at'], true);
+        Tiers::setClubTier($pdo, $clubId, Tiers::planTier($pdo, 'plans', $planId));
+        $pdo->prepare('UPDATE clubs SET member_capacity = (SELECT max_members FROM plans WHERE id = :plan) WHERE id = :id')
+            ->execute(['plan' => $planId, 'id' => $clubId]);
+        return (string) $current['expires_at'];
+    }
+
+    /**
      * Puts the subscription exactly where the admin chose. $startedAt null
      * keeps the current start; $planId null keeps the current plan.
      */

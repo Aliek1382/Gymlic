@@ -6,6 +6,8 @@ import type {
 import type {
   DiscountQuote,
   PaymentInfo,
+  PurchaseKind,
+  PurchaseOptions,
   ReceiptRules,
 } from "@/features/finance/services/finance-service";
 
@@ -140,6 +142,10 @@ export interface TrainerPaymentRequest {
   list_price_toman?: number | null;
   discount_toman?: number;
   discount_code?: string | null;
+  /** Present once the plan-upgrade database update has run (null for older requests). */
+  purchase_kind?: PurchaseKind | null;
+  from_plan_name?: string | null;
+  from_price_toman?: number | null;
 }
 
 export interface TrainerBillingOverview {
@@ -152,6 +158,8 @@ export interface TrainerBillingOverview {
   athletes?: { active: number; pending_invites: number };
   limits?: TrainerLimits;
   plans?: TrainerPlan[];
+  /** What each plan costs now (upgrade by the difference, cheaper locked). */
+  purchase?: PurchaseOptions;
   requests?: TrainerPaymentRequest[];
   /** False until the discount-code tables exist. */
   discounts_enabled?: boolean;

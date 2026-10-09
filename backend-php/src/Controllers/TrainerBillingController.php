@@ -12,6 +12,7 @@ use Gymlic\Jalali;
 use Gymlic\Limits;
 use Gymlic\PaymentCancel;
 use Gymlic\PaymentReminders;
+use Gymlic\PlanChange;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
@@ -69,9 +70,11 @@ final class TrainerBillingController
                     (r.receipt_path IS NOT NULL) AS has_receipt, (r.receipt_path LIKE \'%.pdf\') AS receipt_is_pdf,
                     p.name AS plan_name'
             . ($paidCol ? ', r.paid_amount_toman' : '')
+            . (PlanChange::ready('trainer_payment_requests') ? ', r.purchase_kind, r.from_price_toman, fp.name AS from_plan_name' : '')
             . ($discounts ? ', r.list_price_toman, r.discount_toman, dc.code AS discount_code' : '') . '
              FROM trainer_payment_requests r JOIN trainer_plans p ON p.id = r.plan_id'
-            . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '') . '
+            . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '')
+            . (PlanChange::ready('trainer_payment_requests') ? ' LEFT JOIN trainer_plans fp ON fp.id = r.from_plan_id' : '') . '
              WHERE r.trainer_id = :id ORDER BY r.created_at DESC LIMIT 50'
         );
         $stmt->execute(['id' => $user['id']]);
@@ -84,8 +87,11 @@ final class TrainerBillingController
             'athletes'     => TrainerBilling::athleteCounts($pdo, $user['id']),
             'limits'       => Limits::forTrainer($pdo, $user['id']),
             'plans'        => Cast::rows($plans, [], ['price_toman', 'duration_days', 'max_athletes', 'max_custom_exercises', 'max_templates', 'history_months']),
+            // What each plan costs now: the full price, or only the difference
+            // as an upgrade of the plan running; a cheaper one waits (PlanChange).
+            'purchase'     => PlanChange::options(PlanChange::trainerCurrent($pdo, $user['id']), $plans, 'trainer_payment_requests'),
             'discounts_enabled' => $discounts,
-            'requests'     => Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf']),
+            'requests'     => Cast::rows($stmt->fetchAll(), [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman', 'from_price_toman'], ['has_receipt', 'receipt_is_pdf']),
             'receipts'     => [
                 'required'       => $billing['receipt_required'],
                 'max_mb'         => $billing['receipt_max_mb'],
@@ -128,6 +134,15 @@ final class TrainerBillingController
             return;
         }
 
+        // The full price, or only the difference as an upgrade; a cheaper
+        // plan waits until the running one ends. A code is on what is paid.
+        $purchase = PlanChange::quote(PlanChange::trainerCurrent($pdo, $user['id']), $plan, 'trainer_payment_requests');
+        if ($purchase['kind'] === 'locked') {
+            PlanChange::lockedError($purchase);
+            return;
+        }
+        $priced = ['price_toman' => $purchase['price']] + $plan;
+
         // A discount code, checked now so we know whether anything is left to
         // pay, and again inside the transaction with the code row locked.
         $code = Discounts::normalizeCode($data['discount_code'] ?? '');
@@ -137,7 +152,7 @@ final class TrainerBillingController
         }
         $quote = null;
         if ($code !== '') {
-            $quote = TrainerDiscounts::evaluate($pdo, $code, $plan, $user['id']);
+            $quote = TrainerDiscounts::evaluate($pdo, $code, $priced, $user['id']);
             if (!$quote['ok']) {
                 Response::error(409, $quote['error'], $quote['message']);
                 return;
@@ -177,8 +192,9 @@ final class TrainerBillingController
             'id'            => $id,
             'trainer_id'    => $user['id'],
             'plan_id'       => $plan['id'],
-            // The plan's price at this moment: the admin may edit it later.
-            'amount_toman'  => (int) $plan['price_toman'],
+            // The price at this moment (the admin may edit it later): the
+            // plan's, or the difference for an upgrade.
+            'amount_toman'  => $purchase['price'],
             'reference_note' => self::text($data['reference_note'] ?? '', 500),
             'tracking_code' => $fields['row']['tracking_code'],
             'card_last4'    => $fields['row']['card_last4'],
@@ -188,12 +204,13 @@ final class TrainerBillingController
         if (isset($fields['row']['paid_amount_toman'])) {
             $row['paid_amount_toman'] = $fields['row']['paid_amount_toman'];
         }
+        $row += PlanChange::columns($purchase, 'trainer_payment_requests');
 
         $pdo->beginTransaction();
         try {
             if ($quote !== null) {
                 // Again, with the code locked: it may have run out since.
-                $locked = TrainerDiscounts::evaluate($pdo, $code, $plan, $user['id'], true);
+                $locked = TrainerDiscounts::evaluate($pdo, $code, $priced, $user['id'], true);
                 if (!$locked['ok']) {
                     $pdo->rollBack();
                     Receipts::remove($file);
@@ -242,6 +259,7 @@ final class TrainerBillingController
             'kind'          => 'trainer',
             'who'           => trim($user['first_name'] . ' ' . $user['last_name']) ?: 'مربی',
             'plan'          => (string) $plan['name'],
+            'upgrade_from'  => $purchase['from']['plan_name'] ?? null,
             'amount'        => (int) $row['amount_toman'],
             'paid_amount'   => isset($row['paid_amount_toman']) ? (int) $row['paid_amount_toman'] : null,
             'discount'      => (int) ($row['discount_toman'] ?? 0),
@@ -281,7 +299,12 @@ final class TrainerBillingController
             return;
         }
 
-        $result = TrainerDiscounts::evaluate($pdo, (string) $data['code'], $plan, $user['id']);
+        $purchase = PlanChange::quote(PlanChange::trainerCurrent($pdo, $user['id']), $plan, 'trainer_payment_requests');
+        if ($purchase['kind'] === 'locked') {
+            PlanChange::lockedError($purchase);
+            return;
+        }
+        $result = TrainerDiscounts::evaluate($pdo, (string) $data['code'], ['price_toman' => $purchase['price']] + $plan, $user['id']);
         if (!$result['ok']) {
             Response::error(409, $result['error'], $result['message']);
             return;
@@ -429,6 +452,7 @@ final class TrainerBillingController
         PaymentReminders::sendIfDue($pdo);
         $discounts = TrainerDiscounts::ready();
         $paidCol = Database::hasColumn('trainer_payment_requests', 'paid_amount_toman');
+        $kinds = PlanChange::ready('trainer_payment_requests');
         $stmt = $pdo->prepare(
             "SELECT r.id, r.trainer_id, r.plan_id, r.amount_toman, r.reference_note, r.tracking_code, r.card_last4,
                     r.paid_at, r.status, r.admin_note, r.reviewed_at, r.created_at, r.receipt_purged_at,
@@ -436,17 +460,19 @@ final class TrainerBillingController
                     p.name AS plan_name, t.first_name, t.last_name, t.phone,
                     " . TrackingCodes::duplicateExpr('trainer_payment_requests', 'r') . " AS duplicate_tracking"
             . ($paidCol ? ', r.paid_amount_toman, (r.paid_amount_toman IS NOT NULL AND r.paid_amount_toman <> r.amount_toman) AS amount_mismatch' : '')
-            . ($discounts ? ', r.list_price_toman, r.discount_toman, dc.code AS discount_code' : '') . "
+            . ($discounts ? ', r.list_price_toman, r.discount_toman, dc.code AS discount_code' : '')
+            . ($kinds ? ', r.purchase_kind, r.from_price_toman, fp.name AS from_plan_name' : '') . "
              FROM trainer_payment_requests r
              JOIN trainer_plans p ON p.id = r.plan_id
              JOIN profiles t ON t.id = r.trainer_id"
             . ($discounts ? ' LEFT JOIN trainer_discount_codes dc ON dc.id = r.discount_code_id' : '')
+            . ($kinds ? ' LEFT JOIN trainer_plans fp ON fp.id = r.from_plan_id' : '')
             . ($trainerId !== null ? ' WHERE r.trainer_id = :trainer_id' : '') . "
              ORDER BY r.created_at DESC LIMIT 500"
         );
         $stmt->execute($trainerId !== null ? ['trainer_id' => $trainerId] : []);
         $rows = $stmt->fetchAll();
-        $rows = Cast::rows($rows, [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']);
+        $rows = Cast::rows($rows, [], ['amount_toman', 'list_price_toman', 'discount_toman', 'paid_amount_toman', 'from_price_toman'], ['has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']);
 
         // When the file goes: the retention days after the review.
         $days = Settings::get('billing')['receipt_retention_days'];
@@ -487,15 +513,21 @@ final class TrainerBillingController
                 return;
             }
 
-            // The same plan extends the current period; another plan starts
-            // now with its full period (TrainerBilling::extend).
+            // An upgrade (only the difference paid) changes the plan and keeps
+            // the end date. Otherwise the same plan extends the current
+            // period, and another starts now with its full period.
             $before = Limits::forTrainer($pdo, $request['trainer_id']);
-            $expiresAt = TrainerBilling::extend(
+            $cap = $request['max_athletes'] === null ? null : (int) $request['max_athletes'];
+            $upgrade = ($request['purchase_kind'] ?? null) === PlanChange::UPGRADE;
+            $expiresAt = $upgrade
+                ? TrainerBilling::switchPlan($pdo, $request['trainer_id'], $request['plan_id'], $request['plan_name'], $cap)
+                : null;
+            $expiresAt ??= TrainerBilling::extend(
                 $pdo,
                 $request['trainer_id'],
                 (int) $request['duration_days'],
                 $request['plan_name'],
-                $request['max_athletes'] === null ? null : (int) $request['max_athletes'],
+                $cap,
                 $request['plan_id']
             );
             Tiers::setTrainerTier($pdo, $request['trainer_id'], Tiers::planTier($pdo, 'trainer_plans', $request['plan_id']));
@@ -507,6 +539,7 @@ final class TrainerBillingController
             AdminController::logActivity($pdo, null, $admin['id'], $request['trainer_id'], 'trainer_payment_approved', [
                 'request_id' => $request['id'],
                 'plan'       => $request['plan_name'],
+                'kind'       => $request['purchase_kind'] ?? null,
                 'amount'     => (int) $request['amount_toman'],
                 'before'     => PlanAccountsController::snapshot($before),
                 'expires_at' => $expiresAt,

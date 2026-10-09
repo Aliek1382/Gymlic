@@ -1078,5 +1078,153 @@ call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => false, 
 check(call('POST', "/clubs/{$fcId}/trainer-invites", ['first_name' => 'مربی ۴'], $fc)[0] === 201, 'with enforcement off: no cap');
 call('PUT', '/admin/settings/billing', ['value' => ['trainer_enforce' => true, 'grace_days' => 7, 'expiring_days' => 7, 'receipt_required' => false]], $adminToken);
 
+// ---- Upgrading by the price difference --------------------------------------
+
+/** The trainer's subscription row. */
+function tSub(string $id): array
+{
+    global $pdo;
+    $stmt = $pdo->prepare('SELECT plan_id, plan_name, started_at, expires_at, max_athletes FROM trainer_subscriptions WHERE trainer_id = :id');
+    $stmt->execute(['id' => $id]);
+    return $stmt->fetch() ?: [];
+}
+
+/** The club's subscription row. */
+function cSub(string $id): array
+{
+    global $pdo;
+    $stmt = $pdo->prepare('SELECT plan_id, plan_name, started_at, expires_at FROM subscriptions WHERE club_id = :id ORDER BY expires_at DESC LIMIT 1');
+    $stmt->execute(['id' => $id]);
+    return $stmt->fetch() ?: [];
+}
+
+function requestRow(string $table, string $id): array
+{
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM {$table} WHERE id = :id");
+    $stmt->execute(['id' => $id]);
+    return $stmt->fetch() ?: [];
+}
+
+echo "\nUpgrading by the price difference\n";
+// A rerun: back to before the update.
+foreach (['payment_requests', 'trainer_payment_requests'] as $table) {
+    $has = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{$table}' AND COLUMN_NAME = 'purchase_kind'")->fetchColumn();
+    if ((int) $has === 1) {
+        $pdo->exec("ALTER TABLE {$table} DROP COLUMN purchase_kind, DROP COLUMN from_plan_id, DROP COLUMN from_price_toman");
+    }
+}
+$tPrice = array_column($pdo->query('SELECT name, price_toman FROM trainer_plans')->fetchAll(), 'price_toman', 'name');
+$cPrice = array_column($pdo->query('SELECT name, price_toman FROM plans')->fetchAll(), 'price_toman', 'name');
+
+[$u1, $u1Id] = account('upgrader1', 'trainer');
+admin('trainer', $u1Id, ['action' => 'activate', 'plan_id' => $tPlan['نقره‌ای'], 'started_at' => $day(-10), 'expires_at' => $day(20)]);
+$silverEnd = tSub($u1Id)['expires_at'];
+[, $over] = call('GET', '/trainer-billing', null, $u1);
+check(($over['purchase']['ready'] ?? null) === false && ($over['purchase']['plans'][$tPlan['طلایی']]['kind'] ?? null) === 'new'
+    && ($over['purchase']['plans'][$tPlan['طلایی']]['price_toman'] ?? null) === (int) $tPrice['طلایی'],
+    'before the update: a dearer plan is sold as before (full price, a new period)', $over['purchase'] ?? null);
+
+[$status, $result] = call('POST', '/admin/system/migrations/plan-upgrade/run', null, $adminToken);
+check($status === 200 && ($result['ok'] ?? false), 'the update runs from the admin panel', $result);
+
+[, $over] = call('GET', '/trainer-billing', null, $u1);
+$p = $over['purchase']['plans'] ?? [];
+check(($over['purchase']['ready'] ?? null) === true && ($over['purchase']['current']['plan_name'] ?? null) === 'نقره‌ای', 'the page knows the running plan', $over['purchase'] ?? null);
+check(($p[$tPlan['طلایی']] ?? null) === ['kind' => 'upgrade', 'price_toman' => (int) $tPrice['طلایی'] - (int) $tPrice['نقره‌ای']],
+    'silver → gold costs only the difference', $p[$tPlan['طلایی']] ?? null);
+check(($p[$tPlan['الماسی']]['price_toman'] ?? null) === (int) $tPrice['الماسی'] - (int) $tPrice['نقره‌ای'], 'silver → diamond too', $p[$tPlan['الماسی']] ?? null);
+check(($p[$tPlan['نقره‌ای']] ?? null) === ['kind' => 'renew', 'price_toman' => (int) $tPrice['نقره‌ای']], 'silver again is a renewal at the full price', $p[$tPlan['نقره‌ای']] ?? null);
+
+$upCode = 'UP' . strtoupper($run);
+call('POST', '/admin/trainer-discounts', ['code' => $upCode, 'kind' => 'percent', 'value' => 50], $adminToken);
+$diff = (int) $tPrice['طلایی'] - (int) $tPrice['نقره‌ای'];
+[$status, $quote] = call('POST', '/trainer-billing/discount-check', ['plan_id' => $tPlan['طلایی'], 'code' => $upCode], $u1);
+check($status === 200 && ($quote['list_price_toman'] ?? null) === $diff && ($quote['final_toman'] ?? null) === intdiv($diff, 2),
+    'a discount code is on the difference', $quote);
+[$status, $req] = call('POST', '/trainer-billing/requests', ['plan_id' => $tPlan['طلایی'], 'discount_code' => $upCode, 'tracking_code' => 'UPG' . $run, 'card_last4' => '1234'], $u1);
+check($status === 201, 'the trainer files the upgrade', $req);
+$row = requestRow('trainer_payment_requests', $req['id'] ?? '');
+check((int) ($row['amount_toman'] ?? 0) === intdiv($diff, 2) && ($row['purchase_kind'] ?? null) === 'upgrade'
+    && ($row['from_plan_id'] ?? null) === $tPlan['نقره‌ای'] && (int) ($row['from_price_toman'] ?? 0) === (int) $tPrice['نقره‌ای'],
+    'the request: half the difference to pay, kept as an upgrade from silver', $row);
+check(call('POST', '/trainer-billing/requests', ['plan_id' => $tPlan['الماسی'], 'tracking_code' => 'UPG2' . $run, 'card_last4' => '1234'], $u1)[0] === 409,
+    'a second request waits for the first');
+[, $list] = call('GET', '/admin/trainer-billing/requests?trainer_id=' . $u1Id, null, $adminToken);
+check(($list['items'][0]['purchase_kind'] ?? null) === 'upgrade' && ($list['items'][0]['from_plan_name'] ?? null) === 'نقره‌ای',
+    'the admin sees it is an upgrade from silver', $list['items'][0] ?? null);
+[$status, $data] = call('POST', '/admin/trainer-billing/requests/' . ($req['id'] ?? '') . '/approve', [], $adminToken);
+$sub = tSub($u1Id);
+check($status === 200 && $sub['plan_id'] === $tPlan['طلایی'] && $sub['expires_at'] === $silverEnd && $data['expires_at'] === $silverEnd,
+    'approved: gold now, the end date as it was', [$status, $data, $sub, $silverEnd]);
+$l = limits($u1);
+check(($l['max_athletes'] ?? null) === 40 && ($l['reports']['level'] ?? null) === 'full', "gold's caps and reports at once", $l['max_athletes'] ?? null);
+
+[, $over] = call('GET', '/trainer-billing', null, $u1);
+$p = $over['purchase']['plans'] ?? [];
+check(($p[$tPlan['نقره‌ای']]['kind'] ?? null) === 'locked' && str_contains($p[$tPlan['نقره‌ای']]['message'] ?? '', 'پس از پایان دوره'),
+    'gold → silver is locked until the period ends', $p[$tPlan['نقره‌ای']] ?? null);
+[$status, $data] = call('POST', '/trainer-billing/requests', ['plan_id' => $tPlan['نقره‌ای'], 'tracking_code' => 'DWN' . $run, 'card_last4' => '1234'], $u1);
+check($status === 409 && ($data['error']['code'] ?? '') === 'downgrade_locked', 'and refused if filed anyway', [$status, $data]);
+check(call('POST', '/trainer-billing/discount-check', ['plan_id' => $tPlan['نقره‌ای'], 'code' => $upCode], $u1)[0] === 409, 'a code for it too');
+check(($p[$tPlan['طلایی']]['kind'] ?? null) === 'renew', 'gold again is a renewal');
+
+admin('trainer', $u1Id, ['action' => 'dates', 'expires_at' => $day(-2)]);
+[, $over] = call('GET', '/trainer-billing', null, $u1);
+check(($over['purchase']['plans'][$tPlan['نقره‌ای']] ?? null) === ['kind' => 'new', 'price_toman' => (int) $tPrice['نقره‌ای']],
+    'in the grace days: silver at its full price', $over['purchase']['plans'][$tPlan['نقره‌ای']] ?? null);
+[$status, $req] = call('POST', '/trainer-billing/requests', ['plan_id' => $tPlan['نقره‌ای'], 'tracking_code' => 'NEW' . $run, 'card_last4' => '1234'], $u1);
+check($status === 201 && (requestRow('trainer_payment_requests', $req['id'] ?? '')['purchase_kind'] ?? null) === 'new', 'filed as a new purchase', $req);
+call('POST', '/admin/trainer-billing/requests/' . ($req['id'] ?? '') . '/approve', [], $adminToken);
+$sub = tSub($u1Id);
+check($sub['plan_id'] === $tPlan['نقره‌ای'] && substr((string) $sub['expires_at'], 0, 10) === $day(30), 'approved: silver from today, a full period', $sub);
+
+echo "\nClubs: the same, the amount set by the server\n";
+[$uc, $ucId] = newClub('upgradeclub');
+admin('club', $ucId, ['action' => 'activate', 'plan_id' => $cPlan['نقره‌ای'], 'started_at' => $day(-5), 'expires_at' => $day(25)]);
+$clubEnd = cSub($ucId)['expires_at'];
+[, $info] = call('GET', '/billing/info', null, $uc);
+$cDiff = (int) $cPrice['طلایی'] - (int) $cPrice['نقره‌ای'];
+check(($info['purchase']['plans'][$cPlan['طلایی']] ?? null) === ['kind' => 'upgrade', 'price_toman' => $cDiff], 'the club sees silver → gold at the difference', $info['purchase'] ?? null);
+[$status, $req] = call('POST', '/payment-requests', ['plan_id' => $cPlan['طلایی'], 'amount_toman' => 1, 'tracking_code' => 'CUP' . $run, 'card_last4' => '5678'], $uc);
+$row = requestRow('payment_requests', $req['id'] ?? '');
+check($status === 201 && (int) ($row['amount_toman'] ?? 0) === $cDiff && ($row['purchase_kind'] ?? null) === 'upgrade',
+    'the amount is the difference whatever the page sent', [$status, $row['amount_toman'] ?? null]);
+check(call('POST', '/payment-requests', ['plan_id' => $cPlan['طلایی'], 'tracking_code' => 'CUP2' . $run, 'card_last4' => '5678'], $uc)[0] === 409,
+    'one request at a time');
+[, $list] = call('GET', '/payment-requests', null, $uc);
+check(($list['items'][0]['amount_mismatch'] ?? null) === false && ($list['items'][0]['from_plan_name'] ?? null) === 'نقره‌ای',
+    'not flagged as a wrong amount; shown as an upgrade from silver', $list['items'][0] ?? null);
+[$status, $data] = call('POST', '/admin/payment-requests/' . ($req['id'] ?? '') . '/approve', [], $adminToken);
+$sub = cSub($ucId);
+check($status === 200 && $sub['plan_id'] === $cPlan['طلایی'] && $sub['expires_at'] === $clubEnd, 'approved: gold, the end date as it was', [$status, $sub, $clubEnd]);
+[$status, $data] = call('POST', '/payment-requests', ['plan_id' => $cPlan['نقره‌ای'], 'tracking_code' => 'CDN' . $run, 'card_last4' => '5678'], $uc);
+check($status === 409 && ($data['error']['code'] ?? '') === 'downgrade_locked', 'gold → silver is locked', [$status, $data]);
+[, $list] = call('GET', '/payment-requests', null, $uc);
+check(($list['items'][0]['amount_mismatch'] ?? null) === false, 'a renewal at the full price is not flagged either');
+
+echo "\nAdmin: another plan for the same period\n";
+$before = tSub($u1Id);
+[$status, $data] = admin('trainer', $u1Id, ['action' => 'switch_plan', 'plan_id' => $tPlan['الماسی'], 'amount_toman' => 100000, 'note' => 'ارتقای دستی']);
+$sub = tSub($u1Id);
+check($status === 200 && $sub['plan_id'] === $tPlan['الماسی'] && $sub['expires_at'] === $before['expires_at'] && $sub['started_at'] === $before['started_at'],
+    'switches the plan, start and end untouched', [$status, $data, $sub]);
+check(limits($u1)['max_athletes'] === null, "with the plan's caps");
+$paid = $pdo->prepare("SELECT amount_toman, purchase_kind, status FROM trainer_payment_requests WHERE trainer_id = :t AND tracking_code LIKE 'MANUAL-%'");
+$paid->execute(['t' => $u1Id]);
+check($paid->fetch() == ['amount_toman' => 100000, 'purchase_kind' => 'switch', 'status' => 'approved'], 'and records the money received');
+[$status, $data] = admin('trainer', $u1Id, ['action' => 'switch_plan', 'plan_id' => $tPlan['نقره‌ای']]);
+check($status === 200 && tSub($u1Id)['plan_id'] === $tPlan['نقره‌ای'] && limits($u1)['max_athletes'] === 15, 'down as well, at no charge', [$status, $data]);
+check(admin('trainer', $u1Id, ['action' => 'switch_plan', 'plan_id' => $tPlan['نقره‌ای']])[0] === 409, 'not to the plan it is on');
+[, $nobody] = account('upgrader-free', 'trainer');
+$nobodyId = $pdo->query("SELECT id FROM profiles WHERE email = 'upgrader-free-{$run}@example.test'")->fetchColumn();
+check(admin('trainer', (string) $nobodyId, ['action' => 'switch_plan', 'plan_id' => $tPlan['طلایی']])[0] === 409, 'not without a paid plan (that is «فعال‌سازی پلن»)');
+[$status, $data] = admin('club', $ucId, ['action' => 'switch_plan', 'plan_id' => $cPlan['نقره‌ای']]);
+$sub = cSub($ucId);
+check($status === 200 && $sub['plan_id'] === $cPlan['نقره‌ای'] && $sub['expires_at'] === $clubEnd && ($data['account']['limits']['max_trainers'] ?? null) === 3,
+    'a club too', [$status, $sub, $data['account']['limits']['max_trainers'] ?? null]);
+[, $history] = call('GET', "/admin/plan-accounts/club/{$ucId}", null, $adminToken);
+check(in_array('plan_switch_plan', array_column($history['history'] ?? [], 'action'), true), 'in the account history', array_column($history['history'] ?? [], 'action'));
+
 echo "\n" . ($failures === 0 ? "All checks passed.\n" : "{$failures} check(s) failed.\n");
 exit($failures === 0 ? 0 : 1);

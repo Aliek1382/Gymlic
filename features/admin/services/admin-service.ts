@@ -1,5 +1,6 @@
 import { api, query, type ListResponse } from "@/lib/api/client";
 import type { ClubStatus, SubscriptionStatus } from "@/types/database.types";
+import type { PurchaseKind } from "@/features/finance/services/finance-service";
 
 export async function setClubStatus(clubId: string, status: ClubStatus) {
   await api.post(`/admin/clubs/${clubId}/status`, { status });
@@ -241,6 +242,10 @@ export interface AdminPaymentRequestRow {
   /** The amount typed differs from the plan's price (the club typed it). */
   amount_mismatch?: boolean;
   plan_price_toman?: number;
+  /** Present once the plan-upgrade database update has run (null for older requests). */
+  purchase_kind?: PurchaseKind | null;
+  from_plan_name?: string | null;
+  from_price_toman?: number | null;
 }
 
 export async function listPaymentRequests(): Promise<AdminPaymentRequestRow[]> {

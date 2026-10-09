@@ -81,6 +81,7 @@ const ADMIN_ACTIONS = [
   "exercise_media_changed",
   // Plans and limits (PlanAccountsController, trainer billing).
   "plan_activate",
+  "plan_switch_plan",
   "plan_dates",
   "plan_extend",
   "plan_override",

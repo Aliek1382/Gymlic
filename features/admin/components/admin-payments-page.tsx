@@ -27,7 +27,7 @@ import { ErrorState } from "@/features/dashboard/components/shared/error-state";
 import { TrainerRequestsTable } from "@/features/trainer-billing/components/trainer-payment-requests";
 import { listTrainerRequests } from "@/features/trainer-billing/services/trainer-billing-service";
 import { PaymentRequestActions } from "@/features/admin/components/payment-request-actions";
-import { waitingDays } from "@/features/finance/components/payment-form-bits";
+import { PurchaseKindNote, waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import type { PaymentRequestStatus } from "@/types/database.types";
 
@@ -68,6 +68,8 @@ type RequestRow = Pick<
   | "duplicate_tracking"
   | "amount_mismatch"
   | "plan_price_toman"
+  | "purchase_kind"
+  | "from_plan_name"
 >;
 
 function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions: boolean }) {
@@ -108,6 +110,7 @@ function RequestsTable({ rows, showActions }: { rows: RequestRow[]; showActions:
             </TableCell>
             <TableCell className="text-muted-foreground">
               {request.plan_name}
+              <PurchaseKindNote kind={request.purchase_kind} from={request.from_plan_name} />
             </TableCell>
             <TableCell className="text-muted-foreground">
               {formatToman(request.amount_toman)} تومان

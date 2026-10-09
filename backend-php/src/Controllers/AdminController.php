@@ -13,6 +13,7 @@ use Gymlic\Jalali;
 use Gymlic\Limits;
 use Gymlic\PaymentCancel;
 use Gymlic\PaymentReminders;
+use Gymlic\PlanChange;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Security;
@@ -47,7 +48,7 @@ final class AdminController
         $user = Auth::requireUser();
         // Multipart once a receipt is attached; plain JSON from an older page.
         $multipart = str_starts_with(strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? '')), 'multipart/form-data');
-        $data = Validate::required($multipart ? $_POST : Validate::body(), ['plan_id', 'amount_toman']);
+        $data = Validate::required($multipart ? $_POST : Validate::body(), ['plan_id']);
 
         $pdo = Database::connection();
 
@@ -69,11 +70,24 @@ final class AdminController
             return;
         }
 
-        $amount = (int) $data['amount_toman'];
-        if ($amount < 0) {
-            Response::error(400, 'invalid_amount', 'مبلغ نمی‌تواند منفی باشد.');
+        // One request at a time: what it costs depends on the plan running
+        // when it is approved, and two would be paid for one change.
+        $waiting = $pdo->prepare("SELECT 1 FROM payment_requests WHERE club_id = :id AND status = 'pending'");
+        $waiting->execute(['id' => $clubRow['id']]);
+        if ($waiting->fetchColumn() !== false) {
+            Response::error(409, 'request_pending', 'پرداخت قبلی شما هنوز در انتظار بررسی است.');
             return;
         }
+
+        // The full price, or only the difference as an upgrade; a cheaper
+        // plan waits until the running one ends. The amount is the server's,
+        // whatever the page sent; a code is on what is paid.
+        $purchase = PlanChange::quote(PlanChange::clubCurrent($pdo, $clubRow['id']), $planRow, 'payment_requests');
+        if ($purchase['kind'] === 'locked') {
+            PlanChange::lockedError($purchase);
+            return;
+        }
+        $amount = $purchase['price'];
 
         $code = Discounts::normalizeCode($data['discount_code'] ?? '');
         if ($code !== '' && !Discounts::ready()) {
@@ -89,7 +103,7 @@ final class AdminController
             'submitted_by'   => $user['id'],
             'amount_toman'   => $amount,
             'reference_note' => Validate::nullableString($data['reference_note'] ?? null),
-        ];
+        ] + PlanChange::columns($purchase, 'payment_requests');
 
         // Tracking code, last four card digits and receipt (once the
         // database has the columns; before that the request is as it was).
@@ -123,13 +137,15 @@ final class AdminController
             if ($code !== '') {
                 // Checked again here, with the code locked, whatever the
                 // dialog showed: it may have run out since.
-                $result = Discounts::evaluate($pdo, $code, $planRow, $clubRow['id'], true);
+                $result = Discounts::evaluate($pdo, $code, ['price_toman' => $amount] + $planRow, $clubRow['id'], true);
                 if (!$result['ok']) {
                     $pdo->rollBack();
                     Receipts::remove($receiptFile);
                     Response::error(409, $result['error'], $result['message']);
                     return;
                 }
+                $amount = $result['final'];
+                $row['amount_toman'] = $amount;
                 $row += [
                     'discount_code_id' => $result['code']['id'],
                     'list_price_toman' => $result['list_price'],
@@ -154,6 +170,7 @@ final class AdminController
             'who'           => (string) $clubRow['name'],
             'owner'         => trim($user['first_name'] . ' ' . $user['last_name']),
             'plan'          => (string) $planRow['name'],
+            'upgrade_from'  => $purchase['from']['plan_name'] ?? null,
             'amount'        => $amount,
             'paid_amount'   => isset($row['paid_amount_toman']) ? (int) $row['paid_amount_toman'] : null,
             'discount'      => (int) ($row['discount_toman'] ?? 0),
@@ -227,6 +244,7 @@ final class AdminController
 
         $discounts = Discounts::ready();
         $receipts = Receipts::ready();
+        $kinds = PlanChange::ready('payment_requests');
         $sql =
             'SELECT pr.id, pr.club_id, pr.plan_id, pr.amount_toman, pr.reference_note, pr.status,
                     pr.admin_note, pr.reviewed_at, pr.created_at,
@@ -239,15 +257,19 @@ final class AdminController
                     (pr.receipt_path LIKE \'%.pdf\') AS receipt_is_pdf,
                     ' . TrackingCodes::duplicateExpr('payment_requests', 'pr') . ' AS duplicate_tracking'
                 : '')
-            // The club typed the amount: flag it when it is not what the plan
-            // costs (with any discount), unless an admin recorded it by hand.
+            . ($kinds ? ', pr.purchase_kind, pr.from_price_toman, fp.name AS from_plan_name' : '')
+            // The club used to type the amount: flag it when it is not what the
+            // plan costs (with any discount), unless an admin recorded it by
+            // hand. Since the kind is kept, the server sets the amount.
             . ', (pr.submitted_by = c.owner_id AND pr.amount_toman <> '
             . ($discounts ? 'COALESCE(pr.list_price_toman, p.price_toman) - pr.discount_toman' : 'p.price_toman')
+            . ($kinds ? ' AND pr.purchase_kind IS NULL' : '')
             . ') AS amount_mismatch, p.price_toman AS plan_price_toman
              FROM payment_requests pr
              JOIN clubs c ON c.id = pr.club_id
              JOIN plans p ON p.id = pr.plan_id'
-            . ($discounts ? ' LEFT JOIN discount_codes d ON d.id = pr.discount_code_id' : '');
+            . ($discounts ? ' LEFT JOIN discount_codes d ON d.id = pr.discount_code_id' : '')
+            . ($kinds ? ' LEFT JOIN plans fp ON fp.id = pr.from_plan_id' : '');
         $bind = [];
 
         if (!$isAdmin) {
@@ -262,7 +284,7 @@ final class AdminController
         $rows = Cast::rows(
             $stmt->fetchAll(),
             [],
-            ['amount_toman', 'list_price_toman', 'discount_toman', 'plan_price_toman'],
+            ['amount_toman', 'list_price_toman', 'discount_toman', 'plan_price_toman', 'from_price_toman'],
             ['recorded_by_admin', 'has_receipt', 'receipt_is_pdf', 'duplicate_tracking', 'amount_mismatch']
         );
 
@@ -318,11 +340,16 @@ final class AdminController
                 throw new \RuntimeException('request_not_pending');
             }
 
-            // The same plan counts from the current expiry while it is still
-            // running, so approving early doesn't cost the club its remaining
-            // days; another plan starts today with its full period.
+            // An upgrade (only the difference paid) changes the plan and keeps
+            // the end date. Otherwise the same plan counts from the current
+            // expiry while it is still running, so approving early doesn't
+            // cost the club its remaining days; another plan starts today
+            // with its full period.
             $before = Limits::forClub($pdo, $request['club_id']);
-            $expiresAt = Subscriptions::extend($pdo, $request['club_id'], (int) $request['duration_days'], $request['plan_name'], $request['plan_id']);
+            $expiresAt = ($request['purchase_kind'] ?? null) === PlanChange::UPGRADE
+                ? Subscriptions::switchPlan($pdo, $request['club_id'], $request['plan_id'], $request['plan_name'])
+                : null;
+            $expiresAt ??= Subscriptions::extend($pdo, $request['club_id'], (int) $request['duration_days'], $request['plan_name'], $request['plan_id']);
             Tiers::setClubTier($pdo, $request['club_id'], Tiers::planTier($pdo, 'plans', $request['plan_id']));
 
             $pdo->prepare("UPDATE clubs SET member_capacity = :cap, status = 'active' WHERE id = :id")
@@ -341,6 +368,7 @@ final class AdminController
             self::logActivity($pdo, $request['club_id'], $admin['id'], $request['submitted_by'], 'payment_request_approved', [
                 'request_id' => $params['id'],
                 'plan'       => $request['plan_name'],
+                'kind'       => $request['purchase_kind'] ?? null,
                 'amount'     => (int) $request['amount_toman'],
                 'before'     => PlanAccountsController::snapshot($before),
                 'expires_at' => $expiresAt,
