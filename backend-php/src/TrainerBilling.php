@@ -98,6 +98,37 @@ final class TrainerBilling
         return $expiresAt;
     }
 
+    /**
+     * Moves the trainer's paid subscription to another plan, its start and
+     * end dates as they are: an upgrade paid by the price difference, or the
+     * admin's «تغییر پلن». The plan's cap and tier come with it, an admin's
+     * override goes. Returns the end date, or null when there is no paid
+     * subscription to move. Needs plan-limits-update.sql; call inside a
+     * transaction.
+     */
+    public static function switchPlan(PDO $pdo, string $trainerId, string $planId, string $planName, ?int $maxAthletes): ?string
+    {
+        $stmt = $pdo->prepare('SELECT expires_at FROM trainer_subscriptions WHERE trainer_id = :id FOR UPDATE');
+        $stmt->execute(['id' => $trainerId]);
+        $expiresAt = $stmt->fetchColumn();
+        if ($expiresAt === false || $expiresAt === null || !Limits::ready()) {
+            return null;
+        }
+
+        $pdo->prepare(
+            'UPDATE trainer_subscriptions SET plan_id = :plan_id, plan_name = :plan, max_athletes = :cap,
+                    override_on = 0, override_max_athletes = NULL
+             WHERE trainer_id = :id'
+        )->execute(['plan_id' => $planId, 'plan' => $planName, 'cap' => $maxAthletes, 'id' => $trainerId]);
+        Tiers::setTrainerTier($pdo, $trainerId, Tiers::planTier($pdo, 'trainer_plans', $planId));
+        if (strtotime((string) $expiresAt) > time()) {
+            Limits::restore($pdo, $trainerId);
+        }
+        Limits::resync($pdo, $trainerId);
+
+        return (string) $expiresAt;
+    }
+
     /** False until trainer-billing-extras-update.sql has been run on this database. */
     public static function remindersReady(): bool
     {

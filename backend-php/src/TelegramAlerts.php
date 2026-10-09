@@ -23,7 +23,7 @@ final class TelegramAlerts
      * A card-to-card payment waiting for a finance admin.
      *
      * @param array{
-     *   kind: 'club'|'trainer', who: string, owner?: string, plan: string, amount: int,
+     *   kind: 'club'|'trainer', who: string, owner?: string, plan: string, upgrade_from?: string|null, amount: int,
      *   paid_amount?: int|null, discount?: int, discount_code?: string, tracking_code?: string|null,
      *   card_last4?: string|null, paid_at?: string|null, note?: string|null, receipt?: string|null
      * } $p  `receipt` is the stored file name (see Receipts), not a path.
@@ -41,7 +41,8 @@ final class TelegramAlerts
                 '',
                 ($club ? 'باشگاه' : 'مربی') . ': ' . TelegramGateway::esc($p['who'])
                     . (($p['owner'] ?? '') !== '' && $p['owner'] !== $p['who'] ? ' (' . TelegramGateway::esc($p['owner']) . ')' : ''),
-                'پلن: ' . TelegramGateway::esc($p['plan']),
+                'پلن: ' . TelegramGateway::esc($p['plan'])
+                    . (($p['upgrade_from'] ?? '') !== '' ? ' (ارتقا از «' . TelegramGateway::esc($p['upgrade_from']) . '»؛ فقط تفاوت قیمت)' : ''),
                 'مبلغ: ' . self::toman($p['amount']),
             ];
 

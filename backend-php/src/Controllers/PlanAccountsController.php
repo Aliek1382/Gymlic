@@ -8,6 +8,7 @@ use Gymlic\ContentLibrary;
 use Gymlic\Database;
 use Gymlic\Jalali;
 use Gymlic\Limits;
+use Gymlic\PlanChange;
 use Gymlic\Response;
 use Gymlic\Settings;
 use Gymlic\Subscriptions;
@@ -26,6 +27,9 @@ use Throwable;
  *
  *   activate   — a plan from a start date (today or earlier) to an end date;
  *                optionally records money received outside the site
+ *   switch_plan — another plan for the current paid period, its start and
+ *                end dates as they are (up or down, at no charge; optionally
+ *                records money received outside the site)
  *   dates      — the start and end of the current paid plan. An end today
  *                or earlier starts the grace days (an end older than the
  *                grace days ends the plan at once)
@@ -44,11 +48,11 @@ final class PlanAccountsController
 {
     private const KINDS = ['trainer', 'club'];
 
-    private const ACTIONS = ['activate', 'dates', 'extend', 'override', 'reactivate', 'revoke_invites'];
+    private const ACTIONS = ['activate', 'switch_plan', 'dates', 'extend', 'override', 'reactivate', 'revoke_invites'];
 
     /** The activity-log actions that make up one account's subscription history. */
     private const HISTORY_ACTIONS = [
-        'plan_activate', 'plan_dates', 'plan_extend', 'plan_override', 'plan_reactivate', 'plan_revoke_invites',
+        'plan_activate', 'plan_switch_plan', 'plan_dates', 'plan_extend', 'plan_override', 'plan_reactivate', 'plan_revoke_invites',
         'trainer_payment_approved', 'trainer_payment_rejected', 'trainer_subscription_granted',
         'payment_request_approved', 'subscription_renewed', 'subscription_gifted', 'subscription_set',
         'report_excel_export', 'trainer_data_export', 'trainer_gift_code', 'account_access_set',
@@ -303,6 +307,7 @@ final class PlanAccountsController
             $before = self::limits($pdo, $kind, $id);
             $outcome = match ($action) {
                 'activate'       => self::activate($pdo, $kind, $id, $data, $admin['id'], $note),
+                'switch_plan'    => self::switchPlan($pdo, $kind, $id, $data, $admin['id'], $note),
                 'dates'          => self::dates($pdo, $kind, $id, $data, $before),
                 'extend'         => self::extend($pdo, $kind, $id, $data, $before),
                 'override'       => self::override($pdo, $kind, $id, $data),
@@ -341,7 +346,7 @@ final class PlanAccountsController
                 ] + ($outcome['log'] ?? [])
             );
 
-            if ($notify && in_array($action, ['activate', 'dates', 'extend'], true)) {
+            if ($notify && in_array($action, ['activate', 'switch_plan', 'dates', 'extend'], true)) {
                 self::notifyChange($pdo, $kind, $kind === 'club' ? $account['owner_id'] : $id, $admin['id'], $after);
             }
 
@@ -375,14 +380,10 @@ final class PlanAccountsController
             return ['error' => [400, 'invalid_end', 'تاریخ پایان معتبر نیست؛ نباید قبل از تاریخ شروع باشد.']];
         }
 
-        $amount = $data['amount_toman'] ?? 0;
-        if ($amount === '' || $amount === null) {
-            $amount = 0;
-        }
-        if (!is_numeric($amount) || (int) $amount < 0 || (int) $amount > 1_000_000_000_000) {
+        $amount = self::amount($data);
+        if ($amount === null) {
             return ['error' => [400, 'invalid_amount', 'مبلغ دریافتی معتبر نیست.']];
         }
-        $amount = (int) $amount;
 
         $start = $startedAt . ' ' . ($startedAt === date('Y-m-d') ? date('H:i:s') : '00:00:00');
         $end = $endDate . ' 23:59:59';
@@ -398,23 +399,7 @@ final class PlanAccountsController
             Limits::restore($pdo, $id);
             Tiers::setTrainerTier($pdo, $id, Tiers::planTier($pdo, 'trainer_plans', $plan['id']));
 
-            if ($amount > 0) {
-                $pdo->prepare(
-                    "INSERT INTO trainer_payment_requests
-                       (id, trainer_id, plan_id, amount_toman, reference_note, tracking_code, card_last4,
-                        status, admin_note, reviewed_by, reviewed_at)
-                     VALUES (:id, :trainer, :plan, :amount, :ref, :tracking, '0000', 'approved', :note, :admin, NOW())"
-                )->execute([
-                    'id'       => Uuid::v4(),
-                    'trainer'  => $id,
-                    'plan'     => $plan['id'],
-                    'amount'   => $amount,
-                    'ref'      => 'ثبت دستی در پنل مدیریت',
-                    'tracking' => 'MANUAL-' . strtoupper(substr(str_replace('-', '', Uuid::v4()), 0, 10)),
-                    'note'     => $note,
-                    'admin'    => $adminId,
-                ]);
-            }
+            self::recordPayment($pdo, $kind, $id, $plan['id'], $amount, $adminId, $note);
         } else {
             Subscriptions::set($pdo, $id, $plan['name'], $end, $plan['id'], $start, true);
             Tiers::setClubTier($pdo, $id, Tiers::planTier($pdo, 'plans', $plan['id']));
@@ -422,25 +407,101 @@ final class PlanAccountsController
             // approved payment does; a suspended club stays suspended.
             $pdo->prepare("UPDATE clubs SET status = 'active' WHERE id = :id AND status = 'pending'")->execute(['id' => $id]);
 
-            if ($amount > 0) {
-                $pdo->prepare(
-                    "INSERT INTO payment_requests
-                       (id, club_id, plan_id, submitted_by, amount_toman, reference_note, status, admin_note, reviewed_by, reviewed_at)
-                     VALUES (:id, :club, :plan, :admin, :amount, :ref, 'approved', :note, :admin2, NOW())"
-                )->execute([
-                    'id'     => Uuid::v4(),
-                    'club'   => $id,
-                    'plan'   => $plan['id'],
-                    'admin'  => $adminId,
-                    'amount' => $amount,
-                    'ref'    => 'ثبت دستی در پنل مدیریت',
-                    'note'   => $note,
-                    'admin2' => $adminId,
-                ]);
-            }
+            self::recordPayment($pdo, $kind, $id, $plan['id'], $amount, $adminId, $note);
         }
 
         return ['log' => ['plan' => $plan['name'], 'started_at' => $start, 'expires_at' => $end, 'amount' => $amount]];
+    }
+
+    /**
+     * Another plan for the current paid period, start and end untouched: its
+     * caps and tier now, an override dropped. Up or down, whatever was paid.
+     *
+     * @return array<string, mixed>
+     */
+    private static function switchPlan(PDO $pdo, string $kind, string $id, array $data, string $adminId, ?string $note): array
+    {
+        $current = self::paidPeriod($pdo, $kind, $id);
+        if ($current === null) {
+            return ['error' => [409, 'no_paid_plan', 'این حساب پلن پولی ندارد؛ از «فعال‌سازی پلن» یک پلن با تاریخ شروع و پایان بدهید.']];
+        }
+        $plan = self::plan($pdo, $kind, (string) ($data['plan_id'] ?? ''));
+        if ($plan === null) {
+            return ['error' => [404, 'plan_not_found', 'پلن انتخاب‌شده پیدا نشد.']];
+        }
+        if ($plan['id'] === $current['plan_id']) {
+            return ['error' => [409, 'same_plan', 'این حساب همین حالا روی همین پلن است.']];
+        }
+        $amount = self::amount($data);
+        if ($amount === null) {
+            return ['error' => [400, 'invalid_amount', 'مبلغ دریافتی معتبر نیست.']];
+        }
+
+        $expiresAt = $kind === 'trainer'
+            ? TrainerBilling::switchPlan($pdo, $id, $plan['id'], $plan['name'], self::intOrNull($plan['cap']))
+            : Subscriptions::switchPlan($pdo, $id, $plan['id'], $plan['name']);
+        self::recordPayment($pdo, $kind, $id, $plan['id'], $amount, $adminId, $note, PlanChange::SWITCH);
+
+        return ['log' => ['plan' => $plan['name'], 'from' => $current['plan_name'], 'expires_at' => $expiresAt, 'amount' => $amount]];
+    }
+
+    /** The optional amount received outside the site: 0 when none, null when invalid. */
+    private static function amount(array $data): ?int
+    {
+        $amount = $data['amount_toman'] ?? 0;
+        if ($amount === '' || $amount === null) {
+            return 0;
+        }
+        if (!is_numeric($amount) || (int) $amount < 0 || (int) $amount > 1_000_000_000_000) {
+            return null;
+        }
+        return (int) $amount;
+    }
+
+    /**
+     * Money the admin received outside the site, as an approved payment so
+     * it shows in the finance reports. Nothing for 0.
+     */
+    private static function recordPayment(
+        PDO $pdo,
+        string $kind,
+        string $id,
+        string $planId,
+        int $amount,
+        string $adminId,
+        ?string $note,
+        ?string $purchaseKind = null
+    ): void {
+        if ($amount <= 0) {
+            return;
+        }
+        $table = $kind === 'trainer' ? 'trainer_payment_requests' : 'payment_requests';
+        $row = $kind === 'trainer'
+            ? [
+                'id'             => Uuid::v4(),
+                'trainer_id'     => $id,
+                'plan_id'        => $planId,
+                'amount_toman'   => $amount,
+                'reference_note' => 'ثبت دستی در پنل مدیریت',
+                'tracking_code'  => 'MANUAL-' . strtoupper(substr(str_replace('-', '', Uuid::v4()), 0, 10)),
+                'card_last4'     => '0000',
+            ]
+            : [
+                'id'             => Uuid::v4(),
+                'club_id'        => $id,
+                'plan_id'        => $planId,
+                'submitted_by'   => $adminId,
+                'amount_toman'   => $amount,
+                'reference_note' => 'ثبت دستی در پنل مدیریت',
+            ];
+        $row += ['status' => 'approved', 'admin_note' => $note, 'reviewed_by' => $adminId];
+        if ($purchaseKind !== null && PlanChange::ready($table)) {
+            $row['purchase_kind'] = $purchaseKind;
+        }
+        $pdo->prepare(
+            'INSERT INTO ' . $table . ' (' . implode(', ', array_keys($row)) . ', reviewed_at)
+             VALUES (:' . implode(', :', array_keys($row)) . ', NOW())'
+        )->execute($row);
     }
 
     /** @return array<string, mixed> */

@@ -27,7 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/features/dashboard/components/shared/empty-state";
-import { PaymentFlags, waitingDays } from "@/features/finance/components/payment-form-bits";
+import { PaymentFlags, PurchaseKindNote, waitingDays } from "@/features/finance/components/payment-form-bits";
 import { ReceiptViewer } from "@/features/finance/components/receipt-viewer";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { formatNumber, formatPersianDate, formatToman } from "@/lib/persian";
@@ -119,6 +119,7 @@ export function TrainerRequestsTable({
             )}
             <TableCell className="text-muted-foreground">
               {request.plan_name}
+              <PurchaseKindNote kind={request.purchase_kind} from={request.from_plan_name} />
               <p className="text-xs">
                 {formatToman(request.amount_toman)} تومان
               </p>

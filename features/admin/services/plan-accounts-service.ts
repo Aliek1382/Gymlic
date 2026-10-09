@@ -99,6 +99,7 @@ export async function getPlanAccount(
 /** One change by hand; see PlanAccountsController on the server. */
 export type PlanAccountChange =
   | { action: "activate"; plan_id: string; started_at?: string; expires_at?: string; amount_toman?: number | null }
+  | { action: "switch_plan"; plan_id: string; amount_toman?: number | null }
   | { action: "dates"; started_at?: string; expires_at: string }
   | { action: "extend"; days: number }
   | { action: "override"; on: boolean; max_athletes?: number | null; max_members?: number | null; max_trainers?: number | null }

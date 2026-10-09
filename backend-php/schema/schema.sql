@@ -210,6 +210,9 @@ CREATE TABLE payment_requests (
   id             CHAR(36) NOT NULL PRIMARY KEY,
   club_id        CHAR(36) NOT NULL,
   plan_id        CHAR(36) NOT NULL,
+  purchase_kind  VARCHAR(10) NULL,     -- new | renew | upgrade | switch (PlanChange)
+  from_plan_id   CHAR(36) NULL,        -- an upgrade: the plan it replaced
+  from_price_toman BIGINT NULL,        -- and that plan's price then
   submitted_by   CHAR(36) NOT NULL,
   amount_toman   BIGINT NOT NULL,
   reference_note TEXT NULL,
@@ -794,6 +797,9 @@ CREATE TABLE trainer_payment_requests (
   id                CHAR(36) NOT NULL PRIMARY KEY,
   trainer_id        CHAR(36) NOT NULL,
   plan_id           CHAR(36) NOT NULL,
+  purchase_kind     VARCHAR(10) NULL,       -- new | renew | upgrade | switch (PlanChange)
+  from_plan_id      CHAR(36) NULL,          -- an upgrade: the plan it replaced
+  from_price_toman  BIGINT NULL,            -- and that plan's price then
   amount_toman      BIGINT NOT NULL,
   paid_amount_toman BIGINT NULL,            -- what the trainer says they transferred
   discount_code_id  CHAR(36) NULL,

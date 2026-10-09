@@ -312,8 +312,20 @@ allows; every cap is checked on the server.
   plans and data read-only, no new plans, no messages either way; nothing is
   deleted. Any renewal brings everyone back. An expired club can't invite
   anyone new; nobody is put on hold.
-- **Mid-period purchases:** the same plan extends from the current end; a
-  different plan starts on approval with its full period (no carry-over).
+- **Mid-period purchases** (`PlanChange`, `plan-upgrade-update.sql`): the
+  same plan extends from the current end, at its full price. While a paid
+  plan runs (before its end date), a dearer plan is an upgrade at only the
+  difference of the two prices now (500 − 200 = 300); on approval the plan,
+  its caps and tier change and the end date stays (nothing for the
+  remaining days; the next renewal is at the full price). A cheaper or
+  same-price plan is refused (409 `downgrade_locked`) until the period
+  ends; in the grace days and after, any plan is a new purchase from the
+  approval with its full period. A discount code applies to what is paid.
+  The server sets the amount for clubs too (it used to take the typed one),
+  and a club, like a trainer, has one pending request at a time. Each
+  request keeps `purchase_kind` (new / renew / upgrade / switch) and the
+  plan and price it upgraded from. Before the SQL an upgrade is sold as
+  before (full price, a new period), and a cheaper plan is still refused.
 - **Club trainers:** an invite from a trainer who belongs to a club carries
   the club and counts against the club's member cap; only athletes coached
   outside a club count against the trainer's own plan.
@@ -323,7 +335,9 @@ allows; every cap is checked on the server.
 - **Admin** (`/admin/subscriptions`, finance.plans permission): every trainer and
   club with plan, state, dates and usage; filters, search, CSV. Per account:
   activate a plan from a start date (today or earlier) to any end date, with
-  an optional payment received outside the site; change the dates (an end
+  an optional payment received outside the site; move the current paid
+  period to another plan, up or down, its dates untouched («تغییر پلن»,
+  also with an optional payment); change the dates (an end
   today or earlier starts the grace days); extend; a cap override on that
   subscription (cleared by a plan change, ignored after the grace days);
   bring a trainer's athletes back; revoke open invites. Each change can be

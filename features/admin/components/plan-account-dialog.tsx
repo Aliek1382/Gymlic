@@ -44,7 +44,7 @@ import {
 import { AccountAccessDialog } from "./account-access-dialog";
 import { SUBSCRIPTION_STATUS_LABEL, SubscriptionStatusBadge } from "./subscription-status-badge";
 
-type Mode = "activate" | "dates" | "extend" | "override" | "other" | "history";
+type Mode = "activate" | "switch" | "dates" | "extend" | "override" | "other" | "history";
 
 const parseDate = (value: string) => new Date(value.replace(" ", "T"));
 const showDate = (value: string | null | undefined) => (value ? formatPersianDate(parseDate(value)) : "—");
@@ -53,6 +53,7 @@ const showCap = (value: number | null | undefined) => (value == null ? "∞" : f
 /** Activity-log actions of a subscription's history, in words. */
 export const PLAN_ACTION_LABEL: Record<string, string> = {
   plan_activate: "فعال‌سازی پلن",
+  plan_switch_plan: "تغییر پلن (همان تاریخ‌ها)",
   plan_dates: "تغییر تاریخ اشتراک",
   plan_extend: "تمدید اشتراک",
   plan_override: "تغییر سقف دستی",
@@ -115,9 +116,12 @@ function AccountForm({
     : club?.expires_at ?? null;
   const paidStart = trainer ? trainer.subscription?.started_at ?? null : club?.started_at ?? null;
   const sellable = plans.filter((p) => !p.is_free);
+  const currentPlanId = trainer ? trainer.plan.id : club?.plan_id ?? null;
+  const switchable = sellable.filter((p) => p.id !== currentPlanId);
 
   const [mode, setMode] = useState<Mode>("activate");
   const [planId, setPlanId] = useState(sellable.find((p) => p.is_active)?.id ?? sellable[0]?.id ?? "");
+  const [switchPlanId, setSwitchPlanId] = useState(switchable.find((p) => p.is_active)?.id ?? switchable[0]?.id ?? "");
   const [startedAt, setStartedAt] = useState(() => toIsoDate(new Date()));
   const [expiresAt, setExpiresAt] = useState(() => toIsoDate(new Date(Date.now() + 30 * 86_400_000)));
   const [newStart, setNewStart] = useState(() => (paidStart ? paidStart.slice(0, 10) : toIsoDate(new Date())));
@@ -138,6 +142,7 @@ function AccountForm({
   const [preview, setPreview] = useState<TrainerLimits | ClubLimits | null>(null);
 
   const plan = sellable.find((p) => p.id === planId);
+  const switchPlan = switchable.find((p) => p.id === switchPlanId);
 
   /** The change the current tab describes, or why it can't be made. */
   function change(target: Mode = mode): PlanAccountChange | string {
@@ -151,6 +156,13 @@ function AccountForm({
           if (value !== null && (Number.isNaN(value) || value < 0)) return "مبلغ دریافتی معتبر نیست.";
           return { action: "activate", plan_id: plan.id, started_at: startedAt, expires_at: expiresAt, amount_toman: value };
         }
+      case "switch": {
+        if (!paidExpiry) return "این حساب پلن پولی ندارد؛ از «فعال‌سازی پلن» استفاده کنید.";
+        if (!switchPlan) return "یک پلن انتخاب کنید.";
+        const value = amount.trim() === "" ? null : parseLocaleNumber(amount);
+        if (value !== null && (Number.isNaN(value) || value < 0)) return "مبلغ دریافتی معتبر نیست.";
+        return { action: "switch_plan", plan_id: switchPlan.id, amount_toman: value };
+      }
       case "dates":
         if (!paidExpiry) return "این حساب پلن پولی ندارد؛ ابتدا یک پلن فعال کنید.";
         if (newStart > toIsoDate(new Date())) return "تاریخ شروع نمی‌تواند در آینده باشد.";
@@ -234,6 +246,7 @@ function AccountForm({
       >
         <TabsList className="h-auto w-full flex-wrap justify-start rounded-2xl">
           <TabsTrigger value="activate">فعال‌سازی پلن</TabsTrigger>
+          <TabsTrigger value="switch" disabled={!paidExpiry}>تغییر پلن</TabsTrigger>
           <TabsTrigger value="dates" disabled={!paidExpiry}>تاریخ‌ها</TabsTrigger>
           <TabsTrigger value="extend" disabled={!paidExpiry}>تمدید</TabsTrigger>
           <TabsTrigger value="override">سقف دستی</TabsTrigger>
@@ -293,6 +306,38 @@ function AccountForm({
             <p className="text-xs text-muted-foreground">
               با مبلغ، یک پرداخت تأییدشده هم ثبت می‌شود تا در گزارش مالی بیاید. سقف دستیِ قبلی با پلن جدید پاک می‌شود.
             </p>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="switch" className="space-y-4 pt-3">
+          <p className="text-sm text-muted-foreground">
+            پلن همین دوره عوض می‌شود و تاریخ شروع و پایان ({showDate(paidStart)} تا {showDate(paidExpiry)}) همان
+            می‌ماند؛ بالاتر یا پایین‌تر، بدون پرداخت. سقف‌ها و امکانات پلن تازه از همین لحظه اعمال می‌شود و سقف
+            دستیِ قبلی پاک می‌شود. برای تاریخ‌های تازه از «فعال‌سازی پلن» استفاده کنید.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="pa-switch-plan">پلن تازه</Label>
+            <Select value={switchPlanId} onValueChange={setSwitchPlanId}>
+              <SelectTrigger id="pa-switch-plan" className="w-full">
+                <SelectValue placeholder="انتخاب پلن" />
+              </SelectTrigger>
+              <SelectContent>
+                {switchable.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} · {formatToman(p.price_toman)} تومان
+                    {isTrainer ? ` · ${showCap(p.max_athletes)} ورزشکار` : ` · ${showCap(p.max_members)} عضو / ${showCap(p.max_trainers)} مربی`}
+                    {!p.is_active && " (غیرفعال)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pa-switch-amount">
+              مبلغ دریافتی خارج از سایت <span className="text-muted-foreground">(اختیاری، تومان)</span>
+            </Label>
+            <Input id="pa-switch-amount" dir="ltr" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <p className="text-xs text-muted-foreground">با مبلغ، یک پرداخت تأییدشده هم ثبت می‌شود تا در گزارش مالی بیاید.</p>
           </div>
         </TabsContent>
 
@@ -580,6 +625,8 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
   const after = (meta.after ?? null) as Record<string, unknown> | null;
   const actor = [entry.actor_first_name, entry.actor_last_name].filter(Boolean).join(" ") || "—";
   const details: string[] = [];
+  if (typeof meta.from === "string") details.push(`از ${meta.from}`);
+  if (meta.kind === "upgrade") details.push("ارتقا با تفاوت قیمت");
   if (typeof meta.plan === "string") details.push(`پلن ${meta.plan}`);
   if (after && typeof after.plan === "string") details.push(`پلن ${after.plan}`);
   const end = (after?.expires_at ?? meta.expires_at) as string | undefined;

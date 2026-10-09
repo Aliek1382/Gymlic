@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatNumber, parseLocaleNumber, toPersianDigits } from "@/lib/persian";
+import { formatNumber, formatPersianDate, formatToman, parseLocaleNumber, toPersianDigits } from "@/lib/persian";
+import type { PurchaseKind } from "../services/finance-service";
 
 /**
  * The exact amount to transfer, large, with a button that copies the bare
@@ -42,6 +43,47 @@ export function AmountToPay({
       </Button>
     </div>
   );
+}
+
+/**
+ * How an upgrade is priced: the new plan's price less the running one's, and
+ * the end date that stays.
+ */
+export function UpgradeNote({
+  from,
+  fromPrice,
+  to,
+  toPrice,
+  expiresAt,
+}: {
+  from: string;
+  fromPrice: number;
+  to: string;
+  toPrice: number;
+  expiresAt: string;
+}) {
+  return (
+    <div className="space-y-1 rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+      <p>
+        ارتقا از «{from}»: {formatToman(toPrice)} − {formatToman(fromPrice)} ={" "}
+        <span className="font-medium text-foreground">{formatToman(Math.max(0, toPrice - fromPrice))} تومان</span>
+      </p>
+      <p>
+        بعد از تأیید، پلن «{to}» با همهٔ امکاناتش فعال می‌شود و تاریخ پایان همان{" "}
+        {formatPersianDate(new Date(expiresAt.replace(" ", "T")))} می‌ماند. برای تمدید بعدی، قیمت کامل پلن پرداخت می‌شود.
+      </p>
+    </div>
+  );
+}
+
+/** Under a request's plan: an upgrade (and from what), a renewal, or the admin's switch. */
+export function PurchaseKindNote({ kind, from }: { kind?: PurchaseKind | null; from?: string | null }) {
+  if (kind === "upgrade") {
+    return <p className="text-xs font-medium text-success">ارتقا{from ? ` از «${from}»` : ""} · فقط تفاوت قیمت</p>;
+  }
+  if (kind === "renew") return <p className="text-xs text-muted-foreground">تمدید</p>;
+  if (kind === "switch") return <p className="text-xs text-muted-foreground">تغییر پلن توسط مدیریت</p>;
+  return null;
 }
 
 /** What the payer typed in the amount field, as a whole number; null when blank or not a number. */

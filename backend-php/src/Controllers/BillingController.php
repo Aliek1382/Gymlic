@@ -7,6 +7,7 @@ use Gymlic\Auth;
 use Gymlic\Database;
 use Gymlic\Limits;
 use Gymlic\Discounts;
+use Gymlic\PlanChange;
 use Gymlic\Receipts;
 use Gymlic\Response;
 use Gymlic\Settings;
@@ -16,11 +17,24 @@ use Gymlic\Validate;
 /** What a club owner sees while paying for their subscription. */
 final class BillingController
 {
-    /** Where to transfer the money, as the admin set it in the finance pages. */
+    /**
+     * Where to transfer the money, as the admin set it in the finance pages;
+     * and for a club owner what each plan costs now (PlanChange).
+     */
     public static function info(): void
     {
-        Auth::requireUser();
+        $user = Auth::requireUser();
         $billing = Settings::get('billing');
+        $pdo = Database::connection();
+
+        $purchase = null;
+        $club = $pdo->prepare('SELECT id FROM clubs WHERE owner_id = :owner_id');
+        $club->execute(['owner_id' => $user['id']]);
+        $clubId = $club->fetchColumn();
+        if ($clubId !== false) {
+            $plans = $pdo->query('SELECT id, price_toman FROM plans WHERE is_active = 1' . Limits::notFreeClubPlan())->fetchAll();
+            $purchase = PlanChange::options(PlanChange::clubCurrent($pdo, (string) $clubId), $plans, 'payment_requests');
+        }
 
         Response::ok([
             'payment' => [
@@ -31,6 +45,7 @@ final class BillingController
                 'instructions'   => $billing['instructions'],
             ],
             'discounts_enabled' => Discounts::ready(),
+            'purchase'          => $purchase,
             // What the payment dialog asks for besides the amount; absent
             // until the receipts database update has run.
             'receipts' => (Receipts::ready() || Receipts::claimsReady() || TrainerBilling::ready() || Database::hasTable('membership_payment_requests')) ? [
@@ -68,7 +83,12 @@ final class BillingController
             return;
         }
 
-        $result = Discounts::evaluate($pdo, (string) $data['code'], $plan, (string) $clubId);
+        $purchase = PlanChange::quote(PlanChange::clubCurrent($pdo, (string) $clubId), $plan, 'payment_requests');
+        if ($purchase['kind'] === 'locked') {
+            PlanChange::lockedError($purchase);
+            return;
+        }
+        $result = Discounts::evaluate($pdo, (string) $data['code'], ['price_toman' => $purchase['price']] + $plan, (string) $clubId);
         if (!$result['ok']) {
             Response::error(409, $result['error'], $result['message']);
             return;

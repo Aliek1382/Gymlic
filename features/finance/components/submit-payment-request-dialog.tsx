@@ -41,7 +41,7 @@ import {
   type PaymentRequestFormInput,
   type PaymentRequestFormValues,
 } from "../validators/finance-schemas";
-import { AmountToPay } from "./payment-form-bits";
+import { AmountToPay, UpgradeNote } from "./payment-form-bits";
 import { hasPaymentInfo, PaymentInfoCard, PaymentInfoMissing } from "./payment-info-card";
 
 interface Plan {
@@ -51,7 +51,7 @@ interface Plan {
   durationDays: number;
 }
 
-export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
+export function SubmitPaymentRequestDialog({ plans, waiting = false }: { plans: Plan[]; waiting?: boolean }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
@@ -63,6 +63,8 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
     queryKey: ["finance", "billing-info"],
     queryFn: getBillingInfo,
     enabled: open,
+    // What each plan costs depends on the plan running now: never from cache.
+    staleTime: 0,
   });
 
   const form = useForm<PaymentRequestFormInput, unknown, PaymentRequestFormValues>({
@@ -77,18 +79,29 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
     },
   });
   const rules = billing?.receipts ?? null;
+  // From a backend that prices each plan (upgrade by the difference, cheaper
+  // locked) the amount is the server's; an older one takes the typed amount.
+  const purchase = billing?.purchase ?? null;
   const planId = form.watch("planId");
   const plan = plans.find((p) => p.id === planId);
+  const planPurchase = plan ? purchase?.plans[plan.id] : undefined;
+  const upgrade = planPurchase?.kind === "upgrade";
+
+  /** What a plan costs now: the difference for an upgrade, else its price. */
+  function priceOf(p: Plan): number {
+    const option = purchase?.plans[p.id];
+    return option && option.kind !== "locked" ? option.price_toman : p.priceToman;
+  }
 
   function clearDiscount() {
     setQuote(null);
-    if (plan) form.setValue("amountToman", plan.priceToman);
+    if (plan) form.setValue("amountToman", priceOf(plan));
   }
 
   function handlePlanChange(nextPlanId: string) {
     form.setValue("planId", nextPlanId);
     const next = plans.find((p) => p.id === nextPlanId);
-    if (next) form.setValue("amountToman", next.priceToman);
+    if (next) form.setValue("amountToman", priceOf(next));
     // A code is priced for one plan; picking another means checking it again.
     setQuote(null);
   }
@@ -114,6 +127,9 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
   }
 
   async function onSubmit(values: PaymentRequestFormValues) {
+    if (purchase && plan) {
+      values = { ...values, amountToman: quote ? quote.final_toman : priceOf(plan) };
+    }
     // Zero is only right when a code covers the whole price.
     if (values.amountToman === 0 && quote?.final_toman !== 0) {
       form.setError("amountToman", { message: "مبلغ را وارد کنید." });
@@ -177,7 +193,7 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button disabled={waiting} title={waiting ? "درخواست قبلی هنوز در انتظار بررسی است." : undefined}>
           <Wallet />
           ثبت درخواست پرداخت
         </Button>
@@ -199,11 +215,17 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
                     <SelectValue placeholder="یک پلن را انتخاب کنید" />
                   </SelectTrigger>
                   <SelectContent>
-                    {plans.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} — {formatToman(p.priceToman)} تومان
-                      </SelectItem>
-                    ))}
+                    {plans.map((p) => {
+                      const option = purchase?.plans[p.id];
+                      return (
+                        <SelectItem key={p.id} value={p.id} disabled={option?.kind === "locked"}>
+                          {p.name} — {formatToman(p.priceToman)} تومان
+                          {option?.kind === "upgrade" && ` (ارتقا: ${formatToman(option.price_toman)} تومان)`}
+                          {option?.kind === "renew" && " (تمدید)"}
+                          {option?.kind === "locked" && " (پس از پایان دوره)"}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
@@ -213,7 +235,22 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
                 {form.formState.errors.planId.message}
               </p>
             )}
+            {purchase?.current && Object.values(purchase.plans).some((o) => o.kind === "locked") && (
+              <p className="text-xs text-muted-foreground">
+                تا پایان دورهٔ پلن «{purchase.current.plan_name}» فقط تمدید آن یا ارتقا به پلن گران‌تر ممکن است.
+              </p>
+            )}
           </div>
+
+          {plan && upgrade && purchase?.current && (
+            <UpgradeNote
+              from={purchase.current.plan_name}
+              fromPrice={purchase.current.price_toman ?? 0}
+              to={plan.name}
+              toPrice={plan.priceToman}
+              expiresAt={purchase.current.expires_at}
+            />
+          )}
 
           {billing?.discounts_enabled && (
             <div className="space-y-2">
@@ -267,9 +304,9 @@ export function SubmitPaymentRequestDialog({ plans }: { plans: Plan[] }) {
             <PaymentInfoCard info={billing?.payment} />
           )}
 
-          {plan && <AmountToPay amount={quote ? quote.final_toman : plan.priceToman} />}
+          {plan && <AmountToPay amount={quote ? quote.final_toman : priceOf(plan)} />}
 
-          <div className="space-y-2">
+          <div className={purchase ? "hidden" : "space-y-2"}>
             <Label htmlFor="payment-amount">مبلغ واریزی (تومان)</Label>
             <Input
               id="payment-amount"
