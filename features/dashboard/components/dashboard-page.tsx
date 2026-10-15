@@ -1,10 +1,28 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import { RoleGate } from "@/features/authentication/components/role-gate";
 import { useAuthContext } from "@/features/authentication/hooks/use-auth-context";
-import { ClubDashboard } from "./club/club-dashboard";
-import { TrainerDashboard } from "./trainer/trainer-dashboard";
-import { AthleteDashboard } from "./athlete/athlete-dashboard";
+import { DashboardSkeleton } from "./shared/dashboard-skeleton";
+
+// A user's accountType never changes mid-session, so they only ever render
+// one of these three — but a static import would still ship all three
+// variants' code (and every hook/component they pull in) to every visitor.
+// Code-splitting means a club owner never downloads the trainer or athlete
+// dashboard's JS, and vice versa.
+const ClubDashboard = dynamic(
+  () => import("./club/club-dashboard").then((m) => m.ClubDashboard),
+  { ssr: false, loading: () => <DashboardSkeleton /> }
+);
+const TrainerDashboard = dynamic(
+  () => import("./trainer/trainer-dashboard").then((m) => m.TrainerDashboard),
+  { ssr: false, loading: () => <DashboardSkeleton /> }
+);
+const AthleteDashboard = dynamic(
+  () => import("./athlete/athlete-dashboard").then((m) => m.AthleteDashboard),
+  { ssr: false, loading: () => <DashboardSkeleton /> }
+);
 
 export function DashboardPage() {
   const { data: context } = useAuthContext();
