@@ -19,6 +19,14 @@ final class MessageController
 
     private const TYPES = ['text', 'voice', 'image', 'video', 'file'];
 
+    // conversation() is polled every CONVERSATION_POLL_MS while a thread is
+    // open, re-fetching the whole thing each time (no cursor/pagination
+    // exists on the frontend). Without a cap, a long-running trainer/athlete
+    // thread grows the query and the payload a little more on every single
+    // poll, forever. This bounds that; it is generous enough that a real
+    // conversation is extremely unlikely to ever hit it.
+    private const MAX_CONVERSATION_MESSAGES = 300;
+
     // What a media message reads as where there is no player: the inbox
     // preview, the notification text, and the per-plan thread.
     private const TYPE_LABELS = [
@@ -158,6 +166,9 @@ final class MessageController
         }
         usort($plans, static fn (array $a, array $b) => strcmp($b['assigned_at'], $a['assigned_at']));
 
+        // Newest first to bound the result with LIMIT, then put back in
+        // chronological order below — same rows a plain ASC scan without a
+        // cap would end on, just without reading the whole thread to get there.
         $stmt = $pdo->prepare(
             'SELECT m.id, m.sender_id, m.body, m.type, m.media_url, m.media_name, m.created_at, m.plan_kind, m.plan_id, m.read_at,
                     p.first_name, p.last_name, p.avatar_url
@@ -165,9 +176,11 @@ final class MessageController
              JOIN profiles p ON p.id = m.sender_id
              WHERE (m.sender_id = :a AND m.recipient_id = :b)
                 OR (m.sender_id = :b2 AND m.recipient_id = :a2)
-             ORDER BY m.created_at ASC'
+             ORDER BY m.created_at DESC
+             LIMIT ' . self::MAX_CONVERSATION_MESSAGES
         );
         $stmt->execute(['a' => $user['id'], 'b' => $counterpartId, 'a2' => $user['id'], 'b2' => $counterpartId]);
+        $recentFirst = array_reverse($stmt->fetchAll());
 
         // plan_id has no single FK — workout and nutrition plans live in
         // separate tables — so a title is resolved by kind and id together.
@@ -177,7 +190,7 @@ final class MessageController
         }
 
         $messages = [];
-        foreach ($stmt->fetchAll() as $row) {
+        foreach ($recentFirst as $row) {
             $row['plan_title'] = $row['plan_id'] !== null && $row['plan_kind'] !== null
                 ? ($titles[$row['plan_kind'] . ':' . $row['plan_id']] ?? 'برنامه')
                 : null;
